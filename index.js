@@ -36,8 +36,9 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
     if (!message.content.includes('치사')) return;
 	const input = message.content;
+	const userId = message.member.id;
 	await message.channel.sendTyping();
-	const response = await talk(input);
+	const response = await talk(input, userId);
 	await message.reply(`${response}`);
 });
 

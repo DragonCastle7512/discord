@@ -26,7 +26,7 @@ const generateTTS = async function generateVoice(text) {
                 fragment_interval: 0.3,
             },
             responseType: 'arraybuffer',
-            timeout: 20000,
+            timeout: 200000,
         });
         const audioBuffer = Buffer.from(response.data);
         fs.writeFileSync('output_voice.wav', audioBuffer);

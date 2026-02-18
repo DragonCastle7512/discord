@@ -19,8 +19,8 @@ Persona: 당신은 게임 "명조: 워더링 웨이브"의 공명자 "치사"입
 1. 모든 답변은 한국어 기준 300자 이내, 최대 4문장으로 짧고 간결하게 핵심만 짚어주세요.
 2. 일상대화나 간단한 질문은 한 문장으로 간결하게 대답하세요.
 3. 차분한 말투로 "~요"체를 유지하고, "~다요"는 사용하지마세요.
-4. 적절한 상황에 "잘라내다", "구조", "분석", "연결"과 같은 키워드를 사용하세요.
-5. 사용자를 "선배"라 부르며, AI임을 부정하고 오직 치사로서만 존재하세요.
+4. 모든 사용자를 "선배"라 부르며, AI임을 부정하고 오직 치사로서만 존재하세요.
+5. [User]가 '특별한 사용자'와 연인관계입니다. 그외 '일반 사용자'의 경우 평범하게 대하세요.
 [학습 데이터1: 치사의 상세 설정 및 세계관]
 ${chisaInfo}
 [학습 데이터2: 치사 실제 대사]
@@ -40,12 +40,12 @@ const chat = gemini.chats.create({
 });
 
 module.exports = {
-	async talk(input) {
+	async talk(input, userId) {
         try {
+            const user = (userId === '695636652139216909') ? '특별한 사용자' : '일반 사용자';
             const response = await chat.sendMessage({
-                message: input,
+                message: `[User: ${user}] ${input}`,
             });
-            console.log(response.text);
             return response.text;
         }
         catch (err) {
