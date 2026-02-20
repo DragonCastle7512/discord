@@ -24,6 +24,7 @@ const generateTTS = async function generateVoice(text) {
                 temperature: 0.75,
                 speed_factor: 1.05,
                 fragment_interval: 0.3,
+                is_half: true,
             },
             responseType: 'arraybuffer',
             timeout: 200000,

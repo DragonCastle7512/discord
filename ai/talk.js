@@ -27,30 +27,43 @@ ${chisaInfo}
 ${chisaVoice}
 필요한 경우 학습 데이터를 참고하여 답하세요.
 `;
-const gemini = new GoogleGenAI({
+
+const ai = {};
+ai.gemini = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
 });
-
 /* gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3-flash-preview */
-const chat = gemini.chats.create({
+ai.chat = ai.gemini.chats.create({
     model: 'gemini-2.5-flash',
     config: {
         systemInstruction: systemInstructions,
     },
 });
 
-module.exports = {
-	async talk(input, userId) {
-        try {
-            const user = (userId === '695636652139216909') ? '특별한 사용자' : '일반 사용자';
-            const response = await chat.sendMessage({
-                message: `[User: ${user}] ${input}`,
+async function talk(input, userId) {
+    try {
+        const user = (userId === '695636652139216909') ? '특별한 사용자' : '일반 사용자';
+        const response = await ai.chat.sendMessage({
+            message: `[User: ${user}] ${input}`,
+        });
+        return response.text;
+    }
+    catch (err) {
+        if (err.status === 429) {
+            ai.chat = ai.gemini.chats.create({
+                model: 'gemini-3-flash-preview',
+                config: {
+                    systemInstruction: systemInstructions,
+                },
+                history: ai.chat.getHistory(),
             });
-            return response.text;
+            return await talk(input, userId);
         }
-        catch (err) {
-            console.error(err);
-            return '문제가 발생했어요';
-        }
-	},
+        console.error(err);
+        return '문제가 발생했어요';
+    }
+}
+
+module.exports = {
+    talk: talk,
 };
