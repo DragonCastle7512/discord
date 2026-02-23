@@ -10,7 +10,7 @@ const generateTTS = async function generateVoice(text) {
     try {
         text = text.replace(/[ㄱ-ㅎㅏ-ㅣ]/g, '');
         const { ref_audio, prompt_text } = getEmotion(text);
-        const response = await axios.get('http://localhost:9880/tts', {
+        const response = await axios.get(`${process.env.TTS_SERVER_URL}/tts`, {
             params: {
                 text: text,
                 text_lang: 'ko',
