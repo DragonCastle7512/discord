@@ -33,8 +33,9 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.on('messageCreate', async (message) => {
-  if (message.author.bot) return;
-    if (!message.content.includes('치사')) return;
+  	if (message.author.bot) return;
+  	const msg = message.content;
+    if (!msg.includes('치사야') || msg.includes('치사,')) return;
 	const input = message.content;
 	const userId = message.member.id;
 	await message.channel.sendTyping();
