@@ -1,7 +1,28 @@
 const fs = require('node:fs');
 const path = require('node:path');
+const { Shoukaku, Connectors } = require('shoukaku');
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
 const { talk } = require('./ai/talk');
+const { createMusicRuntime } = require('./util/runtime');
+
+const token = process.env.DISCORD_TOKEN;
+const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
+const lavalinkReadyTimeoutMs = Number(process.env.LAVALINK_READY_TIMEOUT_MS || 20000);
+
+const lavalinkHost = process.env.LAVALINK_HOST;
+const lavalinkPort = Number(process.env.LAVALINK_PORT || 2333);
+const lavalinkPassword = process.env.LAVALINK_PASSWORD;
+const lavalinkSecure = process.env.LAVALINK_SECURE === 'true';
+
+if (!token) {
+  console.error('DISCORD_TOKEN is missing in .env');
+  process.exit(1);
+}
+
+if (!lavalinkHost || !lavalinkPassword) {
+  console.error('LAVALINK_HOST or LAVALINK_PASSWORD is missing in .env');
+  process.exit(1);
+}
 
 const client = new Client({
 	intents: [
@@ -12,7 +33,48 @@ const client = new Client({
 	],
 });
 
-const token = process.env.DISCORD_TOKEN;
+const readyNodes = new Set();
+const shoukaku = new Shoukaku(
+  new Connectors.DiscordJS(client),
+  [
+    {
+      name: 'main',
+      url: `${lavalinkHost}:${lavalinkPort}`,
+      auth: lavalinkPassword,
+      secure: lavalinkSecure,
+    },
+  ],
+  {
+    reconnectTries: 9999,
+    reconnectInterval: 3_000,
+    moveOnDisconnect: false,
+    resume: false,
+  },
+);
+
+const music = createMusicRuntime({
+  client,
+  shoukaku,
+  readyNodes,
+  allowSoundCloudFallback,
+  lavalinkReadyTimeoutMs,
+});
+
+shoukaku.on('ready', (name) => {
+  readyNodes.add(name);
+  console.log(`[Lavalink] Node connected: ${name}`);
+});
+
+shoukaku.on('error', (name, error) => {
+  readyNodes.delete(name);
+  console.error(`[Lavalink] Node error (${name}):`, error);
+});
+
+shoukaku.on('close', (name, code, reason) => {
+  readyNodes.delete(name);
+  console.warn(`[Lavalink] Node closed (${name}) code=${code} reason=${reason || ''}`);
+});
+
 client.once(Events.ClientReady, (readyClient) => {
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
 });
@@ -24,11 +86,21 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	const command = interaction.client.commands.get(interaction.commandName);
 
 	try {
-		await command.execute(interaction);
+		await command.execute(interaction, { client, shoukaku, music });
 	}
 	catch (error) {
-		console.error(error);
-		await interaction.reply({ content: '오류 발생!', ephemeral: true });
+		console.error('Command error:', error);
+		const reason = String(error.message || '');
+		const text = reason.includes('Track lookup failed')
+		? 'Track search failed on Lavalink sources. Try a direct URL or another keyword.'
+		: 'An error occurred while processing your command.';
+
+		if (interaction.deferred || interaction.replied) {
+			await interaction.editReply(text).catch((err) => console.error(err));
+		}
+		else {
+			await interaction.reply({ content: text, ephemeral: true }).catch((err) => console.error(err));
+		}
 	}
 });
 
