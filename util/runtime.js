@@ -94,17 +94,47 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
         }
 
         state.player = null;
+        state.voiceChannelId = null;
         state.playing = false;
         state.current = null;
     }
 
     if (!state.player) {
-      const player = await shoukaku.joinVoiceChannel({
-        guildId: guild.id,
-        channelId: voiceChannel.id,
-        shardId: guild.shardId,
-        deaf: true,
-      });
+      try {
+        await shoukaku.leaveVoiceChannel(guild.id);
+      }
+      catch (err) {
+        console.error(err);
+      }
+
+      let player;
+      try {
+        player = await shoukaku.joinVoiceChannel({
+          guildId: guild.id,
+          channelId: voiceChannel.id,
+          shardId: guild.shardId,
+          deaf: true,
+        });
+      }
+      catch (err) {
+        if (!String(err?.message || '').includes('already have an existing connection')) {
+          throw err;
+        }
+        try {
+          await shoukaku.leaveVoiceChannel(guild.id);
+        }
+        catch {
+          console.log('leave 실패');
+        }
+
+        // leave 이후 재접속 시도
+        player = await shoukaku.joinVoiceChannel({
+          guildId: guild.id,
+          channelId: voiceChannel.id,
+          shardId: guild.shardId,
+          deaf: true,
+        });
+      }
 
       player.on('end', async () => {
         state.playing = false;
