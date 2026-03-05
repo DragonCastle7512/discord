@@ -1,9 +1,63 @@
 const axios = require('axios');
 const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { execFile } = require('child_process');
+const { promisify } = require('util');
+
+const execFileAsync = promisify(execFile);
 
 function getEmotion(input) {
     if (input.includes('!')) return { ref_audio: '0003554560_0003677120', prompt_text: '구조가... 선명하게 보여요!' };
     return { ref_audio: '0003821440_0003999040', prompt_text: '고생한 보람이 있네요... 새로운 물자.' };
+}
+
+function wavSoundUp(buffer, gain = 1.8) {
+    const out = Buffer.from(buffer);
+
+    // WAV 헤더(44바이트) 이후 샘플(16-bit PCM little-endian) 증폭
+    for (let i = 44; i + 1 < out.length; i += 2) {
+      const s = out.readInt16LE(i);
+      let v = Math.round(s * gain);
+      if (v > 32767) v = 32767;
+      if (v < -32768) v = -32768;
+      out.writeInt16LE(v, i);
+    }
+
+    return out;
+  }
+
+async function normalizeWavWithFfmpeg(buffer) {
+    const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+    const inputPath = path.join(os.tmpdir(), `tts-input-${id}.wav`);
+    const outputPath = path.join(os.tmpdir(), `tts-norm-${id}.wav`);
+
+    try {
+        fs.writeFileSync(inputPath, buffer);
+        await execFileAsync('ffmpeg', [
+            '-y',
+            '-i',
+            inputPath,
+            '-af',
+            'loudnorm=I=-14:TP=-1.5:LRA=11',
+            outputPath,
+        ]);
+        return fs.readFileSync(outputPath);
+    }
+    finally {
+        try {
+            fs.unlinkSync(inputPath);
+        }
+        catch (err) {
+            console.error(err);
+        }
+        try {
+            fs.unlinkSync(outputPath);
+        }
+        catch (err) {
+            console.error(err);
+        }
+    }
 }
 
 const generateTTS = async function generateVoice(text) {
@@ -30,8 +84,17 @@ const generateTTS = async function generateVoice(text) {
             timeout: 200000,
         });
         const audioBuffer = Buffer.from(response.data);
-        fs.writeFileSync('output_voice.wav', audioBuffer);
-        return audioBuffer;
+        let louder = wavSoundUp(audioBuffer, 1.7);
+
+        try {
+            louder = await normalizeWavWithFfmpeg(louder);
+        }
+        catch (error) {
+            console.error(error);
+        }
+
+        fs.writeFileSync('output_voice.wav', louder);
+        return louder;
     }
     catch (err) {
         console.error(err);
