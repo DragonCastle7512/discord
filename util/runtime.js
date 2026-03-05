@@ -326,32 +326,11 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     return { ok: true, message: `${currentLine}\n\nUp next:\n${upcoming || 'none'}` };
   }
 
-  function nowPlaying(guildId) {
-    const state = guildStates.get(guildId);
-    if (!state || !state.current) {
-      return { ok: false, message: 'Nothing is currently playing.' };
-    }
-
-    const title = state.current.info?.title || 'Unknown title';
-    const uri = state.current.info?.uri || '(no URL)';
-    return { ok: true, message: `Now playing: **${title}**\n${uri}` };
-  }
-
-  function lavalinkStatus() {
-    const connected = [...readyNodes];
-    if (connected.length === 0) {
-      return { ok: false, message: 'No Lavalink node is connected. Verify container status with `docker compose ps` and logs.' };
-    }
-    return { ok: true, message: `Connected Lavalink node(s): ${connected.join(', ')}` };
-  }
-
   return {
     play,
     skip,
     stop,
     queue,
-    nowPlaying,
-    lavalinkStatus,
   };
 }
 
