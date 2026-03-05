@@ -31,7 +31,7 @@ module.exports = {
                 return;
             }
 
-            await context.music.play(interaction, ttsUrl);
+            await context.music.playTts(interaction, ttsUrl);
             await interaction.editReply({ content: `치사가 읽어드려요: "${input}"` });
         }
         catch (err) {

@@ -1,5 +1,3 @@
-const { PermissionsBitField } = require('discord.js');
-
 function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallback, lavalinkReadyTimeoutMs }) {
   const guildStates = new Map();
 
@@ -29,20 +27,6 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     }
 
     return null;
-  }
-
-  function ensureVoicePermissions(member, channel) {
-    const me = member.guild.members.me;
-    if (!me) return false;
-
-    const perms = channel.permissionsFor(me);
-    if (!perms) return false;
-
-    return (
-      perms.has(PermissionsBitField.Flags.ViewChannel) &&
-      perms.has(PermissionsBitField.Flags.Connect) &&
-      perms.has(PermissionsBitField.Flags.Speak)
-    );
   }
 
   function getGuildState(guildId) {
@@ -267,7 +251,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     if (textChannel) {
       const title = next.info?.title || 'Unknown title';
       const uri = next.info?.uri || '';
-      textChannel.send(`Now playing: **${title}**${uri ? `\n${uri}` : ''}`).catch((err) => console.error(err));
+      textChannel.send(`재생 중... **${title}**${uri ? `\n${uri}` : ''}`).catch((err) => console.error(err));
     }
   }
 
@@ -278,14 +262,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     const member = await guild.members.fetch(interaction.user.id);
     const voiceChannel = member.voice.channel;
     if (!voiceChannel) {
-      return { ok: false, message: 'Join a voice channel first.' };
-    }
-
-    if (!ensureVoicePermissions(member, voiceChannel)) {
-      return {
-        ok: false,
-        message: 'Bot needs ViewChannel, Connect, and Speak permissions in that voice channel.',
-      };
+      return { ok: false, message: '음성채널에 먼저 입장해주세요!' };
     }
 
     const readyNode = await waitForReadyNode();
@@ -304,7 +281,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     if (playlistName) {
       state.queue.push(...tracks);
       await playNext(guild.id);
-      return { ok: true, message: `Playlist queued: **${playlistName}** (${tracks.length} tracks)` };
+      return { ok: true, message: `Playlist에 추가했어요 : **${playlistName}** (${tracks.length} tracks)` };
     }
 
     const first = tracks[0];
@@ -316,11 +293,11 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
   async function skip(guildId) {
     const state = guildStates.get(guildId);
     if (!state || !state.player || !state.playing) {
-      return { ok: false, message: 'Nothing is currently playing.' };
+      return { ok: false, message: '아무것도 재생 중이지 않아요!' };
     }
 
     await state.player.stopTrack();
-    return { ok: true, message: 'Skipped current track.' };
+    return { ok: true, message: '현재 노래를 넘겼어요!' };
   }
 
   async function stop(guildId) {
@@ -342,7 +319,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
   function queue(guildId) {
     const state = guildStates.get(guildId);
     if (!state || (!state.current && state.queue.length === 0)) {
-      return { ok: false, message: 'Queue is empty.' };
+      return { ok: false, message: 'Queue가 비어있어요!' };
     }
 
     const currentLine = state.current
@@ -356,11 +333,38 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     return { ok: true, message: `${currentLine}\n\nUp next:\n${upcoming || 'none'}` };
   }
 
+  async function playTts(interaction, query, input) {
+    const guild = interaction.guild;
+    if (!guild) throw new Error('Guild only command');
+
+    const member = await guild.members.fetch(interaction.user.id);
+    const voiceChannel = member.voice.channel;
+    if (!voiceChannel) {
+      return { ok: false, message: '먼저 음성채널에 입장해주세요!' };
+    }
+
+    const state = await joinOrMovePlayer(guild, interaction.channelId, voiceChannel);
+    if (state.playing) {
+      return { ok: false, message: '이미 재생중인 음성이 있어요' };
+    }
+
+    const { tracks } = await resolveTracks(query);
+    if (!tracks.length) return { ok: false, message: 'No matches found.' };
+
+    const first = tracks[0];
+    state.playing = true;
+    state.current = null;
+    await state.player.playTrack({ track: { encoded: first.encoded } });
+
+    return { ok: true, message: `치사가 읽어드려요: "${input}"` };
+  }
+
   return {
     play,
     skip,
     stop,
     queue,
+    playTts,
   };
 }
 
