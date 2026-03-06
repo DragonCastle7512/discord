@@ -1,5 +1,6 @@
 function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallback, lavalinkReadyTimeoutMs }) {
   const guildStates = new Map();
+  const userPlaylists = new Map();
 
   function isUrl(input) {
     return /^https?:\/\//i.test(input);
@@ -258,6 +259,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
   async function play(interaction, query) {
     const guild = interaction.guild;
     if (!guild) throw new Error('Guild only command');
+    const trimmedQuery = (query || '').trim();
 
     const member = await guild.members.fetch(interaction.user.id);
     const voiceChannel = member.voice.channel;
@@ -274,9 +276,25 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     }
 
     const state = await joinOrMovePlayer(guild, interaction.channelId, voiceChannel);
-    const { tracks, playlistName } = await resolveTracks(query);
+    if (!trimmedQuery) {
+      const playlist = getUserPlaylist(interaction.user.id);
+      if (!playlist.length) {
+        return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
+      }
 
-    if (!tracks.length) return { ok: false, message: 'No matches found.' };
+      const queuedTracks = playlist.map((track) => ({
+        encoded: track.encoded,
+        info: track.info || {},
+      }));
+
+      state.queue.push(...queuedTracks);
+      await playNext(guild.id);
+      return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
+    }
+
+    const { tracks, playlistName } = await resolveTracks(trimmedQuery);
+
+    if (!tracks.length) return { ok: false, message: '찾을 수 없는 노래에요!' };
 
     if (playlistName) {
       state.queue.push(...tracks);
@@ -303,7 +321,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
   async function stop(guildId) {
     const state = guildStates.get(guildId);
     if (!state || !state.player) {
-      return { ok: false, message: 'Nothing to stop.' };
+      return { ok: false, message: '재생 중인 노래가 없어요!' };
     }
 
     state.queue = [];
@@ -313,7 +331,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     state.player = null;
     state.voiceChannelId = null;
 
-    return { ok: true, message: 'Stopped playback and left the channel.' };
+    return { ok: true, message: '모든 노래를 중지했어요!' };
   }
 
   function queue(guildId) {
@@ -359,12 +377,68 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     return { ok: true, message: `치사가 읽어드려요: "${input}"` };
   }
 
+  function getUserPlaylist(userId) {
+    if (!userPlaylists.has(userId)) {
+      userPlaylists.set(userId, []);
+    }
+    return userPlaylists.get(userId);
+  }
+
+  async function getPlaylist(userId) {
+    const playlist = getUserPlaylist(userId);
+    if (!playlist.length) {
+      return { ok: false, message: 'Playlist가 비어있어요' };
+    }
+
+    const lines = playlist.slice(0, 20).map((track, index) => {
+      const title = track.info?.title || 'Unknown title';
+      return `${index + 1}. ${title}`;
+    });
+    return { ok: true, message: lines.join('\n') };
+  }
+
+  async function addToPlaylist(guildId, userId, query) {
+    const playlist = getUserPlaylist(userId);
+    const trimmedQuery = (query || '').trim();
+    let track = null;
+    let note = '';
+
+    if (!trimmedQuery) {
+      const state = guildStates.get(guildId);
+      if (!state || !state.current) {
+        return { ok: false, message: '재생중인 노래가 없어요!' };
+      }
+      track = state.current;
+    }
+    else {
+      const { tracks, playlistName } = await resolveTracks(trimmedQuery);
+      if (!tracks.length) {
+        return { ok: false, message: '노래를 찾을 수 없어요' };
+      }
+      track = tracks[0];
+      if (playlistName && tracks.length > 1) {
+        note = `\n재생중인 노래를 추가했어요!: **${playlistName}**`;
+      }
+    }
+
+    playlist.push({
+      encoded: track.encoded,
+      info: track.info || {},
+      addedAt: Date.now(),
+    });
+
+    const title = track.info?.title || 'Unknown title';
+    return { ok: true, message: `Playlist에 노래를 추가했어요!\n **${title}**${note}` };
+  }
+
   return {
     play,
     skip,
     stop,
     queue,
     playTts,
+    getPlaylist,
+    addToPlaylist,
   };
 }
 
