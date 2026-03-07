@@ -8,6 +8,15 @@ const { createMusicRuntime } = require('./util/runtime');
 const token = process.env.DISCORD_TOKEN;
 const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
 const lavalinkReadyTimeoutMs = Number(process.env.LAVALINK_READY_TIMEOUT_MS || 20000);
+const lavalinkPrewarmEnabled = process.env.LAVALINK_PREWARM_ENABLED !== 'false';
+const lavalinkPrewarmDelayMs = Number(process.env.LAVALINK_PREWARM_DELAY_MS || 3000);
+const lavalinkPrewarmRetries = Number(process.env.LAVALINK_PREWARM_RETRIES || 3);
+const lavalinkPrewarmRetryDelayMs = Number(process.env.LAVALINK_PREWARM_RETRY_DELAY_MS || 1200);
+const lavalinkPrewarmIdentifiers = (process.env.LAVALINK_PREWARM_IDENTIFIERS ||
+  'https://youtu.be/dQw4w9WgXcQ,ytmsearch:test')
+  .split(',')
+  .map((v) => v.trim())
+  .filter(Boolean);
 
 const lavalinkHost = process.env.LAVALINK_HOST;
 const lavalinkPort = Number(process.env.LAVALINK_PORT || 2333);
@@ -60,9 +69,73 @@ const music = createMusicRuntime({
   lavalinkReadyTimeoutMs,
 });
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function getActiveNode() {
+  return (
+    (readyNodes.has('main') && shoukaku.nodes.get('main')) ||
+    [...readyNodes].map((name) => shoukaku.nodes.get(name)).find(Boolean) ||
+    null
+  );
+}
+
+function didLoadTracks(result) {
+  if (!result || result.loadType === 'empty' || result.loadType === 'error') {
+    return false;
+  }
+
+  if (result.loadType === 'track') return Boolean(result.data);
+  if (result.loadType === 'playlist') return (result.data?.tracks || []).length > 0;
+  if (result.loadType === 'search') return Array.isArray(result.data) && result.data.length > 0;
+  return false;
+}
+
+async function prewarmLavalinkNode(nodeName) {
+  if (!lavalinkPrewarmEnabled) return;
+  if (!lavalinkPrewarmIdentifiers.length) return;
+
+  await sleep(Math.max(0, lavalinkPrewarmDelayMs));
+
+  const node = shoukaku.nodes.get(nodeName) || getActiveNode();
+  if (!node) return;
+
+  for (const identifier of lavalinkPrewarmIdentifiers) {
+    let success = false;
+    let lastError = null;
+
+    for (let attempt = 1; attempt <= Math.max(1, lavalinkPrewarmRetries); attempt++) {
+      try {
+        const result = await node.rest.resolve(identifier);
+        if (didLoadTracks(result)) {
+          success = true;
+          console.log(`[Lavalink] Prewarm success (${identifier}) on attempt ${attempt}`);
+          break;
+        }
+      }
+	  catch (error) {
+        lastError = error;
+      }
+
+      if (attempt < Math.max(1, lavalinkPrewarmRetries)) {
+        await sleep(Math.max(0, lavalinkPrewarmRetryDelayMs));
+      }
+    }
+
+    if (!success) {
+      const detail = lastError?.message ? `: ${lastError.message}` : '';
+      console.warn(`[Lavalink] Prewarm failed (${identifier})${detail}`);
+    }
+  }
+}
+
 shoukaku.on('ready', (name) => {
   readyNodes.add(name);
   console.log(`[Lavalink] Node connected: ${name}`);
+  prewarmLavalinkNode(name).catch((error) => {
+    console.warn(`[Lavalink] Prewarm error on node ${name}: ${error.message || error}`);
+  });
 });
 
 shoukaku.on('error', (name, error) => {
