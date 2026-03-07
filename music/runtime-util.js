@@ -33,7 +33,6 @@ function createRuntimeUtils({
   allowSoundCloudFallback,
   lavalinkReadyTimeoutMs,
   guildStates,
-  userPlaylists,
 }) {
     function getGuildState(guildId) {
         if (!guildStates.has(guildId)) {

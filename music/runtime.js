@@ -1,4 +1,6 @@
-function createMusicRuntime({ shoukaku, guildStates, userPlaylists, runtimeUtils }) {
+const { insertPlaylist, findPlaylist, clearPlaylist } = require('./repositorys/playlist.repository');
+
+function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
 
   const {
     getUserPlaylist,
@@ -104,8 +106,8 @@ function createMusicRuntime({ shoukaku, guildStates, userPlaylists, runtimeUtils
     return { ok: true, message: `${currentLine}\n\nUp next:\n${upcoming || 'none'}` };
   }
 
-  function getPlaylist(userId) {
-    const playlist = getUserPlaylist(userId);
+  async function getPlaylist(userId) {
+    const playlist = await findPlaylist(userId);
     if (!playlist.length) {
       return { ok: false, message: 'Playlist가 비어있어요' };
     }
@@ -118,7 +120,6 @@ function createMusicRuntime({ shoukaku, guildStates, userPlaylists, runtimeUtils
   }
 
   async function addToPlaylist(guildId, userId, query) {
-    const playlist = getUserPlaylist(userId);
     const trimmedQuery = (query || '').trim();
     let track = null;
     let note = '';
@@ -140,7 +141,7 @@ function createMusicRuntime({ shoukaku, guildStates, userPlaylists, runtimeUtils
       }
     }
 
-    playlist.push({
+    await insertPlaylist(userId, {
       encoded: track.encoded,
       info: track.info || {},
       addedAt: Date.now(),
@@ -150,14 +151,12 @@ function createMusicRuntime({ shoukaku, guildStates, userPlaylists, runtimeUtils
     return { ok: true, message: `Playlist에 노래를 추가했어요!\n **${title}**${note}` };
   }
 
-  function clearToPlaylist(userId) {
-    const playlist = getUserPlaylist(userId);
-    if (!playlist.length) {
+  async function clearToPlaylist(userId) {
+    const cleared = await clearPlaylist(userId);
+    if (!cleared) {
       return { ok: true, message: 'Playlist가 이미 비어있어요!' };
     }
-    const clearedLength = playlist.length;
-    userPlaylists.set(userId, []);
-    return { ok: true, message: `총 ${clearedLength}개의 항목을 비웠어요!` };
+    return { ok: true, message: `총 ${cleared}개의 항목을 비웠어요!` };
   }
 
   return {

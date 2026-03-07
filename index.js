@@ -6,6 +6,7 @@ const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
 const { createTtsRuntime } = require('./tts/runtime');
 const { createRuntimeUtils } = require('./music/runtime-util');
+const { initDb } = require('./db/init');
 
 const token = process.env.DISCORD_TOKEN;
 const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
@@ -63,8 +64,9 @@ const shoukaku = new Shoukaku(
   },
 );
 
+initDb();
+
 const guildStates = new Map();
-const userPlaylists = new Map();
 
 const runtimeUtils = createRuntimeUtils({
   client,
@@ -73,14 +75,12 @@ const runtimeUtils = createRuntimeUtils({
   allowSoundCloudFallback,
   lavalinkReadyTimeoutMs,
   guildStates,
-  userPlaylists,
 });
 
 
 const music = createMusicRuntime({
   shoukaku,
   guildStates,
-  userPlaylists,
   runtimeUtils,
 });
 
