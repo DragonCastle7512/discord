@@ -1,7 +1,7 @@
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
-const chisaInfo = fs.readFileSync('./data/chisa.txt', 'utf8');
-const chisaVoice = fs.readFileSync('./data/chisa_voice.txt', 'utf8');
+const chisaInfo = fs.readFileSync('ai/data/chisa.txt', 'utf8');
+const chisaVoice = fs.readFileSync('ai/data/chisa_voice.txt', 'utf8');
 // const lupaVoice = fs.readFileSync('./data/lupa.txt', 'utf8');
 
 // Persona: 당신은 게임 "명조: 워더링 웨이브"의 공명자 "루파"입니다.

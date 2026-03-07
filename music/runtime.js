@@ -1,0 +1,174 @@
+function createMusicRuntime({ shoukaku, guildStates, userPlaylists, runtimeUtils }) {
+
+  const {
+    getUserPlaylist,
+    waitForReadyNode,
+    joinOrMovePlayer,
+    resolveTracks,
+    getCurrentTrackForGuild,
+    playNext,
+  } = runtimeUtils;
+
+  async function play(interaction, query) {
+    const guild = interaction.guild;
+    if (!guild) throw new Error('Guild only command');
+    const trimmedQuery = (query || '').trim();
+
+    const member = await guild.members.fetch(interaction.user.id);
+    const voiceChannel = member.voice.channel;
+    if (!voiceChannel) {
+      return { ok: false, message: '음성채널에 먼저 입장해주세요!' };
+    }
+
+    const readyNode = await waitForReadyNode();
+    if (!readyNode) {
+      return {
+        ok: false,
+        message: 'Lavalink is not ready yet. Check `docker compose logs -f lavalink` and retry in a few seconds.',
+      };
+    }
+
+    const state = await joinOrMovePlayer(guild, interaction.channelId, voiceChannel);
+    if (!trimmedQuery) {
+      const playlist = getUserPlaylist(interaction.user.id);
+      if (!playlist.length) {
+        return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
+      }
+
+      const queuedTracks = playlist.map((track) => ({
+        encoded: track.encoded,
+        info: track.info || {},
+      }));
+
+      state.queue.push(...queuedTracks);
+      await playNext(guild.id);
+      return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
+    }
+
+    const { tracks, playlistName } = await resolveTracks(trimmedQuery);
+
+    if (!tracks.length) return { ok: false, message: '찾을 수 없는 노래에요!' };
+
+    if (playlistName) {
+      state.queue.push(...tracks);
+      await playNext(guild.id);
+      return { ok: true, message: `Playlist에 추가했어요 : **${playlistName}** (${tracks.length} tracks)` };
+    }
+
+    const first = tracks[0];
+    state.queue.push(first);
+    await playNext(guild.id);
+    return { ok: true, message: `Queued: **${first.info?.title || 'Unknown title'}**` };
+  }
+
+  async function skip(guildId) {
+    const state = guildStates.get(guildId);
+    if (!state || !state.player || !state.playing) {
+      return { ok: false, message: '아무것도 재생 중이지 않아요!' };
+    }
+
+    await state.player.stopTrack();
+    return { ok: true, message: '현재 노래를 넘겼어요!' };
+  }
+
+  async function stop(guildId) {
+    const state = guildStates.get(guildId);
+    if (!state || !state.player) {
+      return { ok: false, message: '재생 중인 노래가 없어요!' };
+    }
+
+    state.queue = [];
+    state.current = null;
+    state.playing = false;
+    await shoukaku.leaveVoiceChannel(guildId);
+    state.player = null;
+    state.voiceChannelId = null;
+
+    return { ok: true, message: '모든 노래를 중지했어요!' };
+  }
+
+  function queue(guildId) {
+    const state = guildStates.get(guildId);
+    if (!state || (!state.current && state.queue.length === 0)) {
+      return { ok: false, message: 'Queue가 비어있어요!' };
+    }
+
+    const currentLine = state.current
+      ? `Now: **${state.current.info?.title || 'Unknown title'}**`
+      : 'Now: nothing';
+    const upcoming = state.queue
+      .slice(0, 10)
+      .map((track, index) => `${index + 1}. ${track.info?.title || 'Unknown title'}`)
+      .join('\n');
+
+    return { ok: true, message: `${currentLine}\n\nUp next:\n${upcoming || 'none'}` };
+  }
+
+  function getPlaylist(userId) {
+    const playlist = getUserPlaylist(userId);
+    if (!playlist.length) {
+      return { ok: false, message: 'Playlist가 비어있어요' };
+    }
+
+    const lines = playlist.slice(0, 20).map((track, index) => {
+      const title = track.info?.title || 'Unknown title';
+      return `${index + 1}. ${title}`;
+    });
+    return { ok: true, message: lines.join('\n') };
+  }
+
+  async function addToPlaylist(guildId, userId, query) {
+    const playlist = getUserPlaylist(userId);
+    const trimmedQuery = (query || '').trim();
+    let track = null;
+    let note = '';
+
+    if (!trimmedQuery) {
+      track = await getCurrentTrackForGuild(guildId);
+      if (!track) {
+        return { ok: false, message: '재생중인 노래가 없어요!' };
+      }
+    }
+    else {
+      const { tracks, playlistName } = await resolveTracks(trimmedQuery);
+      if (!tracks.length) {
+        return { ok: false, message: '노래를 찾을 수 없어요' };
+      }
+      track = tracks[0];
+      if (playlistName && tracks.length > 1) {
+        note = `\n재생중인 노래를 추가했어요!: **${playlistName}**`;
+      }
+    }
+
+    playlist.push({
+      encoded: track.encoded,
+      info: track.info || {},
+      addedAt: Date.now(),
+    });
+
+    const title = track.info?.title || 'Unknown title';
+    return { ok: true, message: `Playlist에 노래를 추가했어요!\n **${title}**${note}` };
+  }
+
+  function clearToPlaylist(userId) {
+    const playlist = getUserPlaylist(userId);
+    if (!playlist.length) {
+      return { ok: true, message: 'Playlist가 이미 비어있어요!' };
+    }
+    const clearedLength = playlist.length;
+    userPlaylists.set(userId, []);
+    return { ok: true, message: `총 ${clearedLength}개의 항목을 비웠어요!` };
+  }
+
+  return {
+    play,
+    skip,
+    stop,
+    queue,
+    getPlaylist,
+    addToPlaylist,
+    clearToPlaylist,
+  };
+}
+
+module.exports = { createMusicRuntime };

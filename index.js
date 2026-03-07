@@ -3,7 +3,9 @@ const path = require('node:path');
 const { Shoukaku, Connectors } = require('shoukaku');
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
 const { talk } = require('./ai/talk');
-const { createMusicRuntime } = require('./util/runtime');
+const { createMusicRuntime } = require('./music/runtime');
+const { createTtsRuntime } = require('./tts/runtime');
+const { createRuntimeUtils } = require('./music/runtime-util');
 
 const token = process.env.DISCORD_TOKEN;
 const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
@@ -61,13 +63,28 @@ const shoukaku = new Shoukaku(
   },
 );
 
-const music = createMusicRuntime({
+const guildStates = new Map();
+const userPlaylists = new Map();
+
+const runtimeUtils = createRuntimeUtils({
   client,
   shoukaku,
   readyNodes,
   allowSoundCloudFallback,
   lavalinkReadyTimeoutMs,
+  guildStates,
+  userPlaylists,
 });
+
+
+const music = createMusicRuntime({
+  shoukaku,
+  guildStates,
+  userPlaylists,
+  runtimeUtils,
+});
+
+const tts = createTtsRuntime({ runtimeUtils });
 
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -159,7 +176,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	const command = interaction.client.commands.get(interaction.commandName);
 
 	try {
-		await command.execute(interaction, { client, shoukaku, music });
+		await command.execute(interaction, { music, tts });
 	}
 	catch (error) {
 		console.error('Command error:', error);
