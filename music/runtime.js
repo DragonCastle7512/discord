@@ -3,7 +3,6 @@ const { insertPlaylist, findPlaylist, clearPlaylist } = require('./repositorys/p
 function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
 
   const {
-    getUserPlaylist,
     waitForReadyNode,
     joinOrMovePlayer,
     resolveTracks,
@@ -32,7 +31,7 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
 
     const state = await joinOrMovePlayer(guild, interaction.channelId, voiceChannel);
     if (!trimmedQuery) {
-      const playlist = getUserPlaylist(interaction.user.id);
+      const playlist = await findPlaylist(interaction.user.id);
       if (!playlist.length) {
         return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
       }

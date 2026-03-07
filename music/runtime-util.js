@@ -260,13 +260,6 @@ function createRuntimeUtils({
         }
     }
 
-    function getUserPlaylist(userId) {
-        if (!userPlaylists.has(userId)) {
-            userPlaylists.set(userId, []);
-        }
-        return userPlaylists.get(userId);
-    }
-
     async function getCurrentTrackForGuild(guildId) {
         const state = guildStates.get(guildId);
         if (state?.current) {
@@ -301,7 +294,6 @@ function createRuntimeUtils({
         }
     }
     return {
-        getUserPlaylist,
         waitForReadyNode,
         joinOrMovePlayer,
         resolveTracks,
