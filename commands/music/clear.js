@@ -2,10 +2,10 @@ const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
-    .setName('playlist')
-    .setDescription('플레이리스트 목록을 확인합니다.'),
+    .setName('clear')
+    .setDescription('플레이리스트를 초기화합니다.'),
   async execute(interaction, context) {
-    const result = await context.music.getPlaylist(interaction.user.id);
+    const result = await context.music.clearToPlaylist(interaction.user.id);
     await interaction.reply({ content: result.message, ephemeral: true });
   },
 };

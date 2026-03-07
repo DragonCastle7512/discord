@@ -8,7 +8,7 @@ module.exports = {
       option.setName('music').setDescription('노래 제목 또는 URL').setRequired(false),
     ),
   async execute(interaction, context) {
-    await interaction.deferReply();
+    await interaction.deferReply({ ephemeral: true });
     const query = interaction.options.getString('music') || '';
     const result = await context.music.addToPlaylist(interaction.guildId, interaction.user.id, query);
     await interaction.editReply(result.message);

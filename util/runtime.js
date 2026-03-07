@@ -384,7 +384,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     return userPlaylists.get(userId);
   }
 
-  async function getPlaylist(userId) {
+  function getPlaylist(userId) {
     const playlist = getUserPlaylist(userId);
     if (!playlist.length) {
       return { ok: false, message: 'Playlist가 비어있어요' };
@@ -464,6 +464,16 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     return { ok: true, message: `Playlist에 노래를 추가했어요!\n **${title}**${note}` };
   }
 
+  function clearToPlaylist(userId) {
+    const playlist = getUserPlaylist(userId);
+    if (!playlist.length) {
+      return { ok: true, message: 'Playlist가 이미 비어있어요!' };
+    }
+    const clearedLength = playlist.length;
+    userPlaylists.set(userId, []);
+    return { ok: true, message: `총 ${clearedLength}개의 항목을 비웠어요!` };
+  }
+
   return {
     play,
     skip,
@@ -472,6 +482,7 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     playTts,
     getPlaylist,
     addToPlaylist,
+    clearToPlaylist,
   };
 }
 
