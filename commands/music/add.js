@@ -9,7 +9,7 @@ module.exports = {
     ),
   async execute(interaction, context) {
     await interaction.deferReply();
-    const query = interaction.options.getString('music', true).trim();
+    const query = interaction.options.getString('music') || '';
     const result = await context.music.addToPlaylist(interaction.guildId, interaction.user.id, query);
     await interaction.editReply(result.message);
   },

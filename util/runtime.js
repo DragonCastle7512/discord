@@ -397,6 +397,40 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     return { ok: true, message: lines.join('\n') };
   }
 
+  async function getCurrentTrackForGuild(guildId) {
+    const state = guildStates.get(guildId);
+    if (state?.current) {
+      return state.current;
+    }
+
+    const player = state?.player || shoukaku?.players?.get(guildId) || null;
+    const encoded = player?.track || null;
+    if (!encoded) {
+      return null;
+    }
+
+    try {
+      const decoded = await player.node.rest.decode(encoded);
+      if (!decoded?.encoded) {
+        return null;
+      }
+
+      const track = {
+        encoded: decoded.encoded,
+        info: decoded.info || {},
+      };
+
+      if (state) {
+        state.current = track;
+      }
+
+      return track;
+    }
+    catch {
+      return null;
+    }
+  }
+
   async function addToPlaylist(guildId, userId, query) {
     const playlist = getUserPlaylist(userId);
     const trimmedQuery = (query || '').trim();
@@ -404,11 +438,10 @@ function createMusicRuntime({ client, shoukaku, readyNodes, allowSoundCloudFallb
     let note = '';
 
     if (!trimmedQuery) {
-      const state = guildStates.get(guildId);
-      if (!state || !state.current) {
+      track = await getCurrentTrackForGuild(guildId);
+      if (!track) {
         return { ok: false, message: '재생중인 노래가 없어요!' };
       }
-      track = state.current;
     }
     else {
       const { tracks, playlistName } = await resolveTracks(trimmedQuery);
