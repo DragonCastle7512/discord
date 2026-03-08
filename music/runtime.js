@@ -91,31 +91,38 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
   function queue(guildId) {
     const state = guildStates.get(guildId);
     if (!state || (!state.current && state.queue.length === 0)) {
-      return { ok: false, message: 'Queue가 비어있어요!' };
+      return { message: 'Queue가 비어있어요!', count: 0 };
     }
 
     const currentLine = state.current
-      ? `Now: **${state.current.info?.title || 'Unknown title'}**`
-      : 'Now: nothing';
+      ? `현재 곡\n **${state.current.info?.title || 'Unknown title'}**`
+      : '현재 곡\n nothing';
     const upcoming = state.queue
       .slice(0, 10)
       .map((track, index) => `${index + 1}. ${track.info?.title || 'Unknown title'}`)
       .join('\n');
 
-    return { ok: true, message: `${currentLine}\n\nUp next:\n${upcoming || 'none'}` };
+    return { message: `${currentLine}\n\n대기 중인 곡\n**${upcoming || 'none'}**`, count: state.queue.length };
   }
 
   async function getPlaylist(userId) {
     const playlist = await findPlaylist(userId);
     if (!playlist.length) {
-      return { ok: false, message: 'Playlist가 비어있어요' };
+      return { message: 'Playlist가 비어있어요', count: 0 };
     }
 
     const lines = playlist.slice(0, 20).map((track, index) => {
       const title = track.info?.title || 'Unknown title';
       return `${index + 1}. ${title}`;
     });
-    return { ok: true, message: lines.join('\n') };
+
+    const moreCount = playlist.length - lines.length;
+    const moreLine = moreCount > 0 ? `\n...and ${moreCount} more` : '';
+
+    return {
+      message: `${lines.join('\n')}${moreLine}`,
+      count: playlist.length,
+    };
   }
 
   async function addToPlaylist(guildId, userId, query) {
