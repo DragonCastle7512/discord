@@ -6,6 +6,6 @@ module.exports = {
   async execute(interaction, context) {
     const result = context.music.queue(interaction.guildId);
     const embed = buildEmbed('Queue', result.message || [], `${result.count} track(s)`);
-    await interaction.reply({ embeds: [embed], ephemeral: true });
+    await interaction.reply({ embeds: [embed] });
   },
 };

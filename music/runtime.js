@@ -102,7 +102,7 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
       .map((track, index) => `${index + 1}. ${track.info?.title || 'Unknown title'}`)
       .join('\n');
 
-    return { message: `${currentLine}\n\n대기 중인 곡\n**${upcoming || 'none'}**`, count: state.queue.length };
+    return { message: `${currentLine}\n\n대기 중인 곡\n**${upcoming || 'none'}**`, count: state.queue.length + 1 };
   }
 
   async function getPlaylist(userId) {
