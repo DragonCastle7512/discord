@@ -5,11 +5,21 @@ async function insertPlaylist(userId, music_info) {
 }
 
 async function findPlaylist(userId) {
-  const playlist = await PlayList.findAll({
+  return await PlayList.findAll({
     where: { userId },
     order: [['id', 'ASC']],
   });
-  return playlist.map((music) => music.music_info);
+}
+
+async function updatePlaylist(userId, id, music_info, transaction) {
+  return PlayList.update(
+    { music_info },
+    { where: { userId, id }, transaction },
+  );
+}
+
+async function deletePlaylist(userId, id) {
+  return PlayList.destroy({ where: { userId, id } });
 }
 
 async function clearPlaylist(userId) {
@@ -19,5 +29,7 @@ async function clearPlaylist(userId) {
 module.exports = {
   insertPlaylist,
   findPlaylist,
+  updatePlaylist,
+  deletePlaylist,
   clearPlaylist,
 };

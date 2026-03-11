@@ -1,4 +1,4 @@
-const { insertPlaylist, findPlaylist, clearPlaylist } = require('./repositorys/playlist.repository');
+const { insertPlaylist, findPlaylist, clearPlaylist, updatePlaylist, deletePlaylist } = require('./repositorys/playlist.repository');
 
 function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
 
@@ -31,7 +31,8 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
 
     const state = await joinOrMovePlayer(guild, interaction.channelId, voiceChannel);
     if (!trimmedQuery) {
-      const playlist = await findPlaylist(interaction.user.id);
+      const res = await findPlaylist(interaction.user.id);
+      const playlist = res.map((music) => music.music_info);
       if (!playlist.length) {
         return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
       }
@@ -106,23 +107,9 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
   }
 
   async function getPlaylist(userId) {
-    const playlist = await findPlaylist(userId);
-    if (!playlist.length) {
-      return { message: 'Playlist가 비어있어요', count: 0 };
-    }
-
-    const lines = playlist.slice(0, 20).map((track, index) => {
-      const title = track.info?.title || 'Unknown title';
-      return `${index + 1}. ${title}`;
-    });
-
-    const moreCount = playlist.length - lines.length;
-    const moreLine = moreCount > 0 ? `\n...and ${moreCount} more` : '';
-
-    return {
-      message: `${lines.join('\n')}${moreLine}`,
-      count: playlist.length,
-    };
+    const res = await findPlaylist(userId);
+    const playlist = res.map((music) => music.music_info);
+    return playlist;
   }
 
   async function addToPlaylist(guildId, userId, query) {
@@ -165,6 +152,69 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
     return { ok: true, message: `총 ${cleared}개의 항목을 비웠어요!` };
   }
 
+  async function deleteFromPlaylist(userId, index) {
+    const entries = await findPlaylist(userId);
+    if (!entries.length) {
+      return { ok: false, message: 'Playlist가 비어있어요' };
+    }
+
+    const targetIndex = Number(index);
+    if (!Number.isInteger(targetIndex) || targetIndex < 1 || targetIndex > entries.length) {
+      return { ok: false, message: `번호가 잘못됐어요. 1 ~ ${entries.length} 번을 입력해주세요.` };
+    }
+
+    const entry = entries[targetIndex - 1];
+    await deletePlaylist(userId, entry.id);
+    const title = entry.music_info?.info?.title || 'Unknown title';
+    return { ok: true, message: `Playlist에서 노래를 삭제했어요!\n **${title}**` };
+  }
+
+  async function movePlaylistItem(userId, fromIndex, toIndex) {
+    const entries = await findPlaylist(userId);
+    if (!entries.length) {
+      return { ok: false, message: 'Playlist가 비어있어요' };
+    }
+
+    const from = Number(fromIndex);
+    const to = Number(toIndex);
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < 1 || from > entries.length || to > entries.length) {
+      return { ok: false, message: `번호가 잘못됐어요. 1 ~ ${entries.length} 번을 입력해주세요.` };
+    }
+
+    if (from === to) {
+      return { ok: true, message: '노래 위치가 이미 같아요' };
+    }
+
+    const original = entries.map((entry) => entry.music_info);
+    const moved = original.slice();
+    const [item] = moved.splice(from - 1, 1);
+    moved.splice(to - 1, 0, item);
+
+    const start = Math.min(from, to) - 1;
+    const end = Math.max(from, to) - 1;
+
+    const sequelize = entries[0].sequelize || entries[0].constructor?.sequelize;
+    const transaction = sequelize ? await sequelize.transaction() : null;
+    try {
+      for (let i = start; i <= end; i += 1) {
+        const entry = entries[i];
+        await updatePlaylist(userId, entry.id, moved[i], transaction || undefined);
+      }
+      if (transaction) {
+        await transaction.commit();
+      }
+    }
+    catch (error) {
+      if (transaction) {
+        await transaction.rollback();
+      }
+      throw error;
+    }
+
+    const title = item?.info?.title || 'Unknown title';
+    return { ok: true, message: `Playlist에서 노래 위치를 이동했어요!\n **${title}** (${from} -> ${to})` };
+  }
+
   return {
     play,
     skip,
@@ -173,6 +223,8 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
     getPlaylist,
     addToPlaylist,
     clearToPlaylist,
+    deleteFromPlaylist,
+    movePlaylistItem,
   };
 }
 
