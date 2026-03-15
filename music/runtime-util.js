@@ -37,16 +37,36 @@ function createRuntimeUtils({
     function getGuildState(guildId) {
         if (!guildStates.has(guildId)) {
             guildStates.set(guildId, {
-            player: null,
-            queue: [],
-            current: null,
-            textChannelId: null,
-            voiceChannelId: null,
-            playing: false,
+                player: null,
+                queue: [],
+                current: null,
+                textChannelId: null,
+                voiceChannelId: null,
+                playing: false,
             });
         }
 
         return guildStates.get(guildId);
+    }
+
+    async function handleTrackFailure(guildId, failed) {
+        const state = guildStates.get(guildId);
+        if (!state) return;
+
+        if (failed && (failed._retryCount || 0) < 1) {
+            failed._retryCount = (failed._retryCount || 0) + 1;
+            state.queue.unshift(failed);
+            await playNext(guildId);
+            return;
+        }
+
+        const textChannel = getTextChannel(state.textChannelId);
+        if (textChannel && (!failed || !failed._failureNotified)) {
+        if (failed) failed._failureNotified = true;
+            textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
+        }
+
+        await playNext(guildId);
     }
 
     async function joinOrMovePlayer(guild, textChannelId, voiceChannel) {
@@ -82,29 +102,29 @@ function createRuntimeUtils({
         let player;
         try {
             player = await shoukaku.joinVoiceChannel({
-            guildId: guild.id,
-            channelId: voiceChannel.id,
-            shardId: guild.shardId,
-            deaf: true,
+                guildId: guild.id,
+                channelId: voiceChannel.id,
+                shardId: guild.shardId,
+                deaf: true,
             });
         }
         catch (err) {
             if (!String(err?.message || '').includes('already have an existing connection')) {
-            throw err;
+                throw err;
             }
             try {
-            await shoukaku.leaveVoiceChannel(guild.id);
+                await shoukaku.leaveVoiceChannel(guild.id);
             }
             catch {
-            console.log('leave 실패');
+                console.log('leave 실패');
             }
 
             // leave 이후 재접속 시도
             player = await shoukaku.joinVoiceChannel({
-            guildId: guild.id,
-            channelId: voiceChannel.id,
-            shardId: guild.shardId,
-            deaf: true,
+                guildId: guild.id,
+                channelId: voiceChannel.id,
+                shardId: guild.shardId,
+                deaf: true,
             });
         }
 
@@ -116,13 +136,14 @@ function createRuntimeUtils({
 
         player.on('exception', async (event) => {
             console.error('Player exception:', event);
+            const failed = state.current;
             state.playing = false;
             state.current = null;
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
-            textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
+                textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
             }
-            await playNext(guild.id);
+            await handleTrackFailure(guild.id, failed);
         });
 
         player.on('stuck', async () => {
@@ -130,7 +151,7 @@ function createRuntimeUtils({
             state.current = null;
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
-            textChannel.send('Track got stuck. Skipping to next.').catch((err) => console.log(err));
+                textChannel.send('Track got stuck. Skipping to next.').catch((err) => console.log(err));
             }
             await playNext(guild.id);
         });
@@ -179,17 +200,17 @@ function createRuntimeUtils({
         if (isDirectUrl) {
             identifiers.push(query);
             if (ytId) {
-            identifiers.push(`https://www.youtube.com/watch?v=${ytId}`);
-            identifiers.push(`https://music.youtube.com/watch?v=${ytId}`);
-            identifiers.push(`https://youtu.be/${ytId}`);
-            identifiers.push(`ytsearch:${ytId}`);
-            identifiers.push(`ytmsearch:${ytId}`);
+                identifiers.push(`https://www.youtube.com/watch?v=${ytId}`);
+                identifiers.push(`https://music.youtube.com/watch?v=${ytId}`);
+                identifiers.push(`https://youtu.be/${ytId}`);
+                identifiers.push(`ytsearch:${ytId}`);
+                identifiers.push(`ytmsearch:${ytId}`);
             }
         }
         else {
             identifiers.push(`ytmsearch:${query}`, `ytsearch:${query}`);
             if (allowSoundCloudFallback) {
-            identifiers.push(`scsearch:${query}`);
+                identifiers.push(`scsearch:${query}`);
             }
         }
 
@@ -198,11 +219,11 @@ function createRuntimeUtils({
         for (const identifier of identifiers) {
             let result;
             try {
-            result = await node.rest.resolve(identifier);
+                result = await node.rest.resolve(identifier);
             }
             catch (error) {
-            errors.push(`${identifier}: ${error.message || 'request failed'}`);
-            continue;
+                errors.push(`${identifier}: ${error.message || 'request failed'}`);
+                continue;
             }
 
             if (!result || result.loadType === 'empty') continue;
@@ -215,18 +236,18 @@ function createRuntimeUtils({
             }
 
             if (result.loadType === 'track') {
-            return { tracks: result.data ? [result.data] : [], playlistName: null };
+                return { tracks: result.data ? [result.data] : [], playlistName: null };
             }
 
             if (result.loadType === 'search') {
             const tracks = Array.isArray(result.data) ? result.data : [];
             if (tracks.length) return { tracks, playlistName: null };
-            continue;
+                continue;
             }
 
             if (result.loadType === 'error') {
-            const detail = result.data?.message || result.data?.cause || 'unknown';
-            errors.push(`${identifier}: ${detail}`);
+                const detail = result.data?.message || result.data?.cause || 'unknown';
+                errors.push(`${identifier}: ${detail}`);
             }
         }
 
@@ -249,8 +270,17 @@ function createRuntimeUtils({
 
         state.current = next;
         state.playing = true;
-
-        await state.player.playTrack({ track: { encoded: next.encoded } });
+        try {
+            await state.player.playTrack({ track: { encoded: next.encoded } });
+        }
+        catch (error) {
+            console.error('PlayTrack failed:', error);
+            const failed = next;
+            state.playing = false;
+            state.current = null;
+            await handleTrackFailure(guildId, failed);
+            return;
+        }
 
         const textChannel = getTextChannel(state.textChannelId);
         if (textChannel) {
@@ -275,16 +305,16 @@ function createRuntimeUtils({
         try {
             const decoded = await player.node.rest.decode(encoded);
             if (!decoded?.encoded) {
-            return null;
+                return null;
             }
 
             const track = {
-            encoded: decoded.encoded,
-            info: decoded.info || {},
+                encoded: decoded.encoded,
+                info: decoded.info || {},
             };
 
             if (state) {
-            state.current = track;
+                state.current = track;
             }
 
             return track;
