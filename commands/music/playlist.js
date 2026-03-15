@@ -158,11 +158,11 @@ module.exports = {
 
     collector.on('end', async () => {
       try {
-        await interaction.editReply({ components: [] });
+        await interaction.deleteReply();
       }
       catch (error) {
-        if (message.editable) {
-          await message.edit({ components: [] }).catch(() => null);
+        if (message.deletable) {
+          await message.delete();
         }
         else {
           console.warn('Failed to remove playlist components on collector end:', error);
