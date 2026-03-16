@@ -49,13 +49,60 @@ function createRuntimeUtils({
         return guildStates.get(guildId);
     }
 
-    async function handleTrackFailure(guildId, failed) {
+    function isTokenError(error) {
+        const raw = [
+            error?.message,
+            error?.exception?.message,
+            error?.cause,
+            error?.reason,
+        ]
+            .filter(Boolean)
+            .join(' ')
+            .toLowerCase();
+
+        if (!raw) return false;
+
+        return (
+            raw.includes('oauth') ||
+            raw.includes('token') ||
+            raw.includes('sign in') ||
+            raw.includes('signin') ||
+            raw.includes('forbidden') ||
+            raw.includes('permission') ||
+            raw.includes('403') ||
+            raw.includes('401')
+        );
+    }
+
+    async function handleTrackFailure(guildId, failed, error) {
         const state = guildStates.get(guildId);
         if (!state) return;
 
-        if (failed && (failed._retryCount || 0) < 1) {
+        if (failed && (failed._retryCount || 0) < 1 && isTokenError(error)) {
             failed._retryCount = (failed._retryCount || 0) + 1;
-            state.queue.unshift(failed);
+            let retried = false;
+            await sleep(1200);
+
+            const identifier = failed.info?.uri || failed.info?.title || '';
+            if (identifier) {
+                try {
+                    const { tracks } = await resolveTracks(identifier);
+                    if (tracks && tracks.length) {
+                        const refreshed = tracks[0];
+                        refreshed._retryCount = failed._retryCount;
+                        state.queue.unshift(refreshed);
+                        retried = true;
+                    }
+                }
+                catch (err) {
+                    console.warn('Token retry resolve failed:', err?.message || err);
+                }
+            }
+
+            if (!retried) {
+                state.queue.unshift(failed);
+            }
+
             await playNext(guildId);
             return;
         }
@@ -143,7 +190,7 @@ function createRuntimeUtils({
             if (textChannel) {
                 textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
             }
-            await handleTrackFailure(guild.id, failed);
+            await handleTrackFailure(guild.id, failed, event);
         });
 
         player.on('stuck', async () => {
@@ -278,7 +325,7 @@ function createRuntimeUtils({
             const failed = next;
             state.playing = false;
             state.current = null;
-            await handleTrackFailure(guildId, failed);
+            await handleTrackFailure(guildId, failed, event);
             return;
         }
 
