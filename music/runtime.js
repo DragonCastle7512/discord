@@ -40,6 +40,7 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
       const queuedTracks = playlist.map((track) => ({
         encoded: track.encoded,
         info: track.info || {},
+        requestedBy: interaction.user.id,
       }));
 
       state.queue.push(...queuedTracks);
@@ -52,7 +53,11 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
     if (!tracks.length) return { ok: false, message: '찾을 수 없는 노래에요!' };
 
     if (playlistName) {
-      state.queue.push(...tracks);
+      const requestedTracks = tracks.map((track) => ({
+        ...track,
+        requestedBy: interaction.user.id,
+      }));
+      state.queue.push(...requestedTracks);
       await playNext(guild.id);
       return { ok: true, message: `Playlist에 추가했어요 : **${playlistName}** (${tracks.length} tracks)` };
     }
@@ -60,7 +65,7 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
     const first = tracks[0];
     state.queue.push(first);
     await playNext(guild.id);
-    return { ok: true, message: `Queued: **${first.info?.title || 'Unknown title'}**` };
+    return { ok: true, message: `추가된 곡\n**${first.info?.title || 'Unknown title'}**` };
   }
 
   async function skip(guildId) {
@@ -96,7 +101,7 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
     }
 
     const currentLine = state.current
-      ? `현재 곡\n **${state.current.info?.title || 'Unknown title'}**`
+      ? `현재 곡\n - **${state.current.info?.title || 'Unknown title'}**`
       : '현재 곡\n nothing';
     const upcoming = state.queue
       .slice(0, 10)

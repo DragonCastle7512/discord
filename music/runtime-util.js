@@ -1,3 +1,5 @@
+const { buildNowPlayingEmbed } = require('./embeds/buildEmbed');
+
 function isUrl(input) {
     return /^https?:\/\//i.test(input);
 }
@@ -296,9 +298,20 @@ function createRuntimeUtils({
             await state.player.playTrack({ track: { encoded: next.encoded } });
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
-                const title = next.info?.title || 'Unknown title';
-                const uri = next.info?.uri || '';
-                textChannel.send(`재생 중... **${title}**${uri ? `\n${uri}` : ''}`).catch((err) => console.error(err));
+                const info = next.info || {};
+                const title = info.title || 'Unknown title';
+                const uri = info.uri || '';
+                const requesterId = next.requestedBy || null;
+                const thumbnailUrl = info.artworkUrl || null;
+                const embed = buildNowPlayingEmbed({
+                    title,
+                    uri,
+                    requesterId,
+                    durationMs: info.length,
+                    thumbnailUrl,
+                    footer: textChannel?.name || 'Music',
+                });
+                textChannel.send({ embeds: [embed] }).catch((err) => console.error(err));
             }
         }
         catch (error) {
