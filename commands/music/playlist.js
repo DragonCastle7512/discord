@@ -132,8 +132,9 @@ module.exports = {
           }
         }
         else if (component.customId.startsWith('playlist-play:')) {
-          console.log(tracks[selectedIndex - 1].info.uri);
-          await context.music.addToPlaylist(interaction.guildId, interaction.user.id, tracks[selectedIndex - 1].info.uri);
+          const track = tracks[selectedIndex - 1].info;
+          await context.music.play(interaction, track.uri);
+          await interaction.channel.send(`추가된 곡\n**${track.title}**`);
         }
         else if (component.customId.startsWith('playlist-down:')) {
           if (selectedIndex < tracks.length) {
