@@ -49,39 +49,14 @@ function createRuntimeUtils({
         return guildStates.get(guildId);
     }
 
-    function isTokenError(error) {
-        const raw = [
-            error?.message,
-            error?.exception?.message,
-            error?.cause,
-            error?.reason,
-        ]
-            .filter(Boolean)
-            .join(' ')
-            .toLowerCase();
-
-        if (!raw) return false;
-
-        return (
-            raw.includes('oauth') ||
-            raw.includes('token') ||
-            raw.includes('sign in') ||
-            raw.includes('signin') ||
-            raw.includes('forbidden') ||
-            raw.includes('permission') ||
-            raw.includes('403') ||
-            raw.includes('401')
-        );
-    }
-
-    async function handleTrackFailure(guildId, failed, error) {
+    async function handleTrackFailure(guildId, failed) {
         const state = guildStates.get(guildId);
         if (!state) return;
 
-        if (failed && (failed._retryCount || 0) < 1 && isTokenError(error)) {
+        if (failed && (failed._retryCount || 0) < 1) {
             failed._retryCount = (failed._retryCount || 0) + 1;
             let retried = false;
-            await sleep(1200);
+            await sleep(1500);
 
             const identifier = failed.info?.uri || failed.info?.title || '';
             if (identifier) {
@@ -190,7 +165,7 @@ function createRuntimeUtils({
             if (textChannel) {
                 textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
             }
-            await handleTrackFailure(guild.id, failed, event);
+            await handleTrackFailure(guild.id, failed);
         });
 
         player.on('stuck', async () => {
@@ -319,21 +294,20 @@ function createRuntimeUtils({
         state.playing = true;
         try {
             await state.player.playTrack({ track: { encoded: next.encoded } });
+            const textChannel = getTextChannel(state.textChannelId);
+            if (textChannel) {
+                const title = next.info?.title || 'Unknown title';
+                const uri = next.info?.uri || '';
+                textChannel.send(`재생 중... **${title}**${uri ? `\n${uri}` : ''}`).catch((err) => console.error(err));
+            }
         }
         catch (error) {
             console.error('PlayTrack failed:', error);
             const failed = next;
             state.playing = false;
             state.current = null;
-            await handleTrackFailure(guildId, failed, event);
+            await handleTrackFailure(guildId, failed);
             return;
-        }
-
-        const textChannel = getTextChannel(state.textChannelId);
-        if (textChannel) {
-            const title = next.info?.title || 'Unknown title';
-            const uri = next.info?.uri || '';
-            textChannel.send(`재생 중... **${title}**${uri ? `\n${uri}` : ''}`).catch((err) => console.error(err));
         }
     }
 
