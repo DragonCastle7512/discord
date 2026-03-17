@@ -59,6 +59,10 @@ function buildComponents(tracks, selectedIndex, userId) {
       .setStyle(ButtonStyle.Secondary)
       .setDisabled(moveDownDisabled),
     new ButtonBuilder()
+      .setCustomId(`playlist-play:${userId}`)
+      .setLabel('재생')
+      .setStyle(ButtonStyle.Primary),
+    new ButtonBuilder()
       .setCustomId(`playlist-delete:${userId}`)
       .setLabel('삭제')
       .setStyle(ButtonStyle.Danger),
@@ -126,6 +130,10 @@ module.exports = {
             selectedIndex -= 1;
             tracks = await context.music.getPlaylist(userId);
           }
+        }
+        else if (component.customId.startsWith('playlist-play:')) {
+          console.log(tracks[selectedIndex - 1].info.uri);
+          await context.music.addToPlaylist(interaction.guildId, interaction.user.id, tracks[selectedIndex - 1].info.uri);
         }
         else if (component.customId.startsWith('playlist-down:')) {
           if (selectedIndex < tracks.length) {
