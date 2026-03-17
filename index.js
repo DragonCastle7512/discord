@@ -7,6 +7,7 @@ const { createMusicRuntime } = require('./music/runtime');
 const { createTtsRuntime } = require('./tts/runtime');
 const { createRuntimeUtils } = require('./music/runtime-util');
 const { initDb } = require('./db/init');
+const { getVoiceConnection } = require('@discordjs/voice');
 
 const token = process.env.DISCORD_TOKEN;
 const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
@@ -194,10 +195,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	}
 });
 
+client.on('voiceStateUpdate', (oldState, newState) => {
+  const botConnection = newState.guild.members.me.voice;
+
+  if (!botConnection.channelId) return;
+
+  if (oldState.channelId === botConnection.channelId && newState.channelId !== botConnection.channelId) {
+    const channel = oldState.channel;
+
+    if (channel.members.filter(member => !member.user.bot).size === 0) {
+      setTimeout(() => {
+        if (channel.members.filter(member => !member.user.bot).size === 0) {
+          const connection = getVoiceConnection(newState.guild.id);
+          if (connection) {
+            connection.destroy();
+          }
+        }
+      }, 3000);
+    }
+  }
+});
+
 client.on('messageCreate', async (message) => {
-  	if (message.author.bot) return;
-  	const msg = message.content;
-    if (!msg.includes('치사야') || msg.includes('치사,')) return;
+  if (message.author.bot) return;
+  const msg = message.content;
+  if (!msg.includes('치사야') || msg.includes('치사,')) return;
 	const input = message.content;
 	const userId = message.member.id;
 	await message.channel.sendTyping();
