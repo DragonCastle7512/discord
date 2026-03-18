@@ -1,5 +1,4 @@
 const { SlashCommandBuilder } = require('discord.js');
-const { buildEmbed } = require('../../music/embeds/buildEmbed');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -12,12 +11,6 @@ module.exports = {
     await interaction.deferReply();
     const query = (interaction.options.getString('query') || '').trim();
     const result = await context.music.play(interaction, query);
-    if (!query) {
-      await interaction.editReply(result.message);
-      return;
-    }
-    const title = result.ok ? 'Play' : 'Play Error';
-    const embed = buildEmbed(title, result.message, interaction.guild?.name || 'Music');
-    await interaction.editReply({ embeds: [embed] });
+    await interaction.editReply(result.message);
   },
 };

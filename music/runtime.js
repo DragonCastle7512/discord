@@ -62,10 +62,10 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
       return { ok: true, message: `Playlist에 추가했어요 : **${playlistName}** (${tracks.length} tracks)` };
     }
 
-    const first = tracks[0];
+    const first = { ...tracks[0], requestedBy: interaction.user.id };
     state.queue.push(first);
     await playNext(guild.id);
-    return { ok: true, message: `추가된 곡\n**${first.info?.title || 'Unknown title'}**` };
+    return { ok: true, message: `**${first.info?.title || 'Unknown title'}**을(를) 추가했어요!` };
   }
 
   async function skip(guildId) {
