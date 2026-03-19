@@ -7,7 +7,6 @@ const { createMusicRuntime } = require('./music/runtime');
 const { createTtsRuntime } = require('./tts/runtime');
 const { createRuntimeUtils } = require('./music/runtime-util');
 const { initDb } = require('./db/init');
-const { getVoiceConnection } = require('@discordjs/voice');
 
 const token = process.env.DISCORD_TOKEN;
 const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
@@ -80,7 +79,6 @@ const runtimeUtils = createRuntimeUtils({
 
 
 const music = createMusicRuntime({
-  shoukaku,
   guildStates,
   runtimeUtils,
 });
@@ -196,19 +194,31 @@ client.on(Events.InteractionCreate, async (interaction) => {
 });
 
 client.on('voiceStateUpdate', (oldState, newState) => {
-  const botConnection = newState.guild.members.me.voice;
+  const guildId = oldState.guild.id;
+  const botMember = oldState.guild.members.me;
 
-  if (!botConnection.channelId) return;
+  if (!botMember.voice.channelId) return;
 
-  if (oldState.channelId === botConnection.channelId && newState.channelId !== botConnection.channelId) {
+  const botChannelId = botMember.voice.channelId;
+
+  if (oldState.channelId === botChannelId && newState.channelId !== botChannelId) {
     const channel = oldState.channel;
 
-    if (channel.members.filter(member => !member.user.bot).size === 0) {
-      setTimeout(() => {
-        if (channel.members.filter(member => !member.user.bot).size === 0) {
-          const connection = getVoiceConnection(newState.guild.id);
-          if (connection) {
-            connection.destroy();
+    const humanMembers = channel.members.filter(m => !m.user.bot);
+
+    if (humanMembers.size === 0) {
+      setTimeout(async () => {
+        const currentChannel = client.channels.cache.get(botChannelId);
+        if (!currentChannel) return;
+
+        const stillNoHumans = currentChannel.members.filter(m => !m.user.bot).size === 0;
+
+        if (stillNoHumans) {
+          try {
+            await runtimeUtils.stopShoukaku(guildId);
+          }
+          catch (error) {
+            console.error('퇴장 중 오류 발생:', error);
           }
         }
       }, 3000);

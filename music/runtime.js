@@ -1,6 +1,6 @@
 const { insertPlaylist, findPlaylist, clearPlaylist, updatePlaylist, deletePlaylist } = require('./repositorys/playlist.repository');
 
-function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
+function createMusicRuntime({ guildStates, runtimeUtils }) {
 
   const {
     waitForReadyNode,
@@ -84,12 +84,7 @@ function createMusicRuntime({ shoukaku, guildStates, runtimeUtils }) {
       return { ok: false, message: '재생 중인 노래가 없어요!' };
     }
 
-    state.queue = [];
-    state.current = null;
-    state.playing = false;
-    await shoukaku.leaveVoiceChannel(guildId);
-    state.player = null;
-    state.voiceChannelId = null;
+    await runtimeUtils.stopShoukaku(guildId);
 
     return { ok: true, message: '모든 노래를 중지했어요!' };
   }

@@ -282,6 +282,18 @@ function createRuntimeUtils({
         return { tracks: [], playlistName: null };
     }
 
+    async function stopShoukaku(guildId) {
+      const state = guildStates.get(guildId);
+      if (state) {
+        state.queue = [];
+        state.current = null;
+        state.playing = false;
+        await shoukaku.leaveVoiceChannel(guildId);
+        state.player = null;
+        state.voiceChannelId = null;
+      }
+    }
+
     async function playNext(guildId) {
         const state = guildStates.get(guildId);
         if (!state || !state.player || state.playing) return;
@@ -363,6 +375,7 @@ function createRuntimeUtils({
         resolveTracks,
         getCurrentTrackForGuild,
         playNext,
+        stopShoukaku,
     };
 }
 
