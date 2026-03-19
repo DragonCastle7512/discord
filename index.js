@@ -85,6 +85,8 @@ const music = createMusicRuntime({
 
 const tts = createTtsRuntime({ runtimeUtils });
 
+const context = { music, tts };
+
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -175,7 +177,7 @@ client.on(Events.InteractionCreate, async (interaction) => {
 	const command = interaction.client.commands.get(interaction.commandName);
 
 	try {
-		await command.execute(interaction, { music, tts });
+		await command.execute(interaction, context);
 	}
 	catch (error) {
 		console.error('Command error:', error);
@@ -230,10 +232,8 @@ client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   const msg = message.content;
   if (!msg.includes('치사야') || msg.includes('치사,')) return;
-	const input = message.content;
-	const userId = message.member.id;
 	await message.channel.sendTyping();
-	const response = await talk(input, userId);
+	const response = await talk(message, context);
 	await message.reply(`${response}`);
 });
 

@@ -10,12 +10,15 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     playNext,
   } = runtimeUtils;
 
-  async function play(interaction, query) {
-    const guild = interaction.guild;
+  /* interaction과 message객체 모두 호환 */
+  async function play(context, query) {
+    const { channelId } = context;
+    const guild = context.guild || client.guilds.cache.get(message.guildId);
     if (!guild) throw new Error('Guild only command');
     const trimmedQuery = (query || '').trim();
 
-    const member = await guild.members.fetch(interaction.user.id);
+    const userId = context.user?.id || context.author?.id;
+    const member = await guild.members.fetch(userId);
     const voiceChannel = member.voice.channel;
     if (!voiceChannel) {
       return { ok: false, message: '음성채널에 먼저 입장해주세요!' };
@@ -29,9 +32,9 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       };
     }
 
-    const state = await joinOrMovePlayer(guild, interaction.channelId, voiceChannel);
+    const state = await joinOrMovePlayer(guild, channelId, voiceChannel);
     if (!trimmedQuery) {
-      const res = await findPlaylist(interaction.user.id);
+      const res = await findPlaylist(userId);
       const playlist = res.map((music) => music.music_info);
       if (!playlist.length) {
         return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
@@ -40,7 +43,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       const queuedTracks = playlist.map((track) => ({
         encoded: track.encoded,
         info: track.info || {},
-        requestedBy: interaction.user.id,
+        requestedBy: userId,
       }));
 
       state.queue.push(...queuedTracks);
@@ -55,14 +58,14 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     if (playlistName) {
       const requestedTracks = tracks.map((track) => ({
         ...track,
-        requestedBy: interaction.user.id,
+        requestedBy: userId,
       }));
       state.queue.push(...requestedTracks);
       await playNext(guild.id);
       return { ok: true, message: `Playlist에 추가했어요 : **${playlistName}** (${tracks.length} tracks)` };
     }
 
-    const first = { ...tracks[0], requestedBy: interaction.user.id };
+    const first = { ...tracks[0], requestedBy: userId };
     state.queue.push(first);
     await playNext(guild.id);
     return { ok: true, message: `**${first.info?.title || 'Unknown title'}**을(를) 추가했어요!` };
