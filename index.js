@@ -231,7 +231,7 @@ client.on('voiceStateUpdate', (oldState, newState) => {
 client.on('messageCreate', async (message) => {
   if (message.author.bot) return;
   const msg = message.content;
-  if (!msg.includes('치사야') || msg.includes('치사,')) return;
+  if (!msg.includes('치사야') && !msg.includes('치사,')) return;
 	await message.channel.sendTyping();
 	const response = await talk(message, context);
 	await message.reply(`${response}`);
