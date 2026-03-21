@@ -39,11 +39,16 @@ module.exports = {
   handlers: {
     play_music: async (args, obj) => {
       const { message, context } = obj;
-      await context.music.play(message, args.query);
-      if (!args.query) {
-        return '플레이리스트 재생' ;
+      try {
+        await context.music.play(message, args.query);
+        if (!args.query) {
+          return '플레이리스트 재생' ;
+        }
+        return `${args.query} 재생`;
       }
-      return `${args.query} 재생`;
+      catch (err) {
+        return `재생할 수 없는 노래입니다: ${err}`;
+      }
     },
     get_youtube_popular_music: async (args) => {
       const apiKey = process.env.YOUTUBE_API_KEY;
@@ -60,22 +65,20 @@ module.exports = {
         `&maxResults=${limit}&regionCode=${encodeURIComponent(region)}` +
         `&key=${encodeURIComponent(apiKey)}`;
 
-      let data;
       try {
         const res = await fetch(youtubeUrl);
         if (!res.ok) {
           const text = await res.text();
           return `YouTube API 요청 실패: ${res.status} ${res.statusText} - ${text}`;
         }
-        data = await res.json();
+        const data = await res.json();
+        const items = Array.isArray(data?.items) ? data.items : [];
+        if (!items.length) {
+          return '인기 음악 결과를 찾지 못했습니다.';
+        }
       }
       catch (err) {
         return `YouTube API 요청 중 오류: ${err?.message || err}`;
-      }
-
-      const items = Array.isArray(data?.items) ? data.items : [];
-      if (!items.length) {
-        return '인기 음악 결과를 찾지 못했습니다.';
       }
 
       const lines = items.map((item, index) => {
