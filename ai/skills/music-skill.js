@@ -51,12 +51,12 @@ const parseIsoDurationToSeconds = (duration) => {
   return (hours * 3600) + (minutes * 60) + seconds;
 };
 
-const isShortDuration = (duration) => {
+const isShortOrLongDuration = (duration) => {
   const seconds = parseIsoDurationToSeconds(duration);
   if (seconds === null) {
     return false;
   }
-  return seconds <= 60;
+  return seconds <= 60 || seconds > 360;
 };
 
 module.exports = {
@@ -86,6 +86,13 @@ module.exports = {
           keyword: {
             type: 'STRING',
             description: '검색 키워드 (곡명/아티스트 등). 제공 시 키워드 기반 인기곡 조회.',
+          },
+          order: {
+            type: 'STRING',
+            description: `검색 결과의 정렬 기준을 설정합니다. 반드시 아래 값 중 하나여야 합니다.
+              1. 'date': 최근 업로드된 날짜 순으로 정렬
+              2. 'relevance': 검색어와의 관련성이 높은 순으로 정렬 (기본값)
+              3. 'viewCount': 조회수가 높은 순으로 정렬 (인기 순위 확인 시 권장)`,
           },
           limit: {
             type: 'NUMBER',
@@ -124,6 +131,12 @@ module.exports = {
       const limit = Math.max(1, Math.min(50, Number(args?.limit) || 10));
       const region = String(args?.region || 'KR').toUpperCase();
       const keyword = String(args?.keyword || '').trim();
+      const orderRaw = String(args?.order || '').trim().toLowerCase();
+      const orderMap = {
+        date: 'date',
+        viewcount: 'viewCount',
+      };
+      const order = orderMap[orderRaw] || 'relevance';
 
       if (!keyword) {
         const url =
@@ -142,8 +155,8 @@ module.exports = {
 
       const searchUrl =
         'https://www.googleapis.com/youtube/v3/search' +
-        '?part=snippet&type=video&videoCategoryId=10&order=viewCount' +
-        `&maxResults=${limit}&q=${encodeURIComponent(keyword)}` +
+        `?part=snippet&type=video&videoCategoryId=10&order=${order}` +
+        `&maxResults=${limit}&q=${encodeURIComponent(keyword)} -shorts -short -틱톡 -tiktok` +
         `&regionCode=${encodeURIComponent(region)}` +
         `&key=${encodeURIComponent(apiKey)}`;
 
@@ -180,7 +193,7 @@ module.exports = {
               if (!duration) {
                 return true;
               }
-              return !isShortDuration(duration);
+              return !isShortOrLongDuration(duration);
             });
 
             return buildListResponse(newItems, region, '유튜브 인기 음악');
