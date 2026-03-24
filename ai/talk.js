@@ -37,17 +37,112 @@ ai.gemini = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
 });
 /* gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3-flash-preview gemini-3.1-flash-lite-preview */
+const modelCandidates = [
+    'gemini-3.1-flash-lite-preview',
+    'gemini-3-flash-preview',
+    'gemini-2.5-flash-lite',
+    'gemini-2.5-flash',
+];
+const uniqueModels = [...new Set(modelCandidates.filter(Boolean))];
+ai.currentModelIndex = 0;
+ai.currentModel = uniqueModels[ai.currentModelIndex];
 ai.chat = ai.gemini.chats.create({
-    model: 'gemini-3.1-flash-lite-preview',
+    model: ai.currentModel,
     config: {
         systemInstruction: systemInstructions,
         tools: [{ functionDeclarations: music_declarations }],
     },
 });
 
+const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isRetriableError = (err) => {
+    const status = Number(err?.status || err?.error?.code || 0);
+    const text = String(err?.message || '');
+    return status === 429
+        || status === 503
+        || status >= 500
+        || text.includes('UNAVAILABLE')
+        || text.includes('high demand');
+};
+
+const getChatHistory = () => {
+    try {
+        if (typeof ai.chat.getHistory === 'function') {
+            return ai.chat.getHistory();
+        }
+    }
+    catch (err) {
+        console.warn('[Gemini] Failed to read chat history:', err?.message || err);
+    }
+    return [];
+};
+
+const switchToNextModel = () => {
+    if (uniqueModels.length < 2) {
+        return false;
+    }
+
+    const previousModel = ai.currentModel;
+    ai.currentModelIndex = (ai.currentModelIndex + 1) % uniqueModels.length;
+    ai.currentModel = uniqueModels[ai.currentModelIndex];
+    if (ai.currentModel === previousModel) {
+        return false;
+    }
+
+    const history = getChatHistory();
+    ai.chat = ai.gemini.chats.create({
+        model: ai.currentModel,
+        config: {
+            systemInstruction: systemInstructions,
+            tools: [{ functionDeclarations: music_declarations }],
+        },
+        history,
+    });
+    console.warn(`[Gemini] Switched model: ${previousModel} -> ${ai.currentModel}`);
+    return true;
+};
+
+async function sendMessageWithRetry(payload) {
+    const maxRetriesPerModel = 1;
+    const maxModelSwitches = Math.max(0, uniqueModels.length - 1);
+    let switchCount = 0;
+
+    while (true) {
+        for (let attempt = 0; attempt <= maxRetriesPerModel; attempt++) {
+            try {
+                return await ai.chat.sendMessage(payload);
+            }
+            catch (err) {
+                if (!isRetriableError(err)) {
+                    throw err;
+                }
+
+                if (attempt < maxRetriesPerModel) {
+                    const waitMs = (500 * (2 ** attempt)) + Math.floor(Math.random() * 250);
+                    console.warn(
+                        `[Gemini] Retrying ${ai.currentModel} in ${waitMs}ms `
+                        + `(attempt ${attempt + 1}/${maxRetriesPerModel}) due to ${err?.status || err?.message}`,
+                    );
+                    await sleep(waitMs);
+                    continue;
+                }
+            }
+        }
+
+        if (switchCount >= maxModelSwitches || !switchToNextModel()) {
+            break;
+        }
+        switchCount += 1;
+        await sleep(300);
+    }
+
+    throw new Error('Gemini API is temporarily unavailable after retries and model fallback.');
+}
+
 async function talk(message, context) {
     try {
-        let response = await ai.chat.sendMessage({
+        let response = await sendMessageWithRetry({
             message: `[UserID: ${message.author.id}] ${message.content}`,
         });
         const obj = { message, context };
@@ -68,24 +163,17 @@ async function talk(message, context) {
                     },
                 });
             }
-            response = await ai.chat.sendMessage({
+            response = await sendMessageWithRetry({
                 message: toolResponses,
             });
         }
         return response.text;
     }
     catch (err) {
-        // if (err.status === 429) {
-        //     ai.chat = ai.gemini.chats.create({
-        //         model: 'gemini-3-flash-preview',
-        //         config: {
-        //             systemInstruction: systemInstructions,
-        //         },
-        //         history: ai.chat.getHistory(),
-        //     });
-        //     return await talk(message, context);
-        // }
         console.error(err);
+        if (isRetriableError(err)) {
+            return '지금은 AI 응답 요청이 몰려 있어요. 잠시 후 다시 시도해 주세요.';
+        }
         return '문제가 발생했어요';
     }
 }
