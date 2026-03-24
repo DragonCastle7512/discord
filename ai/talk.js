@@ -24,7 +24,7 @@ Persona: 당신은 게임 "명조: 워더링 웨이브"의 공명자 "치사"입
 5. [UserID]는 사용자의 고유 ID이며, '${process.env.SPECIAL_USER_ID}'인 사용자와 연인관계입니다. 그외 '일반 사용자'의 경우 평범하게 대하세요.
 6. 노래를 선정 해야하는 경우는 반드시 'get_youtube_popular_music' 스킬을 먼저 호출하여 현재 인기 음악 리스트를 확보하세요. 제목에서 음악이 아니라고 유추되면 다른 음악을 찾아보세요.
 7. 만약 'N곡 틀어줘'와 같이 수량을 지정하면, 서로 다른 노래를 직접 선정하여 해당 횟수만큼 함수를 반복 호출하세요.
-8. 최근 대화 내용 확인, 요약, 누가 무슨 말을 했는지 묻는 요청은 'read_messages' 스킬을 먼저 호출해 실제 채널 메시지를 확인한 뒤 답변하세요.
+8. 대화 맥락을 파악하거나, 최근 대화 내용 확인, 요약, 누가 무슨 말을 했는지 묻는 요청은 'read_messages' 스킬을 먼저 호출해 실제 채널 메시지를 확인한 뒤 답변하세요.
 [학습 데이터1: 치사의 상세 설정 및 세계관]
 ${chisaInfo}
 [학습 데이터2: 치사 실제 대사]
@@ -39,8 +39,8 @@ ai.gemini = new GoogleGenAI({
 /* gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3-flash-preview gemini-3.1-flash-lite-preview */
 const modelCandidates = [
     'gemini-3.1-flash-lite-preview',
-    'gemini-3-flash-preview',
     'gemini-2.5-flash-lite',
+    'gemini-3-flash-preview',
     'gemini-2.5-flash',
 ];
 const uniqueModels = [...new Set(modelCandidates.filter(Boolean))];
@@ -99,41 +99,30 @@ const switchToNextModel = () => {
         },
         history,
     });
-    console.warn(`[Gemini] Switched model: ${previousModel} -> ${ai.currentModel}`);
+    console.warn(`[Gemini] 모델 교체: ${previousModel} -> ${ai.currentModel}`);
     return true;
 };
 
 async function sendMessageWithRetry(payload) {
-    const maxRetriesPerModel = 1;
     const maxModelSwitches = Math.max(0, uniqueModels.length - 1);
     let switchCount = 0;
 
     while (true) {
-        for (let attempt = 0; attempt <= maxRetriesPerModel; attempt++) {
-            try {
-                return await ai.chat.sendMessage(payload);
+        try {
+            return await ai.chat.sendMessage(payload);
+        }
+        catch (err) {
+            if (!isRetriableError(err)) {
+                throw err;
             }
-            catch (err) {
-                if (!isRetriableError(err)) {
-                    throw err;
-                }
-
-                if (attempt < maxRetriesPerModel) {
-                    const waitMs = (500 * (2 ** attempt)) + Math.floor(Math.random() * 250);
-                    console.warn(
-                        `[Gemini] Retrying ${ai.currentModel} in ${waitMs}ms `
-                        + `(attempt ${attempt + 1}/${maxRetriesPerModel}) due to ${err?.status || err?.message}`,
-                    );
-                    await sleep(waitMs);
-                    continue;
-                }
-            }
+            console.warn(
+                `[Gemini] ${ai.currentModel} 호출 중 오류 발생: ${err?.status || err?.message}`,
+            );
         }
 
-        if (switchCount >= maxModelSwitches || !switchToNextModel()) {
+        if (switchCount++ >= maxModelSwitches || !switchToNextModel()) {
             break;
         }
-        switchCount += 1;
         await sleep(300);
     }
 
