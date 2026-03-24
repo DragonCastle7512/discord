@@ -140,14 +140,40 @@ module.exports = {
     play_music: async (args, obj) => {
       const { message, context } = obj;
       try {
-        await context.music.play(message, args.query);
-        if (!args.query) {
-          return '플레이리스트 재생' ;
+        const guildId = message?.guild?.id;
+        const beforeQueue = guildId ? context.music.queue(guildId) : { count: 0 };
+        const result = await context.music.play(message, args.query);
+        const afterQueue = guildId ? context.music.queue(guildId) : { count: 0 };
+        const queueIncreased = Number(afterQueue?.count || 0) > Number(beforeQueue?.count || 0);
+
+        if (!result?.ok) {
+          return {
+            ok: false,
+            requestedQuery: args?.query || null,
+            reason: result?.message || '재생 실패',
+          };
         }
-        return `${args.query} 재생`;
+
+        return {
+          ok: true,
+          requestedQuery: args?.query || null,
+          message: result?.message || (args?.query ? `${args.query} 재생 요청 완료` : '플레이리스트 재생 요청 완료'),
+          verification: {
+            queueBefore: Number(beforeQueue?.count || 0),
+            queueAfter: Number(afterQueue?.count || 0),
+            queueIncreased,
+            note: queueIncreased
+              ? '큐 증가가 확인되었습니다.'
+              : '큐 증가는 없지만 현재 곡 교체/즉시 재생 상태일 수 있습니다.',
+          },
+        };
       }
       catch (err) {
-        return `재생할 수 없는 노래입니다: ${err}`;
+        return {
+          ok: false,
+          requestedQuery: args?.query || null,
+          reason: `재생 중 예외가 발생했습니다: ${err?.message || err}`,
+        };
       }
     },
     get_youtube_popular_music: async (args) => {
