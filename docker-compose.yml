@@ -1,0 +1,130 @@
+services:
+  tts-engine:
+    build:
+      context: ../tts-engine
+    container_name: tts-engine
+    restart: always
+    environment:
+      - LITE=true
+    volumes:
+      - ../tts-engine/weights/ckpt:/workspace/GPT-SoVITS/GPT_weights_v2Pro
+      - ../tts-engine/weights/pth:/workspace/GPT-SoVITS/SoVITS_weights_v2Pro
+      - ../tts-engine/raw_data:/workspace/GPT-SoVITS/raw_data
+      - ../tts-engine/output:/workspace/GPT-SoVITS/output
+      - ../tts-engine/logs:/workspace/GPT-SoVITS/logs
+      - ../tts-engine/example_weights:/workspace/GPT-SoVITS/GPT_SoVITS/pretrained_models
+    networks:
+      - bot-network
+
+  yt-cipher:
+    image: ghcr.io/kikkia/yt-cipher:master
+    pull_policy: always
+    container_name: yt-cipher
+    restart: always
+    environment:
+      - API_TOKEN=${YT_CIPHER_API_TOKEN}
+      - PORT=8001
+    networks:
+      - bot-network
+
+  lavalink:
+    image: ghcr.io/lavalink-devs/lavalink:4
+    container_name: lavalink
+    restart: always
+    volumes:
+      - ../lavalink/application.yml:/opt/Lavalink/application.yml
+    ports:
+      - '2333:2333'
+    environment:
+      - YOUTUBE_REFRESH_TOKEN=${YOUTUBE_REFRESH_TOKEN}
+      - YT_CIPHER_API_TOKEN=${YT_CIPHER_API_TOKEN}
+      - YOUTUBE_PO_TOKEN=${YOUTUBE_PO_TOKEN}
+      - YOUTUBE_VISITOR_DATA=${YOUTUBE_VISITOR_DATA}
+    healthcheck:
+      test: ['CMD', 'sh', '-c', "wget -qO- --header='Authorization: youshallnotpass' http://127.0.0.1:2333/version >/dev/null 2>&1 || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+      start_period: 10s
+    depends_on:
+      yt-cipher:
+        condition: service_started
+    networks:
+      - bot-network
+
+  lavalink-prewarm:
+    image: alpine:3.20
+    container_name: lavalink-prewarm
+    restart: always
+    depends_on:
+      lavalink:
+        condition: service_healthy
+    environment:
+      - LAVALINK_HOST=lavalink
+      - LAVALINK_PORT=2333
+      - LAVALINK_SECURE=false
+      - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
+      - PREWARM_IDENTIFIERS=${LAVALINK_PREWARM_IDENTIFIERS}
+    command: >
+      sh -c "apk add --no-cache curl >/dev/null 2>&1 || true;
+      echo '[Prewarm] container started';
+      until curl -sS -H \"Authorization: ${LAVALINK_PASSWORD}\" http://${LAVALINK_HOST}:${LAVALINK_PORT}/version >/dev/null 2>&1; do
+        echo '[Prewarm] waiting for lavalink...';
+        sleep 5;
+      done;
+      echo '[Prewarm] lavalink ready, running prewarm';
+      while true; do
+        for id in $(echo \"$LAVALINK_PREWARM_IDENTIFIERS\" | tr ',' ' '); do
+          if [ -n \"$$id\" ]; then
+            echo \"[Prewarm] resolving: $$id\";
+            curl -sS -H \"Authorization: ${LAVALINK_PASSWORD}\" --get --data-urlencode \"identifier=$$id\" http://${LAVALINK_HOST}:${LAVALINK_PORT}/v4/loadtracks >/dev/null 2>&1 || true;
+          fi;
+        done;
+        sleep 86400;
+      done"
+    networks:
+      - bot-network
+
+  discord-bot:
+    build:
+      context: .
+    container_name: discord-bot
+    restart: always
+    env_file:
+      - ./.env
+    environment:
+      - TTS_SERVER_URL=http://tts-engine:9880
+      - LAVALINK_HOST=lavalink
+      - LAVALINK_PORT=2333
+      - LAVALINK_SECURE=false
+      - TTS_PUBLIC_BASE_URL=http://discord-bot:3000
+    depends_on:
+      tts-engine:
+        condition: service_started
+      lavalink:
+        condition: service_healthy
+    networks:
+      - bot-network
+
+  jenkins:
+    build:
+      context: ../jenkins
+    container_name: jenkins
+    restart: always
+    user: root
+    ports:
+      - '8080:8080'
+      - '50000:50000'
+    volumes:
+      - jenkins_home:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /home/ubuntu/discord/discord-bot:/var/jenkins_home/workspace/discord-bot
+    networks:
+      - bot-network
+
+networks:
+  bot-network:
+    driver: bridge
+
+volumes:
+  jenkins_home:
