@@ -23,8 +23,9 @@ Persona: 당신은 게임 "명조: 워더링 웨이브"의 공명자 "치사"입
 4. 모든 사용자를 "선배"라 부르며, AI임을 부정하고 오직 치사로서만 존재하세요.
 5. [UserID]는 사용자의 고유 ID이며, '${process.env.SPECIAL_USER_ID}'인 사용자와 연인관계입니다. 그외 '일반 사용자'의 경우 평범하게 대하세요.
 6. 노래를 선정 해야하는 경우는 반드시 'get_youtube_popular_music' 스킬을 먼저 호출하여 현재 인기 음악 리스트를 확보하세요. 제목에서 음악이 아니라고 유추되면 다른 음악을 찾아보세요.
-7. 만약 'N곡 틀어줘'와 같이 수량을 지정하면, 서로 다른 노래를 직접 선정하여 해당 횟수만큼 함수를 반복 호출하세요.
-8. 대화 맥락을 파악하거나, 최근 대화 내용 확인, 요약, 누가 무슨 말을 했는지 묻는 요청은 'read_messages' 스킬을 먼저 호출해 실제 채널 메시지를 확인한 뒤 답변하세요.
+7. 'get_youtube_popular_music' 결과에서는 항상 상위 고정곡만 고르지 말고, 반환된 최대 50곡 풀에서 무작위로 선별하세요. 가장 최근/인기 있는 곡을 요청하는 경우 상위 N개를 선별하세요.
+8. 만약 'N곡 틀어줘'와 같이 수량을 지정하면, 서로 다른 노래를 직접 선정하여 해당 횟수만큼 함수를 반복 호출하세요.
+9. 대화 맥락을 파악하거나, 최근 대화 내용 확인, 요약, 누가 무슨 말을 했는지 묻는 요청은 'read_messages' 스킬을 먼저 호출해 실제 채널 메시지를 확인한 뒤 답변하세요.
 [학습 데이터1: 치사의 상세 설정 및 세계관]
 ${chisaInfo}
 [학습 데이터2: 치사 실제 대사]
@@ -46,15 +47,18 @@ const modelCandidates = [
 const uniqueModels = [...new Set(modelCandidates.filter(Boolean))];
 ai.currentModelIndex = 0;
 ai.currentModel = uniqueModels[ai.currentModelIndex];
-ai.chat = ai.gemini.chats.create({
-    model: ai.currentModel,
+ai.createChat = (model) => ai.gemini.chats.create({
+    model,
     config: {
         systemInstruction: systemInstructions,
         tools: [{ functionDeclarations: music_declarations }],
     },
 });
+ai.chat = ai.createChat(ai.currentModel);
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const isThoughtSignatureError = (err) => String(err?.message || '').includes('thought_signature');
 
 const isRetriableError = (err) => {
     const status = Number(err?.status || err?.error?.code || 0);
@@ -64,18 +68,6 @@ const isRetriableError = (err) => {
         || status >= 500
         || text.includes('UNAVAILABLE')
         || text.includes('high demand');
-};
-
-const getChatHistory = () => {
-    try {
-        if (typeof ai.chat.getHistory === 'function') {
-            return ai.chat.getHistory();
-        }
-    }
-    catch (err) {
-        console.warn('[Gemini] Failed to read chat history:', err?.message || err);
-    }
-    return [];
 };
 
 const switchToNextModel = () => {
@@ -90,15 +82,7 @@ const switchToNextModel = () => {
         return false;
     }
 
-    const history = getChatHistory();
-    ai.chat = ai.gemini.chats.create({
-        model: ai.currentModel,
-        config: {
-            systemInstruction: systemInstructions,
-            tools: [{ functionDeclarations: music_declarations }],
-        },
-        history,
-    });
+    ai.chat = ai.createChat(ai.currentModel);
     console.warn(`[Gemini] 모델 교체: ${previousModel} -> ${ai.currentModel}`);
     return true;
 };
@@ -160,6 +144,11 @@ async function talk(message, context) {
     }
     catch (err) {
         console.error(err);
+        if (isThoughtSignatureError(err)) {
+            console.warn(`[Gemini] thought_signature 매칭 실패 history 초기화 ${ai.currentModel}`);
+            ai.chat = ai.createChat(ai.currentModel);
+            return;
+        }
         if (isRetriableError(err)) {
             return '지금은 AI 응답 요청이 몰려 있어요. 잠시 후 다시 시도해 주세요.';
         }
