@@ -2,11 +2,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const { Shoukaku, Connectors } = require('shoukaku');
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
+const express = require('express');
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
 const { createTtsRuntime } = require('./tts/runtime');
 const { createRuntimeUtils } = require('./music/runtime-util');
 const { initDb } = require('./db/init');
+const { createTtsHttpStore } = require('./tts/http-store');
 
 const token = process.env.DISCORD_TOKEN;
 const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
@@ -15,6 +17,35 @@ const lavalinkHost = process.env.LAVALINK_HOST;
 const lavalinkPort = Number(process.env.LAVALINK_PORT || 2333);
 const lavalinkPassword = process.env.LAVALINK_PASSWORD;
 const lavalinkSecure = process.env.LAVALINK_SECURE === 'true';
+
+const httpPort = 3000;
+const httpHost = '0.0.0.0';
+const ttsPublicUrl = (process.env.TTS_PUBLIC_BASE_URL || `http://localhost:${httpPort}`);
+const app = express();
+
+const ttsHttpStore = createTtsHttpStore({
+  baseUrl: ttsPublicUrl,
+});
+
+app.get('/health', (req, res) => {
+  res.json({ ok: true });
+});
+
+app.get('/tts/:id.wav', (req, res) => {
+  const entry = ttsHttpStore.get(req.params.id);
+  if (!entry) {
+    res.status(404).send('Not found');
+    return;
+  }
+
+  res.set('Content-Type', entry.contentType);
+  res.set('Cache-Control', 'no-store');
+  res.send(entry.buffer);
+});
+
+app.listen(httpPort, httpHost, () => {
+  console.log(`[HTTP] listening on ${httpHost}:${httpPort}`);
+});
 
 if (!token) {
   console.error('DISCORD_TOKEN is missing in .env');

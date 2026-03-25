@@ -1,4 +1,8 @@
-function createTtsRuntime({ runtimeUtils }) {
+function createTtsRuntime({ runtimeUtils, ttsHttpStore }) {
+    function createPlayableUrl(audioBuffer) {
+        return ttsHttpStore?.put(audioBuffer, 'audio/wav') || null;
+    }
+
     async function playTts(interaction, query, input) {
         const guild = interaction.guild;
         if (!guild) throw new Error('Guild only command');
@@ -24,6 +28,6 @@ function createTtsRuntime({ runtimeUtils }) {
 
         return { ok: true, message: `치사가 읽어드려요: "${input}"` };
     };
-  return { playTts };
+  return { playTts, createPlayableUrl };
 }
 module.exports = { createTtsRuntime };

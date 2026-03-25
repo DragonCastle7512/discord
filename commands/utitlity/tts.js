@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, AttachmentBuilder } = require('discord.js');
+const { SlashCommandBuilder } = require('discord.js');
 const { generateTTS } = require('../../util/tts');
 
 module.exports = {
@@ -15,23 +15,24 @@ module.exports = {
                 return;
             }
 
-            if (!context?.music?.play) {
-                await interaction.editReply({ content: '노래가 아직 재생중입니다!' });
+            if (!context?.tts?.createPlayableUrl || !context?.tts?.playTts) {
+                await interaction.editReply({ content: 'TTS 런타임이 준비되지 않았어요. 이미 재생되고 있는 음성이 있는지 확인해주세요!' });
                 return;
             }
 
             const audioBuffer = await generateTTS(input);
-            const fileName = `tts-${Date.now()}.wav`;
-            const attachment = new AttachmentBuilder(audioBuffer, { name: fileName });
-            const tempMessage = await interaction.channel.send({ files: [attachment] });
-            const ttsUrl = tempMessage.attachments.first()?.url;
+            if (!Buffer.isBuffer(audioBuffer) || audioBuffer.length === 0) {
+                await interaction.editReply({ content: 'TTS 음성 생성에 실패했습니다.' });
+                return;
+            }
 
+            const ttsUrl = context.tts.createPlayableUrl(audioBuffer);
             if (!ttsUrl) {
                 await interaction.editReply({ content: 'tts 파일 업로드 실패' });
                 return;
             }
 
-            await context.tts.playTts(interaction, ttsUrl);
+            await context.tts.playTts(interaction, ttsUrl, input);
             await interaction.editReply({ content: `치사가 읽어드려요: "${input}"` });
         }
         catch (err) {
