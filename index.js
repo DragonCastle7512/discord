@@ -104,7 +104,7 @@ const music = createMusicRuntime({
   runtimeUtils,
 });
 
-const tts = createTtsRuntime({ runtimeUtils });
+const tts = createTtsRuntime({ runtimeUtils, ttsHttpStore });
 
 const context = { music, tts };
 

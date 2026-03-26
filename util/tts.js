@@ -2,10 +2,12 @@ const axios = require('axios');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const ffmpegStatic = require('ffmpeg-static');
 const { execFile } = require('child_process');
 const { promisify } = require('util');
 
 const execFileAsync = promisify(execFile);
+const ffmpegBinary = process.env.FFMPEG_PATH || ffmpegStatic || 'ffmpeg';
 
 function getEmotion(input) {
     if (input.includes('!')) return { ref_audio: '0003554560_0003677120', prompt_text: '구조가... 선명하게 보여요!' };
@@ -34,7 +36,7 @@ async function normalizeWavWithFfmpeg(buffer) {
 
     try {
         fs.writeFileSync(inputPath, buffer);
-        await execFileAsync('ffmpeg', [
+        await execFileAsync(ffmpegBinary, [
             '-y',
             '-i',
             inputPath,
@@ -42,20 +44,21 @@ async function normalizeWavWithFfmpeg(buffer) {
             'loudnorm=I=-14:TP=-1.5:LRA=11',
             outputPath,
         ]);
+        if (!fs.existsSync(outputPath)) {
+            throw new Error(`ffmpeg output not found: ${outputPath}`);
+        }
         return fs.readFileSync(outputPath);
     }
     finally {
-        try {
-            fs.unlinkSync(inputPath);
-        }
-        catch (err) {
-            console.error(err);
-        }
-        try {
-            fs.unlinkSync(outputPath);
-        }
-        catch (err) {
-            console.error(err);
+        for (const p of [inputPath, outputPath]) {
+            try {
+                fs.unlinkSync(p);
+            }
+            catch (err) {
+                if (err?.code !== 'ENOENT') {
+                    console.error(err);
+                }
+            }
         }
     }
 }
