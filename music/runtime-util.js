@@ -1,5 +1,6 @@
 const { buildNowPlayingEmbed } = require('./embeds/buildEmbed');
 
+const HISTORY_LIMIT = 20;
 function isUrl(input) {
     return /^https?:\/\//i.test(input);
 }
@@ -305,6 +306,21 @@ function createRuntimeUtils({
         }
 
         state.current = next;
+        if (!Array.isArray(state.history)) {
+            state.history = [];
+        }
+
+        state.history.unshift({
+            encoded: next.encoded,
+            info: next.info || {},
+            requestedBy: next.requestedBy || null,
+            playedAt: Date.now(),
+        });
+
+        if (state.history.length > HISTORY_LIMIT) {
+            state.history.length = HISTORY_LIMIT;
+        }
+
         state.playing = true;
         try {
             await state.player.playTrack({ track: { encoded: next.encoded } });

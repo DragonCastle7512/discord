@@ -88,6 +88,20 @@ module.exports = {
       },
     },
     {
+      name: 'get_recent_played_music',
+      description: '현재 서버에서 최근 재생한 음악 목록을 조회합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          limit: {
+            type: 'NUMBER',
+            description: '조회할 개수 (1~20). 기본값: 10',
+          },
+        },
+        required: [],
+      },
+    },
+    {
       name: 'get_youtube_popular_music',
       description: '유튜브 인기 음악을 조회합니다. 요청 수에 못 미치면 nextPageToken을 사용해 pageToken으로 재호출할 수 있습니다.',
       parameters: {
@@ -270,6 +284,32 @@ module.exports = {
       });
       console.log(response?.text);
       return response;
+    },
+    get_recent_played_music: async (args, obj) => {
+      const guildId = obj?.message?.guild?.id;
+      if (!guildId) {
+        return {
+          ok: false,
+          reason: '서버 채널에서만 사용할 수 있습니다.',
+        };
+      }
+
+      const limit = Math.max(1, Math.min(20, Number(args?.limit) || 10));
+      const result = obj?.context?.music?.history(guildId, limit);
+      const items = Array.isArray(result?.items) ? result.items : [];
+
+      return {
+        ok: true,
+        count: Number(result?.count || 0),
+        total: Number(result?.total || 0),
+        items: items.map((track, index) => ({
+          index: index + 1,
+          title: track?.info?.title || 'Unknown title',
+          url: track?.info?.uri || null,
+          requestedBy: track?.requestedBy || null,
+          playedAt: track?.playedAt || null,
+        })),
+      };
     },
     read_messages: async (args, obj) => {
       const channel = obj?.message?.channel;

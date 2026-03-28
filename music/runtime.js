@@ -172,6 +172,18 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `Playlist에서 노래를 삭제했어요!\n **${title}**` };
   }
 
+  function history(guildId, limit = 10) {
+    const state = guildStates.get(guildId);
+    const items = Array.isArray(state?.history) ? state.history : [];
+    const safeLimit = Math.max(1, Math.min(20, Number(limit) || 10));
+    const recent = items.slice(0, safeLimit);
+    return {
+      count: recent.length,
+      total: items.length,
+      items: recent,
+    };
+  }
+
   async function movePlaylistItem(userId, fromIndex, toIndex) {
     const entries = await findPlaylist(userId);
     if (!entries.length) {
@@ -223,6 +235,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     skip,
     stop,
     queue,
+    history,
     getPlaylist,
     addToPlaylist,
     clearToPlaylist,
