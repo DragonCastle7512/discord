@@ -1,19 +1,19 @@
 const { DataTypes, Model, Sequelize } = require('sequelize');
 
-class PlayList extends Model {}
+class MusicHistory extends Model {}
 
-function initPlayListModel(sequelize) {
-  PlayList.init(
+function initMusicHistoryModel(sequelize) {
+  MusicHistory.init(
     {
       id: {
         type: DataTypes.BIGINT,
         autoIncrement: true,
         primaryKey: true,
       },
-      userId: {
-        type: DataTypes.STRING(64),
+      guildId: {
+        type: DataTypes.STRING(32),
         allowNull: false,
-        field: 'user_id',
+        field: 'guild_id',
       },
       musicInfo: {
         type: DataTypes.JSON,
@@ -29,17 +29,17 @@ function initPlayListModel(sequelize) {
     },
     {
       sequelize,
-      modelName: 'PlayList',
-      tableName: 'PLAYLIST',
+      modelName: 'MusicHistory',
+      tableName: 'MUSIC_HISTORY',
       timestamps: true,
       updatedAt: false,
     },
   );
 
-  return PlayList;
+  return MusicHistory;
 }
 
 module.exports = {
-  PlayList,
-  initPlayListModel,
+  MusicHistory,
+  initMusicHistoryModel,
 };

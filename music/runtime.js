@@ -1,3 +1,4 @@
+const { findAllHistory } = require('./repositorys/music-history.repository');
 const { insertPlaylist, findPlaylist, clearPlaylist, updatePlaylist, deletePlaylist } = require('./repositorys/playlist.repository');
 
 function createMusicRuntime({ guildStates, runtimeUtils }) {
@@ -35,7 +36,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     const state = await joinOrMovePlayer(guild, channelId, voiceChannel);
     if (!trimmedQuery) {
       const res = await findPlaylist(userId);
-      const playlist = res.map((music) => music.music_info);
+      const playlist = res.map((music) => music.musicInfo);
       if (!playlist.length) {
         return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
       }
@@ -111,7 +112,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
 
   async function getPlaylist(userId) {
     const res = await findPlaylist(userId);
-    const playlist = res.map((music) => music.music_info);
+    const playlist = res.map((music) => music.musicInfo);
     return playlist;
   }
 
@@ -168,19 +169,16 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
 
     const entry = entries[targetIndex - 1];
     await deletePlaylist(userId, entry.id);
-    const title = entry.music_info?.info?.title || 'Unknown title';
+    const title = entry.musicInfo?.info?.title || 'Unknown title';
     return { ok: true, message: `Playlist에서 노래를 삭제했어요!\n **${title}**` };
   }
 
-  function history(guildId, limit = 10) {
-    const state = guildStates.get(guildId);
-    const items = Array.isArray(state?.history) ? state.history : [];
-    const safeLimit = Math.max(1, Math.min(20, Number(limit) || 10));
-    const recent = items.slice(0, safeLimit);
+  async function history(guildId) {
+    const items = await findAllHistory(guildId);
+
     return {
-      count: recent.length,
       total: items.length,
-      items: recent,
+      items: items,
     };
   }
 
@@ -200,7 +198,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       return { ok: true, message: '노래 위치가 이미 같아요' };
     }
 
-    const original = entries.map((entry) => entry.music_info);
+    const original = entries.map((entry) => entry.musicInfo);
     const moved = original.slice();
     const [item] = moved.splice(from - 1, 1);
     moved.splice(to - 1, 0, item);

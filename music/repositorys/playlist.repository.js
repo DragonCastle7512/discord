@@ -1,7 +1,7 @@
 const { PlayList } = require('../models/playlist');
 
-async function insertPlaylist(userId, music_info) {
-  return PlayList.create({ userId, music_info });
+async function insertPlaylist(userId, musicInfo) {
+  return PlayList.create({ userId, musicInfo });
 }
 
 async function findPlaylist(userId) {
@@ -11,9 +11,9 @@ async function findPlaylist(userId) {
   });
 }
 
-async function updatePlaylist(userId, id, music_info, transaction) {
+async function updatePlaylist(userId, id, musicInfo, transaction) {
   return PlayList.update(
-    { music_info },
+    { musicInfo },
     { where: { userId, id }, transaction },
   );
 }

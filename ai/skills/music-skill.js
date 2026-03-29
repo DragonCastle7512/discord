@@ -92,12 +92,7 @@ module.exports = {
       description: '현재 서버에서 최근 재생한 음악 목록을 조회합니다.',
       parameters: {
         type: 'OBJECT',
-        properties: {
-          limit: {
-            type: 'NUMBER',
-            description: '조회할 개수 (1~20). 기본값: 10',
-          },
-        },
+        properties: {},
         required: [],
       },
     },
@@ -294,22 +289,18 @@ module.exports = {
         };
       }
 
-      const limit = Math.max(1, Math.min(20, Number(args?.limit) || 10));
-      const result = obj?.context?.music?.history(guildId, limit);
-      const items = Array.isArray(result?.items) ? result.items : [];
-
+      const result = await obj?.context?.music?.history(guildId);
       return {
         ok: true,
-        count: Number(result?.count || 0),
         total: Number(result?.total || 0),
-        items: items.map((track, index) => ({
+        items: result.items.map((track, index) => ({
           index: index + 1,
-          title: track?.info?.title || 'Unknown title',
-          url: track?.info?.uri || null,
-          requestedBy: track?.requestedBy || null,
-          playedAt: track?.playedAt || null,
+          title: track?.musicInfo?.info?.title || 'Unknown title',
+          url: track?.musicInfo?.info?.uri || null,
+          requestedBy: track?.musicInfo?.requestedBy || null,
+          createAt: track?.createdAt || null,
         })),
-      };
+      };;
     },
     read_messages: async (args, obj) => {
       const channel = obj?.message?.channel;

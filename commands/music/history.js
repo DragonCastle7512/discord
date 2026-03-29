@@ -10,9 +10,9 @@ function formatTitle(title, max = 80) {
   return `${title.slice(0, max - 3)}...`;
 }
 
-function formatPlayedAt(playedAt) {
-  if (!playedAt) return '날짜 없음';
-  const date = new Date(playedAt);
+function formatPlayedAt(createdAt) {
+  if (!createdAt) return '날짜 없음';
+  const date = new Date(createdAt);
   if (Number.isNaN(date.getTime())) return '날짜 없음';
   return date.toLocaleString('ko-KR', {
     year: 'numeric',
@@ -35,25 +35,24 @@ module.exports = {
         .setMaxValue(MAX_LIMIT),
     ),
   async execute(interaction, context) {
-    const limit = interaction.options.getInteger('limit') || DEFAULT_LIMIT;
-    const result = context.music.history(interaction.guildId, limit);
+    const result = await context.music.history(interaction.guildId);
 
-    if (!result.count) {
+    if (!result.total) {
       const empty = buildEmbed('History', '최근 재생한 음악이 없습니다.', '0 track(s)');
       await interaction.reply({ embeds: [empty] });
       return;
     }
 
     const lines = result.items.map((track) => {
-      const title = formatTitle(track?.info?.title);
-      const playedAt = formatPlayedAt(track?.playedAt);
-      return `**[ ${playedAt} ]**\n* ${title}\n`;
+      const title = formatTitle(track?.musicInfo?.info?.title);
+      const createdAt = formatPlayedAt(track?.createdAt);
+      return `**[ ${createdAt} ]**\n* ${title}\n`;
     });
 
     const embed = buildEmbed(
       'History',
       lines.join('\n'),
-      `${result.count} track(s)${result.total > result.count ? ` / total ${result.total}` : ''}`,
+      `${result.total} track(s)`,
     );
 
     await interaction.reply({ embeds: [embed] });
