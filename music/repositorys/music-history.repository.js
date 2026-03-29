@@ -7,7 +7,7 @@ async function insertHistory(guildId, musicInfo) {
 async function findAllHistory(guildId) {
   return await MusicHistory.findAll({
     where: { guildId },
-    order: [['createdAt', 'ASC']],
+    order: [['createdAt', 'DESC']],
   });
 }
 
