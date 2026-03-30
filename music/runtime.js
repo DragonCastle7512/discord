@@ -182,6 +182,12 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     };
   }
 
+  async function loop(guildId) {
+    const state = guildStates.get(guildId);
+    state.loop = !state.loop;
+    return { enabled: Boolean(state.loop) };
+  }
+
   async function movePlaylistItem(userId, fromIndex, toIndex) {
     const entries = await findPlaylist(userId);
     if (!entries.length) {
@@ -233,6 +239,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     skip,
     stop,
     queue,
+    loop,
     history,
     getPlaylist,
     addToPlaylist,

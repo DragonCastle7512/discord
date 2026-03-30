@@ -46,6 +46,7 @@ function createRuntimeUtils({
                 textChannelId: null,
                 voiceChannelId: null,
                 playing: false,
+                loop: false,
             });
         }
 
@@ -153,9 +154,16 @@ function createRuntimeUtils({
             });
         }
 
-        player.on('end', async () => {
+        player.on('end', async (event) => {
+            const endedTrack = state.current;
             state.playing = false;
             state.current = null;
+            if (state.loop && endedTrack && (!event?.reason || event.reason === 'finished' || event.reason === 'stopped')) {
+                state.queue.push({
+                   ...endedTrack,
+                     info: endedTrack.info ? { ...endedTrack.info } : {},
+                  });
+             }
             await playNext(guild.id);
         });
 
