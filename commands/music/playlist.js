@@ -4,6 +4,10 @@ const { buildEmbed } = require('../../music/embeds/buildEmbed');
 const MAX_VISIBLE = 25;
 const COLLECTOR_MS = 5 * 60 * 1000;
 
+function isUnknownMessageError(error) {
+  return Number(error?.code) === 10008;
+}
+
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
 }
@@ -170,8 +174,16 @@ module.exports = {
         await interaction.deleteReply();
       }
       catch (error) {
+        if (isUnknownMessageError(error)) return;
         if (message.deletable) {
-          await message.delete();
+          try {
+            await message.delete();
+          }
+          catch (deleteError) {
+            if (!isUnknownMessageError(deleteError)) {
+              console.warn('Failed to delete playlist message:', deleteError);
+            }
+          }
         }
         else {
           console.warn('Failed to remove playlist components on collector end:', error);

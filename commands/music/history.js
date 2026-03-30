@@ -4,6 +4,10 @@ const { buildEmbed } = require('../../music/embeds/buildEmbed');
 const PAGE_SIZE = 6;
 const COLLECTOR_MS = 3 * 60 * 1000;
 
+function isUnknownMessageError(error) {
+  return Number(error?.code) === 10008;
+}
+
 function formatTitle(title, max = 80) {
   if (!title) return 'Unknown title';
   if (title.length <= max) return title;
@@ -115,8 +119,16 @@ module.exports = {
         await interaction.deleteReply();
       }
       catch (error) {
+        if (isUnknownMessageError(error)) return;
         if (message.deletable) {
-          await message.delete();
+          try {
+            await message.delete();
+          }
+          catch (deleteError) {
+            if (!isUnknownMessageError(deleteError)) {
+              console.warn('Failed to delete history pagination message:', deleteError);
+            }
+          }
         }
         else {
           console.warn('Failed to disable history pagination buttons:', error);
