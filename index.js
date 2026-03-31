@@ -130,26 +130,34 @@ client.once(Events.ClientReady, (readyClient) => {
 client.login(token);
 client.commands = new Collection();
 client.on(Events.InteractionCreate, async (interaction) => {
-	if (!interaction.isChatInputCommand()) return;
-	const command = interaction.client.commands.get(interaction.commandName);
+  try {
+    if (interaction.isButton() || interaction.isStringSelectMenu()) {
+      if (!interaction.customId.startsWith('qctl|')) return;
+      const queueCommand = interaction.client.commands.get('queue');
+      if (!queueCommand || typeof queueCommand.handleComponent !== 'function') return;
+      await queueCommand.handleComponent(interaction, context);
+      return;
+    }
 
-	try {
-		await command.execute(interaction, context);
-	}
-	catch (error) {
-		console.error('Command error:', error);
-		const reason = String(error.message || '');
-		const text = reason.includes('Track lookup failed')
-		? 'Track search failed on Lavalink sources. Try a direct URL or another keyword.'
-		: 'An error occurred while processing your command.';
+    if (!interaction.isChatInputCommand()) return;
+    const command = interaction.client.commands.get(interaction.commandName);
+    if (!command) return;
+    await command.execute(interaction, context);
+  }
+  catch (error) {
+    console.error('Command error:', error);
+    const reason = String(error.message || '');
+    const text = reason.includes('Track lookup failed')
+      ? 'Track search failed on Lavalink sources. Try a direct URL or another keyword.'
+      : 'An error occurred while processing your command.';
 
-		if (interaction.deferred || interaction.replied) {
-			await interaction.editReply(text).catch((err) => console.error(err));
-		}
-		else {
-			await interaction.reply({ content: text, ephemeral: true }).catch((err) => console.error(err));
-		}
-	}
+    if (interaction.deferred || interaction.replied) {
+      await interaction.editReply(text).catch((err) => console.error(err));
+    }
+    else if (interaction.isRepliable()) {
+      await interaction.reply({ content: text, ephemeral: true }).catch((err) => console.error(err));
+    }
+  }
 });
 
 client.on('voiceStateUpdate', (oldState, newState) => {

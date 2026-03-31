@@ -173,6 +173,48 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `Playlist에서 노래를 삭제했어요!\n **${title}**` };
   }
 
+  function getQueueSnapshot(guildId) {
+    const state = guildStates.get(guildId);
+    return {
+      current: state.current || null,
+      queue: state.queue.slice(),
+    };
+  }
+
+  function moveQueueItem(guildId, fromIndex, toIndex) {
+    const state = guildStates.get(guildId);
+    const length = state.queue.length;
+    const from = Number(fromIndex);
+    const to = Number(toIndex);
+
+    if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < 1 || from > length || to > length) {
+      return { ok: false, message: `Invalid queue position. Use 1-${length}.` };
+    }
+
+    if (from === to) {
+      return { ok: true, message: 'Track is already in that position.' };
+    }
+
+    const [item] = state.queue.splice(from - 1, 1);
+    state.queue.splice(to - 1, 0, item);
+    const title = item?.info?.title || 'Unknown title';
+    return { ok: true, message: `Moved: ${title} (${from} -> ${to})` };
+  }
+
+  function removeQueueItem(guildId, index) {
+    const state = guildStates.get(guildId);
+    const length = state.queue.length;
+    const target = Number(index);
+
+    if (!Number.isInteger(target) || target < 1 || target > length) {
+      return { ok: false, message: `Invalid queue position. Use 1-${length}.` };
+    }
+
+    const [removed] = state.queue.splice(target - 1, 1);
+    const title = removed?.info?.title || 'Unknown title';
+    return { ok: true, message: `Removed: ${title}` };
+  }
+
   async function history(guildId) {
     const items = await findAllHistory(guildId);
 
@@ -244,6 +286,9 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     getPlaylist,
     addToPlaylist,
     clearToPlaylist,
+    getQueueSnapshot,
+    moveQueueItem,
+    removeQueueItem,
     deleteFromPlaylist,
     movePlaylistItem,
   };
