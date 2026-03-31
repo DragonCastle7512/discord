@@ -148,8 +148,8 @@ client.on(Events.InteractionCreate, async (interaction) => {
     console.error('Command error:', error);
     const reason = String(error.message || '');
     const text = reason.includes('Track lookup failed')
-      ? 'Track search failed on Lavalink sources. Try a direct URL or another keyword.'
-      : 'An error occurred while processing your command.';
+      ? '트랙 재생에 실패했어요.'
+      : '오류가 발생했어요.';
 
     if (interaction.deferred || interaction.replied) {
       await interaction.editReply(text).catch((err) => console.error(err));

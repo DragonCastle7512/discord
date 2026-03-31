@@ -6,6 +6,7 @@ const {
   ButtonBuilder,
   ButtonStyle,
 } = require('discord.js');
+const { buildEmbed } = require('../../music/embeds/buildEmbed');
 
 const PAGE_SIZE = 10;
 const CUSTOM_PREFIX = 'qctl';
@@ -84,7 +85,7 @@ function buildQueueView(snapshot, state = {}) {
       const duration = formatDuration(track.info?.length);
       return `${marker} ${queueIndex}. ${truncate(track.info?.title)} [${duration}]`;
     })
-    : ['(대기열이 비어 있습니다)'];
+    : ['(대기열이 비어 있어요)'];
 
   const footer = [
     `대기열 ${queueLength}곡`,
@@ -184,6 +185,11 @@ module.exports = {
     .setDescription('재생 대기열을 확인하고 순서를 제어합니다'),
   async execute(interaction, context) {
     const snapshot = context.music.getQueueSnapshot(interaction.guildId);
+    if (!snapshot.current && snapshot.queue.length <= 0) {
+      const embed = buildEmbed('Queue', 'Queue가 비어있어요', '0 track(s)');
+      await interaction.reply({ embeds: [embed] });
+      return;
+    }
     const view = buildQueueView(snapshot, { page: 1 });
     await interaction.reply(view);
   },
@@ -225,35 +231,35 @@ module.exports = {
         shouldFollowSelection = false;
       }
       else if (parsed.action === 'top') {
-          const result = context.music.moveQueueItem(guildId, selectedIndex, 1);
-          selectedIndex = result.ok ? 1 : selectedIndex;
-        }
-        else if (parsed.action === 'up') {
-          const target = Math.max(1, selectedIndex - 1);
-          const result = context.music.moveQueueItem(guildId, selectedIndex, target);
-          selectedIndex = result.ok ? target : selectedIndex;
-        }
-        else if (parsed.action === 'down') {
-          const target = Math.min(queueLength, selectedIndex + 1);
-          const result = context.music.moveQueueItem(guildId, selectedIndex, target);
-          selectedIndex = result.ok ? target : selectedIndex;
-        }
-        else if (parsed.action === 'bottom') {
-          const result = context.music.moveQueueItem(guildId, selectedIndex, queueLength);
-          selectedIndex = result.ok ? queueLength : selectedIndex;
-        }
-        else if (parsed.action === 'remove') {
-          const result = context.music.removeQueueItem(guildId, selectedIndex);
-          if (result.ok) {
-            const afterLength = Math.max(0, queueLength - 1);
-            if (afterLength === 0) {
-              selectedIndex = null;
-            }
-            else if (selectedIndex > afterLength) {
-              selectedIndex = afterLength;
-            }
+        const result = context.music.moveQueueItem(guildId, selectedIndex, 1);
+        selectedIndex = result.ok ? 1 : selectedIndex;
+      }
+      else if (parsed.action === 'up') {
+        const target = Math.max(1, selectedIndex - 1);
+        const result = context.music.moveQueueItem(guildId, selectedIndex, target);
+        selectedIndex = result.ok ? target : selectedIndex;
+      }
+      else if (parsed.action === 'down') {
+        const target = Math.min(queueLength, selectedIndex + 1);
+        const result = context.music.moveQueueItem(guildId, selectedIndex, target);
+        selectedIndex = result.ok ? target : selectedIndex;
+      }
+      else if (parsed.action === 'bottom') {
+        const result = context.music.moveQueueItem(guildId, selectedIndex, queueLength);
+        selectedIndex = result.ok ? queueLength : selectedIndex;
+      }
+      else if (parsed.action === 'remove') {
+        const result = context.music.removeQueueItem(guildId, selectedIndex);
+        if (result.ok) {
+          const afterLength = Math.max(0, queueLength - 1);
+          if (afterLength === 0) {
+            selectedIndex = null;
+          }
+          else if (selectedIndex > afterLength) {
+            selectedIndex = afterLength;
           }
         }
+      }
     }
 
     const snapshot = context.music.getQueueSnapshot(guildId);

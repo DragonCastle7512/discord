@@ -29,7 +29,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     if (!readyNode) {
       return {
         ok: false,
-        message: 'Lavalink is not ready yet. Check `docker compose logs -f lavalink` and retry in a few seconds.',
+        message: '아직 서버가 준비 중이에요. 잠시 후에 다시 시도해주세요.',
       };
     }
 
@@ -176,8 +176,8 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
   function getQueueSnapshot(guildId) {
     const state = guildStates.get(guildId);
     return {
-      current: state.current || null,
-      queue: state.queue.slice(),
+      current: state?.current || null,
+      queue: state?.queue.slice() || [],
     };
   }
 
@@ -188,11 +188,11 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     const to = Number(toIndex);
 
     if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < 1 || from > length || to > length) {
-      return { ok: false, message: `Invalid queue position. Use 1-${length}.` };
+      return { ok: false, message: `유효하지 않은 위치예요. 1-${length}번을 선택해주세요.` };
     }
 
     if (from === to) {
-      return { ok: true, message: 'Track is already in that position.' };
+      return { ok: true, message: '같은 위치예요.' };
     }
 
     const [item] = state.queue.splice(from - 1, 1);
@@ -207,7 +207,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     const target = Number(index);
 
     if (!Number.isInteger(target) || target < 1 || target > length) {
-      return { ok: false, message: `Invalid queue position. Use 1-${length}.` };
+      return { ok: false, message: `유효하지 않은 위치예요. 1-${length}번을 선택해주세요.` };
     }
 
     const [removed] = state.queue.splice(target - 1, 1);
