@@ -53,48 +53,6 @@ function createRuntimeUtils({
         return guildStates.get(guildId);
     }
 
-    async function handleTrackFailure(guildId, failed) {
-        const state = guildStates.get(guildId);
-        if (!state) return;
-
-        if (failed && (failed._retryCount || 0) < 1) {
-            failed._retryCount = (failed._retryCount || 0) + 1;
-            let retried = false;
-            await sleep(1500);
-
-            const identifier = failed.info?.uri || failed.info?.title || '';
-            if (identifier) {
-                try {
-                    const { tracks } = await resolveTracks(identifier);
-                    if (tracks && tracks.length) {
-                        const refreshed = tracks[0];
-                        refreshed._retryCount = failed._retryCount;
-                        state.queue.unshift(refreshed);
-                        retried = true;
-                    }
-                }
-                catch (err) {
-                    console.warn('Token retry resolve failed:', err?.message || err);
-                }
-            }
-
-            if (!retried) {
-                state.queue.unshift(failed);
-            }
-
-            await playNext(guildId);
-            return;
-        }
-
-        const textChannel = getTextChannel(state.textChannelId);
-        if (textChannel && (!failed || !failed._failureNotified)) {
-        if (failed) failed._failureNotified = true;
-            textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
-        }
-
-        await playNext(guildId);
-    }
-
     async function joinOrMovePlayer(guild, textChannelId, voiceChannel) {
         const state = getGuildState(guild.id);
         state.textChannelId = textChannelId;
@@ -169,14 +127,12 @@ function createRuntimeUtils({
 
         player.on('exception', async (event) => {
             console.error('Player exception:', event);
-            const failed = state.current;
             state.playing = false;
             state.current = null;
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
                 textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
             }
-            await handleTrackFailure(guild.id, failed);
         });
 
         player.on('stuck', async () => {
@@ -346,10 +302,8 @@ function createRuntimeUtils({
         }
         catch (error) {
             console.error('PlayTrack failed:', error);
-            const failed = next;
             state.playing = false;
             state.current = null;
-            await handleTrackFailure(guildId, failed);
             return;
         }
     }

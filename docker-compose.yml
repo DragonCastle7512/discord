@@ -16,17 +16,6 @@ services:
     networks:
       - bot-network
 
-  yt-cipher:
-    image: ghcr.io/kikkia/yt-cipher:master
-    pull_policy: always
-    container_name: yt-cipher
-    restart: always
-    environment:
-      - API_TOKEN=${YT_CIPHER_API_TOKEN}
-      - PORT=8001
-    networks:
-      - bot-network
-
   lavalink:
     image: ghcr.io/lavalink-devs/lavalink:4
     container_name: lavalink
@@ -38,17 +27,12 @@ services:
     environment:
       - YOUTUBE_REFRESH_TOKEN=${YOUTUBE_REFRESH_TOKEN}
       - YT_CIPHER_API_TOKEN=${YT_CIPHER_API_TOKEN}
-      - YOUTUBE_PO_TOKEN=${YOUTUBE_PO_TOKEN}
-      - YOUTUBE_VISITOR_DATA=${YOUTUBE_VISITOR_DATA}
     healthcheck:
       test: ['CMD', 'sh', '-c', "wget -qO- --header='Authorization: youshallnotpass' http://127.0.0.1:2333/version >/dev/null 2>&1 || exit 1"]
       interval: 10s
       timeout: 3s
       retries: 10
       start_period: 10s
-    depends_on:
-      yt-cipher:
-        condition: service_started
     networks:
       - bot-network
 
@@ -124,7 +108,7 @@ services:
 
 networks:
   bot-network:
-    driver: bridge
+    external: true
 
 volumes:
   jenkins_home:
