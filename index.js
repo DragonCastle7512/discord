@@ -1,4 +1,3 @@
-const fs = require('node:fs');
 const path = require('node:path');
 const { Shoukaku, Connectors } = require('shoukaku');
 const { Client, Events, GatewayIntentBits, Collection } = require('discord.js');
@@ -9,6 +8,8 @@ const { createTtsRuntime } = require('./tts/runtime');
 const { createRuntimeUtils } = require('./music/runtime-util');
 const { initDb } = require('./db/init');
 const { createTtsHttpStore } = require('./tts/http-store');
+const { loadCommandModules } = require('./commands/loader');
+const { createSlashCommandInvoker } = require('./commands/slash-command-invoker');
 
 const token = process.env.DISCORD_TOKEN;
 const allowSoundCloudFallback = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
@@ -108,6 +109,21 @@ const tts = createTtsRuntime({ runtimeUtils, ttsHttpStore });
 
 const context = { music, tts };
 
+const commandsRoot = path.join(__dirname, 'commands');
+const { commands: loadedCommands, warnings } = loadCommandModules(commandsRoot);
+for (const warning of warnings) {
+  console.log(warning);
+}
+client.commands = new Collection();
+for (const [name, command] of loadedCommands.entries()) {
+  client.commands.set(name, command);
+}
+
+context.slashCommands = createSlashCommandInvoker({
+  commands: client.commands,
+  context,
+});
+
 shoukaku.on('ready', (name) => {
   readyNodes.add(name);
   console.log(`[Lavalink] Node connected: ${name}`);
@@ -128,7 +144,6 @@ client.once(Events.ClientReady, (readyClient) => {
 });
 
 client.login(token);
-client.commands = new Collection();
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
@@ -201,20 +216,3 @@ client.on('messageCreate', async (message) => {
 	const response = await talk(message, context);
 	await message.reply(`${response}`);
 });
-
-const foldersPath = path.join(__dirname, 'commands');
-const commandFolders = fs.readdirSync(foldersPath);
-for (const folder of commandFolders) {
-	const commandsPath = path.join(foldersPath, folder);
-	const commandFiles = fs.readdirSync(commandsPath).filter((file) => file.endsWith('.js'));
-	for (const file of commandFiles) {
-		const filePath = path.join(commandsPath, file);
-		const command = require(filePath);
-		if ('data' in command && 'execute' in command) {
-			client.commands.set(command.data.name, command);
-		}
-		else {
-			console.log(`[WARNING] The command at ${filePath} is missing a required "data" or "execute" property.`);
-		}
-	}
-}

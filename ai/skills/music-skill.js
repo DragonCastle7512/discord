@@ -72,22 +72,6 @@ const isShortOrLongDuration = (duration) => {
 module.exports = {
   music_declarations: [
     {
-      name: 'play_music',
-      description: `음악을 재생합니다. 
-        1. 'query'를 비워둔 채 호출하면 플레이리스트(재생 목록)의 모든 곡을 재생합니다.
-        2. 'query'에 곡 제목, 또는 유튜브 URL를 넣으면, 해당 곡을 재생합니다.`,
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          query: {
-            type: 'STRING',
-            description: '재생하고 싶은 노래 제목 또는 YouTube URL입니다. 플레이리스트 곡 재생 시에는 이 값을 생략하세요.',
-          },
-        },
-        required: [],
-      },
-    },
-    {
       name: 'get_recent_played_music',
       description: '현재 서버에서 최근 재생한 음악 목록을 조회합니다.',
       parameters: {
@@ -146,45 +130,6 @@ module.exports = {
   ],
 
   handlers: {
-    play_music: async (args, obj) => {
-      const { message, context } = obj;
-      try {
-        const guildId = message?.guild?.id;
-        const beforeQueue = guildId ? context.music.queue(guildId) : { count: 0 };
-        const result = await context.music.play(message, args.query);
-        const afterQueue = guildId ? context.music.queue(guildId) : { count: 0 };
-        const queueIncreased = Number(afterQueue?.count || 0) > Number(beforeQueue?.count || 0);
-
-        if (!result?.ok) {
-          return {
-            ok: false,
-            requestedQuery: args?.query || null,
-            reason: result?.message || '재생 실패',
-          };
-        }
-
-        return {
-          ok: true,
-          requestedQuery: args?.query || null,
-          message: result?.message || (args?.query ? `${args.query} 재생 요청 완료` : '플레이리스트 재생 요청 완료'),
-          verification: {
-            queueBefore: Number(beforeQueue?.count || 0),
-            queueAfter: Number(afterQueue?.count || 0),
-            queueIncreased,
-            note: queueIncreased
-              ? '큐 증가가 확인되었습니다.'
-              : '큐 증가는 없지만 현재 곡 교체/즉시 재생 상태일 수 있습니다.',
-          },
-        };
-      }
-      catch (err) {
-        return {
-          ok: false,
-          requestedQuery: args?.query || null,
-          reason: `재생 중 예외가 발생했습니다: ${err?.message || err}`,
-        };
-      }
-    },
     get_youtube_popular_music: async (args) => {
       const apiKey = process.env.YOUTUBE_API_KEY;
       if (!apiKey) {
@@ -300,7 +245,7 @@ module.exports = {
           requestedBy: track?.musicInfo?.requestedBy || null,
           createAt: track?.createdAt || null,
         })),
-      };;
+      };
     },
     read_messages: async (args, obj) => {
       const channel = obj?.message?.channel;
