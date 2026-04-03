@@ -224,9 +224,9 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     };
   }
 
-  async function loop(guildId) {
+  async function loop(guildId, enable) {
     const state = guildStates.get(guildId);
-    state.loop = !state.loop;
+    state.loop = (enable !== null) ? Boolean(enable) : !state.loop;
     return { enabled: Boolean(state.loop) };
   }
 

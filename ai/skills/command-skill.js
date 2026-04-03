@@ -96,10 +96,15 @@ module.exports = {
     },
     {
       name: 'slash_loop',
-      description: '반복 모드 활성화/비활성화 합니다.',
+      description: '반복 모드의 활성화/비활성화를 전환합니다.',
       parameters: {
         type: 'OBJECT',
-        properties: {},
+        properties: {
+          enable: {
+            type: 'BOOLEAN',
+            description: '활성화(true) 또는 비활성화(false) 여부',
+          },
+        },
         required: [],
       },
     },
@@ -173,7 +178,7 @@ module.exports = {
     slash_add: async (args, obj) => executeSlash(obj, 'add', { music: args?.music }),
     slash_clear: async (args, obj) => executeSlash(obj, 'clear'),
     slash_history: async (args, obj) => executeSlash(obj, 'history'),
-    slash_loop: async (args, obj) => executeSlash(obj, 'loop'),
+    slash_loop: async (args, obj) => executeSlash(obj, 'loop', { enable: args?.enable }),
     slash_playlist: async (args, obj) => executeSlash(obj, 'playlist'),
     slash_queue: async (args, obj) => executeSlash(obj, 'queue'),
     slash_skip: async (args, obj) => executeSlash(obj, 'skip'),
