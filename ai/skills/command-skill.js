@@ -87,10 +87,15 @@ module.exports = {
     },
     {
       name: 'slash_history',
-      description: '사용자에게 최근 재생한 음악 목록을 보여줍니다.',
+      description: '최근 재생한 음악 목록을 보여줍니다. user_id를 주면 해당 신청자 기록만 조회합니다.',
       parameters: {
         type: 'OBJECT',
-        properties: {},
+        properties: {
+          user: {
+            type: 'STRING',
+            description: '조회할 사용자 ID 또는 멘션(예: 123..., <@123...>)',
+          },
+        },
         required: [],
       },
     },
@@ -177,7 +182,7 @@ module.exports = {
     slash_play: async (args, obj) => executeSlash(obj, 'play', { query: args?.query }),
     slash_add: async (args, obj) => executeSlash(obj, 'add', { music: args?.music }),
     slash_clear: async (args, obj) => executeSlash(obj, 'clear'),
-    slash_history: async (args, obj) => executeSlash(obj, 'history'),
+    slash_history: async (args, obj) => executeSlash(obj, 'history', { user: args?.user }),
     slash_loop: async (args, obj) => executeSlash(obj, 'loop', { enable: args?.enable }),
     slash_playlist: async (args, obj) => executeSlash(obj, 'playlist'),
     slash_queue: async (args, obj) => executeSlash(obj, 'queue'),

@@ -28,6 +28,19 @@ function parseBoolean(value) {
 
 function createOptionsResolver(options) {
   const raw = (options && typeof options === 'object') ? options : {};
+    const normalizeUserId = (value) => {
+    if (value === undefined || value === null) return null;
+    if (typeof value === 'object' && value.id) {
+      return String(value.id);
+    }
+
+    const text = String(value).trim();
+    if (!text) return null;
+    const mention = /^<@!?(\d+)>$/.exec(text);
+    if (mention) return mention[1];
+    if (/^\d+$/.test(text)) return text;
+    return null;
+  };
 
   return {
     getString(name) {
@@ -48,6 +61,11 @@ function createOptionsResolver(options) {
         throw new Error(`Invalid boolean option: ${name}`);
       }
       return parsed;
+    },
+    getUser(name) {
+      const id = normalizeUserId(raw[name]);
+      if (!id) return null;
+      return { id };
     },
   };
 }

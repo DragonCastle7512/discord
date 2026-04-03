@@ -11,7 +11,20 @@ async function findAllHistory(guildId) {
   });
 }
 
+async function findHistoryByRequester(guildId, requestedBy) {
+  const items = await findAllHistory(guildId);
+  if (!requestedBy) {
+    return items;
+  }
+
+  return items.filter((item) => {
+    const requesterId = item?.musicInfo?.requestedBy;
+    return String(requesterId || '') === String(requestedBy);
+  });
+}
+
 module.exports = {
   insertHistory,
   findAllHistory,
+  findHistoryByRequester,
 };

@@ -1,4 +1,4 @@
-const { findAllHistory } = require('./repositorys/music-history.repository');
+const { findHistoryByRequester } = require('./repositorys/music-history.repository');
 const { insertPlaylist, findPlaylist, clearPlaylist, updatePlaylist, deletePlaylist } = require('./repositorys/playlist.repository');
 
 function createMusicRuntime({ guildStates, runtimeUtils }) {
@@ -215,8 +215,8 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `Removed: ${title}` };
   }
 
-  async function history(guildId) {
-    const items = await findAllHistory(guildId);
+  async function history(guildId, requestedBy) {
+    const items = await findHistoryByRequester(guildId, requestedBy);
 
     return {
       total: items.length,

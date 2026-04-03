@@ -34,7 +34,8 @@ function buildDescription(items, page) {
   return pageItems.map((track) => {
     const title = formatTitle(track?.musicInfo?.info?.title);
     const playedAt = formatPlayedAt(track?.createdAt);
-    return `> ${playedAt}\n* **${title}**`;
+    const member = items?.userCache?.get(track?.musicInfo?.requestedBy);
+    return `> ${playedAt} | 신청자: ${member?.user?.globalName}\n* **${title}**`;
   }).join('\n');
 }
 
@@ -58,12 +59,29 @@ function buildComponents(page, totalPages, userId) {
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('history')
-    .setDescription('최근 재생한 음악 목록을 확인합니다'),
+    .setDescription('최근 재생한 음악 목록을 확인합니다')
+    .addUserOption((option) =>
+      option
+        .setName('user')
+        .setDescription('해당 사용자가 요청한 곡만 조회')
+        .setRequired(false),
+    ),
   async execute(interaction, context) {
-    const result = await context.music.history(interaction.guildId);
+    const targetUser = interaction.options.getUser('user');
+    const result = await context.music.history(interaction.guildId, targetUser?.id);
 
+    let header = 'History';
+    if (targetUser) {
+      const directName = targetUser.globalName || targetUser.username || null;
+      if (directName) {
+        header = `${directName}의 Histroy`;
+      }
+      else if (targetUser.id) {
+        header = `${interaction?.guild?.members?.cache?.get(targetUser.id)?.user?.globalName}의 Histroy`;
+      }
+    }
     if (!result.total) {
-      const empty = buildEmbed('History', '최근 재생한 음악이 없습니다.', '0 track(s)');
+      const empty = buildEmbed(header, '최근 재생한 음악이 없습니다.', '0 track(s)');
       await interaction.reply({ embeds: [empty] });
       return;
     }
@@ -72,9 +90,10 @@ module.exports = {
     const totalPages = Math.ceil(items.length / PAGE_SIZE);
     let page = 0;
     const userId = interaction.user.id;
+    items.userCache = interaction.guild.members.cache;
 
     const embed = buildEmbed(
-      'History',
+      header,
       buildDescription(items, page),
       `${result.total} track(s) | Page ${page + 1}/${totalPages}`,
     );
