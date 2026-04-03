@@ -114,6 +114,29 @@ module.exports = {
       },
     },
     {
+      name: 'get_playlist',
+      description: '사용자의 플레이리스트 목록을 조회합니다. userId가 없으면 요청자의 목록을 조회합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          userId: {
+            type: 'STRING',
+            description: '플레이리스트를 조회할 사용자 ID',
+          },
+        },
+        required: [],
+      },
+    },
+    {
+      name: 'get_queue',
+      description: '현재 서버에서 재생 중인 곡과 대기열 목록을 조회합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: [],
+      },
+    },
+    {
       name: 'read_messages',
       description: '현재 채널의 최근 메시지를 읽습니다. 대화 흐름 파악, 요약, 특정 사용자 발화 확인에 사용합니다.',
       parameters: {
@@ -244,6 +267,67 @@ module.exports = {
           url: track?.musicInfo?.info?.uri || null,
           requestedBy: track?.musicInfo?.requestedBy || null,
           createAt: track?.createdAt || null,
+        })),
+      };
+    },
+    get_playlist: async (args, obj) => {
+      const fallbackUserId = obj?.message?.author?.id;
+      const userId = String(args?.userId || fallbackUserId || '').trim();
+
+      if (!userId) {
+        return {
+          ok: false,
+          reason: 'userId가 없습니다.',
+        };
+      }
+
+      const tracks = await obj?.context?.music?.getPlaylist(userId);
+      const list = Array.isArray(tracks) ? tracks : [];
+
+      return {
+        ok: true,
+        userId,
+        total: list.length,
+        items: list.map((track, index) => ({
+          index: index + 1,
+          title: track?.info?.title || 'Unknown title',
+          url: track?.info?.uri || null,
+          lengthMs: Number.isFinite(track?.info?.length) ? track.info.length : null,
+          author: track?.info?.author || null,
+        })),
+      };
+    },
+    get_queue: async (args, obj) => {
+      const guildId = obj?.message?.guild?.id;
+      if (!guildId) {
+        return {
+          ok: false,
+          reason: '서버 채널에서만 사용할 수 있습니다.',
+        };
+      }
+
+      const snapshot = obj?.context?.music?.getQueueSnapshot(guildId);
+      const current = snapshot?.current || null;
+      const queue = Array.isArray(snapshot?.queue) ? snapshot.queue : [];
+
+      return {
+        ok: true,
+        guildId,
+        current: current
+          ? {
+            title: current?.info?.title || 'Unknown title',
+            url: current?.info?.uri || null,
+            lengthMs: Number.isFinite(current?.info?.length) ? current.info.length : null,
+            requestedBy: current?.requestedBy || null,
+          }
+          : null,
+        totalQueued: queue.length,
+        items: queue.map((track, index) => ({
+          index: index + 1,
+          title: track?.info?.title || 'Unknown title',
+          url: track?.info?.uri || null,
+          lengthMs: Number.isFinite(track?.info?.length) ? track.info.length : null,
+          requestedBy: track?.requestedBy || null,
         })),
       };
     },
