@@ -224,6 +224,14 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     };
   }
 
+  async function searchTracks(query) {
+    const trimmedQuery = String(query || '').trim();
+    if (!trimmedQuery) {
+      return { tracks: [], playlistName: null };
+    }
+    return resolveTracks(trimmedQuery);
+  }
+
   async function loop(guildId, enable) {
     const state = guildStates.get(guildId);
     state.loop = (enable !== null) ? Boolean(enable) : !state.loop;
@@ -283,6 +291,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     queue,
     loop,
     history,
+    searchTracks,
     getPlaylist,
     addToPlaylist,
     clearToPlaylist,
