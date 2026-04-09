@@ -9,6 +9,99 @@ function sleep(ms) {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+function normalizeTagToken(value) {
+    return String(value || '')
+        .toLowerCase()
+        .replace(/[^\p{L}\p{N}\s#-]/gu, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+function uniqueTags(tags, limit = 12) {
+    const seen = new Set();
+    const result = [];
+    for (const rawTag of tags) {
+        const tag = normalizeTagToken(rawTag);
+        if (!tag || seen.has(tag)) continue;
+        seen.add(tag);
+        result.push(tag);
+        if (result.length >= limit) break;
+    }
+    return result;
+}
+
+function extractTagsFromTrackInfo(info) {
+    const title = String(info?.title || '');
+    const author = String(info?.author || '');
+    const uri = String(info?.uri || '');
+    const sourceName = String(info?.sourceName || '');
+    const tags = [];
+
+    if (author) {
+        tags.push(author);
+    }
+    if (sourceName) {
+        tags.push(sourceName);
+    }
+
+    const hashTags = title.match(/#[\p{L}\p{N}_-]+/gu) || [];
+    tags.push(...hashTags.map((tag) => tag.replace(/^#/, '')));
+
+    const bracketParts = [];
+    const bracketRegex = /[\(\[\{]([^\)\]\}]{2,40})[\)\]\}]/g;
+    let match;
+    while ((match = bracketRegex.exec(title)) !== null) {
+        bracketParts.push(match[1]);
+    }
+    tags.push(...bracketParts);
+
+    const splitParts = title.split(/[-–|:/]/g).map((part) => part.trim()).filter(Boolean);
+    tags.push(...splitParts);
+
+    const noise = new Set([
+        'lyrics',
+        'lyric',
+        'official',
+        'youtube',
+        'music',
+        'video',
+        'mv',
+        'audio',
+        'ver',
+        'version',
+        'feat',
+        'remix',
+        'live',
+        'shorts',
+        'translate',
+        'translation',
+        '가사',
+        '번역',
+        '독음',
+        '파트',
+    ]);
+
+    const cleaned = tags
+        .map((value) => normalizeTagToken(value))
+        .filter((value) => value.length >= 2 && value.length <= 40)
+        .filter((value) => {
+            if (noise.has(value)) return false;
+            if (/^\d+$/.test(value)) return false;
+            return true;
+        });
+
+    if (uri) {
+        const hostTag = uri.includes('youtube.com') || uri.includes('youtu.be')
+            ? 'youtube'
+            : (uri.includes('soundcloud.com') ? 'soundcloud' : '');
+        if (hostTag) {
+            cleaned.push(hostTag);
+        }
+    }
+
+    return uniqueTags(cleaned, 12);
+}
+
 function extractYoutubeVideoId(input) {
     try {
         const u = new URL(input);
@@ -276,6 +369,7 @@ function createRuntimeUtils({
                 encoded: next.encoded,
                 info: next.info || {},
                 requestedBy: next.requestedBy || null,
+                tags: extractTagsFromTrackInfo(next.info || {}),
             },
         );
 

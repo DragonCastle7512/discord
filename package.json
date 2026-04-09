@@ -4,7 +4,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node --env-file=.env index.js",
-    "deploy": "node --env-file=.env deploy-commands.js"
+    "deploy": "node --env-file=.env deploy-commands.js",
+    "backfill:history-tags": "node --env-file=.env scripts/backfill-history-tags.js",
+    "backfill:remove-youtube-tag": "node --env-file=.env scripts/backfill-remove-youtube-tag.js"
   },
   "author": "",
   "license": "ISC",

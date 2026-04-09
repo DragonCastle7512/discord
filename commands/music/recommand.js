@@ -4,10 +4,11 @@ const { handlers: musicSkillHandlers } = require('../../ai/skills/music-skill');
 
 const DEFAULT_COUNT = 5;
 const MAX_COUNT = 10;
-const HISTORY_LIMIT = 50;
+const HISTORY_LIMIT = 100;
 const POPULAR_LIMIT = 50;
-const KEYWORD_TOP_K = 3;
-const MIN_CURRENT_POOL_SIZE = 6;
+const TAG_KEYWORD_LIMIT = 4;
+const KEYWORD_SIMILARITY_THRESHOLD = 0.8;
+const MIN_TAG_KEYWORD_LENGTH = 4;
 const MIN_DURATION_MS = 90 * 1000;
 const MAX_DURATION_MS = 6 * 60 * 1000;
 
@@ -22,7 +23,49 @@ function normalizeText(value) {
 function tokenize(value) {
   const normalized = normalizeText(value);
   if (!normalized) return [];
-  return normalized.split(' ').filter((token) => token.length >= 2);
+  return normalized.split(' ').filter(Boolean);
+}
+
+function jaccardSimilarity(a, b) {
+  const setA = new Set(tokenize(a));
+  const setB = new Set(tokenize(b));
+  if (!setA.size || !setB.size) return 0;
+
+  let intersection = 0;
+  for (const token of setA) {
+    if (setB.has(token)) intersection += 1;
+  }
+  const union = setA.size + setB.size - intersection;
+  return union > 0 ? (intersection / union) : 0;
+}
+
+function containmentSimilarity(a, b) {
+  const tokensA = new Set(tokenize(a));
+  const tokensB = new Set(tokenize(b));
+  if (!tokensA.size || !tokensB.size) return 0;
+
+  let inter = 0;
+  for (const token of tokensA) {
+    if (tokensB.has(token)) inter += 1;
+  }
+  return Math.max(inter / tokensA.size, inter / tokensB.size);
+}
+
+function keywordSimilarity(a, b) {
+  return Math.max(jaccardSimilarity(a, b), containmentSimilarity(a, b));
+}
+
+function dedupeSimilarKeywords(keywords, threshold = KEYWORD_SIMILARITY_THRESHOLD) {
+  const selected = [];
+  for (const keyword of keywords) {
+    const normalized = normalizeText(keyword);
+    if (!isValidTagKeyword(normalized)) continue;
+    const duplicated = selected.some((picked) => keywordSimilarity(picked, normalized) >= threshold);
+    if (!duplicated) {
+      selected.push(normalized);
+    }
+  }
+  return selected;
 }
 
 function getTrackInfo(raw) {
@@ -34,27 +77,14 @@ function getTrackInfo(raw) {
     uri: info.uri || '',
     artworkUrl: info.artworkUrl || null,
     length: Number(info.length) || 0,
+    tags: Array.isArray(base?.tags) ? base.tags : [],
   };
-}
-
-function pushByWeight(map, key) {
-  if (!key) return;
-  map.set(key, (map.get(key) || 0) + 1);
-}
-
-function topKeysByWeight(map, limit) {
-  return [...map.entries()]
-    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
-    .slice(0, limit)
-    .map(([value]) => value);
 }
 
 function getTrackKey(track) {
   const uri = normalizeText(track.uri);
   if (uri) return `uri:${uri}`;
-  const author = normalizeText(track.author);
-  const title = normalizeText(track.title);
-  return `meta:${author}|${title}`;
+  return `meta:${normalizeText(track.author)}|${normalizeText(track.title)}`;
 }
 
 function clampCount(input) {
@@ -75,17 +105,42 @@ function formatDuration(durationMs) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
+function isPrimarySource(source) {
+  return String(source || '').startsWith('history-tag-1');
+}
+
+function interleaveBySource(tracks, count) {
+  const firstList = tracks.filter((track) => isPrimarySource(track.source));
+  const secondList = tracks.filter((track) => !isPrimarySource(track.source));
+  const ordered = [];
+  let useFirst = true;
+
+  while (ordered.length < count && (firstList.length > 0 || secondList.length > 0)) {
+    if (useFirst && firstList.length > 0) {
+      ordered.push(firstList.shift());
+    }
+    else if (!useFirst && secondList.length > 0) {
+      ordered.push(secondList.shift());
+    }
+    else if (firstList.length > 0) {
+      ordered.push(firstList.shift());
+    }
+    else if (secondList.length > 0) {
+      ordered.push(secondList.shift());
+    }
+    useFirst = !useFirst;
+  }
+
+  return ordered.slice(0, count);
+}
+
 function getVideoIdFromUrl(url) {
   try {
     const value = String(url || '').trim();
     if (!value) return null;
     const u = new URL(value);
-    if (u.hostname.toLowerCase() === 'youtu.be') {
-      return u.pathname.replace('/', '') || null;
-    }
-    if (u.hostname.toLowerCase().includes('youtube.com')) {
-      return u.searchParams.get('v');
-    }
+    if (u.hostname.toLowerCase() === 'youtu.be') return u.pathname.replace('/', '') || null;
+    if (u.hostname.toLowerCase().includes('youtube.com')) return u.searchParams.get('v');
     return null;
   }
   catch {
@@ -93,76 +148,96 @@ function getVideoIdFromUrl(url) {
   }
 }
 
-function buildKeywordCandidates(historyItems, currentTrack) {
-  const authorWeightMap = new Map();
-  const titleTokenWeightMap = new Map();
-  const keywords = [];
-  const seen = new Set();
-  const add = (value) => {
-    const normalized = String(value || '').trim();
-    if (!normalized || seen.has(normalized)) return;
-    seen.add(normalized);
-    keywords.push(normalized);
-  };
+function isValidTagKeyword(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) return false;
+  return normalized.replace(/\s+/g, '').length >= MIN_TAG_KEYWORD_LENGTH;
+}
 
-  if (currentTrack?.author) {
-    add(currentTrack.author);
-  }
+function buildHistoryTagKeywords(historyItems, limit = TAG_KEYWORD_LIMIT) {
+  const artistWeight = new Map();
+  const tagWeight = new Map();
 
   historyItems.forEach((entry) => {
     const track = getTrackInfo(entry);
-    if (track.author) {
-      pushByWeight(authorWeightMap, track.author);
+
+    const author = normalizeText(track.author);
+    if (author) {
+      artistWeight.set(author, (artistWeight.get(author) || 0) + 1);
     }
-    tokenize(track.title).forEach((token) => pushByWeight(titleTokenWeightMap, token));
+
+    const unique = new Set(
+      (track.tags || [])
+        .map((tag) => normalizeText(tag))
+        .filter((tag) => isValidTagKeyword(tag)),
+    );
+    unique.forEach((tag) => tagWeight.set(tag, (tagWeight.get(tag) || 0) + 1));
   });
 
-  const topAuthors = topKeysByWeight(authorWeightMap, KEYWORD_TOP_K);
-  const topTokens = topKeysByWeight(titleTokenWeightMap, KEYWORD_TOP_K);
-  topAuthors.forEach((author) => add(author));
-  topTokens.forEach((token) => add(token));
+  const topArtists = [...artistWeight.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 8);
 
-  return keywords.slice(0, KEYWORD_TOP_K + 1);
+  const keywordScores = [...tagWeight.entries()].map(([tag, freq]) => {
+    let bestArtistSimilarity = 0;
+    let matchedArtistWeight = 0;
+    for (const [artist, artistFreq] of topArtists) {
+      const sim = keywordSimilarity(tag, artist);
+      if (sim > bestArtistSimilarity) {
+        bestArtistSimilarity = sim;
+        matchedArtistWeight = artistFreq;
+      }
+    }
+
+    const artistBonus = bestArtistSimilarity * Math.log1p(matchedArtistWeight);
+    const score = freq + artistBonus;
+    return {
+      tag,
+      score,
+      freq,
+      bestArtistSimilarity,
+      matchedArtistWeight,
+    };
+  });
+
+  return keywordScores
+    .sort((a, b) => (
+      b.score - a.score
+      || b.freq - a.freq
+      || b.bestArtistSimilarity - a.bestArtistSimilarity
+      || a.tag.localeCompare(b.tag)
+    ))
+    .slice(0, limit)
+    .map((item) => item.tag);
 }
 
-function buildHistoryKeywordCandidates(historyItems, excludedKeyword) {
-  const authorWeightMap = new Map();
-  const titleTokenWeightMap = new Map();
-  const excludedNorm = normalizeText(excludedKeyword);
-
+function buildHistoryTagFrequencies(historyItems) {
+  const weight = new Map();
   historyItems.forEach((entry) => {
     const track = getTrackInfo(entry);
-    if (track.author) {
-      pushByWeight(authorWeightMap, track.author);
-    }
-    tokenize(track.title).forEach((token) => pushByWeight(titleTokenWeightMap, token));
+    const unique = new Set(
+      (track.tags || [])
+        .map((tag) => normalizeText(tag))
+        .filter((tag) => isValidTagKeyword(tag)),
+    );
+    unique.forEach((tag) => weight.set(tag, (weight.get(tag) || 0) + 1));
   });
 
-  const merged = [
-    ...topKeysByWeight(authorWeightMap, KEYWORD_TOP_K + 2),
-    ...topKeysByWeight(titleTokenWeightMap, KEYWORD_TOP_K + 2),
-  ];
-
-  const result = [];
-  const seen = new Set();
-  merged.forEach((keyword) => {
-    const normalized = normalizeText(keyword);
-    if (!normalized) return;
-    if (normalized === excludedNorm) return;
-    if (seen.has(normalized)) return;
-    seen.add(normalized);
-    result.push(keyword);
-  });
-
-  return result;
+  return [...weight.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-function includesKeyword(track, keyword) {
-  const key = normalizeText(keyword);
-  if (!key) return false;
-  const target = `${normalizeText(track.title)} ${normalizeText(track.author)}`.trim();
-  if (!target) return false;
-  return target.includes(key);
+async function fetchPopularByKeyword(keyword, limit = POPULAR_LIMIT) {
+  const output = await musicSkillHandlers.get_youtube_popular_music({
+    keyword,
+    order: 'viewCount',
+    limit,
+    region: 'KR',
+  });
+
+  if (typeof output === 'string') return [];
+  if (!output || typeof output !== 'object' || !Array.isArray(output.items)) return [];
+  return output.items;
 }
 
 async function collectFromPopularItems({
@@ -171,11 +246,9 @@ async function collectFromPopularItems({
   excludedTrackKeys,
   globalSeenKeys,
   maxCount,
-  requiredKeyword,
   source,
 }) {
   const collected = [];
-
   for (const item of popularItems) {
     const videoUrl = item?.url || (item?.id ? `https://www.youtube.com/watch?v=${item.id}` : '');
     if (!videoUrl) continue;
@@ -196,7 +269,6 @@ async function collectFromPopularItems({
     if (!key || globalSeenKeys.has(key)) continue;
     if (excludedTrackKeys.has(key)) continue;
     if (!isDurationInRange(track.length)) continue;
-    if (requiredKeyword && !includesKeyword(track, requiredKeyword)) continue;
 
     const videoId = getVideoIdFromUrl(videoUrl);
     const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
@@ -209,25 +281,7 @@ async function collectFromPopularItems({
     collected.push(track);
     if (collected.length >= maxCount) break;
   }
-
   return collected;
-}
-
-async function fetchPopularByKeyword(keyword, limit = POPULAR_LIMIT) {
-  const output = await musicSkillHandlers.get_youtube_popular_music({
-    keyword,
-    order: 'viewCount',
-    limit,
-    region: 'KR',
-  });
-
-  if (typeof output === 'string') {
-    return [];
-  }
-  if (!output || typeof output !== 'object' || !Array.isArray(output.items)) {
-    return [];
-  }
-  return output.items;
 }
 
 module.exports = {
@@ -244,118 +298,82 @@ module.exports = {
     await interaction.deferReply();
 
     const count = clampCount(interaction.options.getString('count'));
-    const currentTarget = Math.max(1, Math.ceil(count * 0.6));
-    const historyTarget = Math.max(0, count - currentTarget);
+    const firstTarget = Math.max(1, Math.ceil(count * 0.6));
+    const secondTarget = Math.max(0, count - firstTarget);
 
     const historyResult = await context.music.history(interaction.guildId);
     const allHistoryItems = Array.isArray(historyResult?.items) ? historyResult.items : [];
     const recentHistoryItems = allHistoryItems.slice(0, HISTORY_LIMIT);
-    const snapshot = context.music.getQueueSnapshot(interaction.guildId);
-    const currentTrack = snapshot?.current ? getTrackInfo(snapshot.current) : null;
-    const currentKeywordCandidates = buildKeywordCandidates(recentHistoryItems, currentTrack);
-    const currentKeyword = currentKeywordCandidates[0] || 'music';
-    const historyKeywordCandidates = buildHistoryKeywordCandidates(recentHistoryItems, currentKeyword);
-    const historyKeyword = historyKeywordCandidates[0] || 'music';
-    const historyFallbackKeyword = historyKeywordCandidates
-      .find((keyword) => normalizeText(keyword) !== normalizeText(historyKeyword)) || '';
+    const tagFrequencies = buildHistoryTagFrequencies(recentHistoryItems);
+    console.log('[recommand] history tag frequencies(top15):', tagFrequencies.slice(0, 15));
+    const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 6);
+    const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw);
+
+    const firstKeyword = tagKeywords[0] || 'music';
+    const secondKeyword = tagKeywords.find((tag) => tag !== firstKeyword) || 'music';
 
     const excludedTrackKeys = new Set();
     recentHistoryItems.forEach((entry) => {
       const key = getTrackKey(getTrackInfo(entry));
-      if (key) {
-        excludedTrackKeys.add(key);
-      }
+      if (key) excludedTrackKeys.add(key);
     });
 
-    const currentPopularItems = await fetchPopularByKeyword(currentKeyword, POPULAR_LIMIT);
-    const historyPopularItems = await fetchPopularByKeyword(historyKeyword, POPULAR_LIMIT);
+    const firstPopularItems = await fetchPopularByKeyword(firstKeyword, POPULAR_LIMIT);
+    const secondPopularItems = await fetchPopularByKeyword(secondKeyword, POPULAR_LIMIT);
 
-    if (!currentPopularItems.length && !historyPopularItems.length) {
+    if (!firstPopularItems.length && !secondPopularItems.length) {
       const embed = buildEmbed('Recommendation', '추천 결과가 없습니다.', '0 result(s)');
       await interaction.editReply({ embeds: [embed] });
       return;
     }
 
     const globalSeenKeys = new Set();
-    const currentCandidates = await collectFromPopularItems({
-      popularItems: currentPopularItems,
+    const firstCandidates = await collectFromPopularItems({
+      popularItems: firstPopularItems,
       context,
       excludedTrackKeys,
       globalSeenKeys,
-      maxCount: Math.max(count * 2, currentTarget),
-      source: 'current-popular',
+      maxCount: Math.max(count * 2, firstTarget),
+      source: 'history-tag-1-popular',
     });
-    const historyCandidates = await collectFromPopularItems({
-      popularItems: historyPopularItems,
+    const secondCandidates = await collectFromPopularItems({
+      popularItems: secondPopularItems,
       context,
       excludedTrackKeys,
       globalSeenKeys,
-      maxCount: Math.max(count * 2, historyTarget + currentTarget),
-      source: 'history-popular',
+      maxCount: Math.max(count * 2, secondTarget + firstTarget),
+      source: 'history-tag-2-popular',
     });
 
-    const isCurrentKeywordUsable = currentCandidates.length >= MIN_CURRENT_POOL_SIZE;
-    let historySecondaryCandidates = [];
-    if (!isCurrentKeywordUsable && historyFallbackKeyword) {
-      const historySecondaryPopularItems = await fetchPopularByKeyword(historyFallbackKeyword, POPULAR_LIMIT);
-      historySecondaryCandidates = await collectFromPopularItems({
-        popularItems: historySecondaryPopularItems.slice(0, count),
-        context,
-        excludedTrackKeys,
-        globalSeenKeys,
-        maxCount: count,
-        requiredKeyword: historyFallbackKeyword,
-        source: 'history-secondary-popular',
-      });
-    }
+    const firstPool = firstCandidates;
+    const secondPool = secondCandidates;
 
-    const selectedCurrent = isCurrentKeywordUsable ? currentCandidates.slice(0, currentTarget) : [];
-    if (selectedCurrent.length < currentTarget && historyCandidates.length > 0) {
-      const preferred = historyFallbackKeyword
-        ? [
-          ...historySecondaryCandidates,
-          ...historyCandidates.filter((track) => includesKeyword(track, historyFallbackKeyword)),
-        ]
-        : [];
-      const rest = [
-        ...historyCandidates.filter((track) => !preferred.includes(track)),
-        ...historySecondaryCandidates.filter((track) => !preferred.includes(track)),
-      ];
-      const fillPool = [...preferred, ...rest];
-      const usedKeys = new Set(selectedCurrent.map((track) => getTrackKey(track)));
-      for (const track of fillPool) {
-        if (selectedCurrent.length >= currentTarget) break;
+    const selectedFirst = firstPool.slice(0, firstTarget);
+    if (selectedFirst.length < firstTarget) {
+      const used = new Set(selectedFirst.map((track) => getTrackKey(track)));
+      for (const track of secondPool) {
+        if (selectedFirst.length >= firstTarget) break;
         const key = getTrackKey(track);
-        if (!key || usedKeys.has(key)) continue;
-        usedKeys.add(key);
-        track.source = historyFallbackKeyword ? 'history-fallback-current-replace' : (track.source || 'history-popular');
-        selectedCurrent.push(track);
+        if (!key || used.has(key)) continue;
+        used.add(key);
+        track.source = 'history-tag-2-force-fill';
+        selectedFirst.push(track);
       }
     }
 
-    const selectedKeys = new Set(selectedCurrent.map((track) => getTrackKey(track)));
-    const selectedHistory = [];
-    for (const track of [...historyCandidates, ...historySecondaryCandidates]) {
-      if (selectedHistory.length >= historyTarget) break;
+    const selectedKeys = new Set(selectedFirst.map((track) => getTrackKey(track)));
+    const selectedSecond = [];
+    for (const track of secondPool) {
+      if (selectedSecond.length >= secondTarget) break;
       const key = getTrackKey(track);
       if (!key || selectedKeys.has(key)) continue;
       selectedKeys.add(key);
-      selectedHistory.push(track);
+      selectedSecond.push(track);
     }
 
-    const recommendations = [...selectedCurrent, ...selectedHistory].slice(0, count);
-
+    const recommendations = [...selectedFirst, ...selectedSecond].slice(0, count);
     if (recommendations.length < count) {
-      if (isCurrentKeywordUsable) {
-        for (const track of currentCandidates) {
-          if (recommendations.length >= count) break;
-          const key = getTrackKey(track);
-          if (!key || selectedKeys.has(key)) continue;
-          selectedKeys.add(key);
-          recommendations.push(track);
-        }
-      }
-      for (const track of [...historyCandidates, ...historySecondaryCandidates]) {
+      for (const track of [...firstPool, ...secondPool]) {
         if (recommendations.length >= count) break;
         const key = getTrackKey(track);
         if (!key || selectedKeys.has(key)) continue;
@@ -365,29 +383,24 @@ module.exports = {
     }
 
     if (!recommendations.length) {
-      const embed = buildEmbed(
-        'Recommendation',
-        '최근 재생한 20곡을 제외하면 인기곡이 없습니다.',
-        '0 result(s)',
-      );
+      const embed = buildEmbed('Recommendation', '최근 재생한 곡들을 제외하면 추천 곡이 없습니다.', '0 result(s)');
       await interaction.editReply({ embeds: [embed] });
       return;
     }
 
-    const detailEmbeds = recommendations.map((track, idx) => {
+    const displayOrder = interleaveBySource(recommendations, count);
+    const detailEmbeds = displayOrder.map((track, idx) => {
       const durationText = formatDuration(track.length);
-      const uriLine = track.uri ? `${track.uri}` : 'no url';
+      const uriLine = track.uri || 'no url';
       const embed = new EmbedBuilder()
         .setColor(0xcd2929)
         .setTitle(`${idx + 1}. ${track.title} [${durationText}]`)
         .setDescription(`**Artist** - ${track.author || 'Unknown artist'}\n\n**URL**\n${uriLine}`)
         .setFooter({
-          text: `추천 곡: ${idx + 1}/${recommendations.length}`,
+          text: `추천 곡: ${idx + 1}/${displayOrder.length}`,
         });
 
-      if (track.artworkUrl) {
-        embed.setThumbnail(track.artworkUrl);
-      }
+      if (track.artworkUrl) embed.setThumbnail(track.artworkUrl);
       return embed;
     });
 

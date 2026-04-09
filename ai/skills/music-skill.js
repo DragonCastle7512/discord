@@ -181,6 +181,10 @@ module.exports = {
           `&key=${encodeURIComponent(apiKey)}`;
 
         const items = await searchYoutube(searchUrl);
+
+        if (!Array.isArray(items)) {
+          return items || 'API 요청 실패';
+        }
         if (!items.length) {
           return '키워드 인기 음악 결과를 찾지 못했습니다.';
         }
