@@ -147,6 +147,12 @@ client.login(token);
 client.on(Events.InteractionCreate, async (interaction) => {
   try {
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
+      if (interaction.isButton() && interaction.customId.startsWith('recommand_play:')) {
+        const recommandCommand = interaction.client.commands.get('recommand');
+        if (!recommandCommand || typeof recommandCommand.handleComponent !== 'function') return;
+        await recommandCommand.handleComponent(interaction, context);
+        return;
+      }
       if (!interaction.customId.startsWith('qctl|')) return;
       const queueCommand = interaction.client.commands.get('queue');
       if (!queueCommand || typeof queueCommand.handleComponent !== 'function') return;
