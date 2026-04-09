@@ -1,3 +1,9 @@
+const {
+  clampRecommendationCount,
+  parseUserIdFromArg,
+  recommendFromHistory,
+} = require('../../music/recommand-service');
+
 const buildListResponse = (items, region, label, keyword, meta = {}) => {
   const displayLimit = Number.isInteger(meta.displayLimit)
     ? Math.max(0, Math.min(meta.displayLimit, items.length))
@@ -31,6 +37,119 @@ const buildListResponse = (items, region, label, keyword, meta = {}) => {
     },
   };
 };
+
+async function getYoutubePopularMusic(args) {
+  const apiKey = process.env.YOUTUBE_API_KEY;
+  if (!apiKey) {
+    return 'YOUTUBE_API_KEY가 설정되지 않았습니다. .env에 추가해주세요.';
+  }
+
+  const limit = Math.max(1, Math.min(50, Number(args?.limit) || 10));
+  const region = String(args?.region || 'KR').toUpperCase();
+  const keyword = String(args?.keyword || '').trim();
+  const pageToken = String(args?.pageToken || '').trim();
+  const orderRaw = String(args?.order || '').trim().toLowerCase();
+  const orderMap = {
+    date: 'date',
+    viewcount: 'viewCount',
+  };
+  const order = orderMap[orderRaw] || 'relevance';
+
+  if (!keyword) {
+    const url =
+      'https://www.googleapis.com/youtube/v3/videos' +
+      '?part=snippet,statistics&chart=mostPopular&videoCategoryId=10' +
+      `&maxResults=50&regionCode=${encodeURIComponent(region)}` +
+      `&key=${encodeURIComponent(apiKey)}`;
+
+    const items = await searchYoutube(url);
+    if (!items.length) {
+      return '인기 음악 결과를 찾지 못했습니다.';
+    }
+
+    return buildListResponse(items, region, '유튜브 인기 음악', '', { displayLimit: limit });
+  }
+
+    const searchUrl =
+      'https://www.googleapis.com/youtube/v3/search' +
+      `?part=snippet&type=video&videoCategoryId=10&order=${order}` +
+      `&maxResults=50&q=${encodeURIComponent(keyword)} -shorts -short -틱톡 -tiktok` +
+      '&topicId=/m/04rlf' +
+      `&regionCode=${encodeURIComponent(region)}` +
+      (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '') +
+      `&key=${encodeURIComponent(apiKey)}`;
+
+    const items = await searchYoutube(searchUrl);
+
+    if (!Array.isArray(items)) {
+      return items || 'API 요청 실패';
+    }
+    if (!items.length) {
+      return '키워드 인기 음악 결과를 찾지 못했습니다.';
+    }
+
+    let filteredItems = items;
+    const ids = items
+        .map((item) => item?.id?.videoId)
+        .filter((id) => typeof id === 'string' && id.length > 0);
+
+    if (ids.length) {
+      const detailsUrl =
+        'https://www.googleapis.com/youtube/v3/videos' +
+        `?part=contentDetails&id=${encodeURIComponent(ids.join(','))}` +
+        `&key=${encodeURIComponent(apiKey)}`;
+
+      try {
+        const res = await fetch(detailsUrl);
+
+        if (res.ok) {
+          const detailsData = await res.json();
+          const detailsItems = Array.isArray(detailsData?.items) ? detailsData.items : [];
+          const detailsById = detailsItems.reduce((acc, item) => {
+            if (item?.id) {
+              acc[item.id] = item?.contentDetails || {};
+            }
+            return acc;
+          }, {});
+
+          filteredItems = items.filter((item) => {
+            const id = item?.id?.videoId;
+            const duration = id ? detailsById?.[id]?.duration : null;
+            if (!duration) {
+              return true;
+            }
+            return !isShortOrLongDuration(duration);
+          });
+        }
+      }
+      catch (err) {
+        console.error(err);
+      }
+  }
+  const nextToken = String(items?.nextPageToken || '');
+  const response = buildListResponse(filteredItems, region, '키워드 인기 음악', keyword, {
+    displayLimit: limit,
+    requestedLimit: limit,
+    nextPageToken: nextToken || null,
+    filteredCount: filteredItems.length,
+    filterApplied: true,
+  });
+  console.log(response?.text);
+  return response;
+}
+
+async function fetchPopularByKeywordViaSkill({ keyword, limit, region }) {
+  const output = await getYoutubePopularMusic({
+    keyword,
+    order: 'viewCount',
+    limit,
+    region,
+  });
+
+  if (typeof output === 'string') return [];
+  if (!output || typeof output !== 'object' || !Array.isArray(output.items)) return [];
+  return output.items;
+}
 
 const searchYoutube = async (url) => {
   try {
@@ -114,6 +233,28 @@ module.exports = {
       },
     },
     {
+      name: 'get_recommand_list',
+      description: '히스토리 태그 기반 추천 목록을 JSON으로 반환합니다. user/userId를 주면 해당 사용자 기준으로 추천합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          user: {
+            type: 'STRING',
+            description: '추천 기준 사용자 ID 또는 멘션(예: 123..., <@123...>)',
+          },
+          count: {
+            type: 'NUMBER',
+            description: '추천 개수 (기본 5, 최대 10)',
+          },
+          region: {
+            type: 'STRING',
+            description: '국가 코드 (기본 KR)',
+          },
+        },
+        required: [],
+      },
+    },
+    {
       name: 'get_playlist',
       description: '사용자의 플레이리스트 목록을 조회합니다. userId가 없으면 요청자의 목록을 조회합니다.',
       parameters: {
@@ -139,105 +280,7 @@ module.exports = {
   ],
 
   handlers: {
-    get_youtube_popular_music: async (args) => {
-      const apiKey = process.env.YOUTUBE_API_KEY;
-      if (!apiKey) {
-        return 'YOUTUBE_API_KEY가 설정되지 않았습니다. .env에 추가해주세요.';
-      }
-
-      const limit = Math.max(1, Math.min(50, Number(args?.limit) || 10));
-      const region = String(args?.region || 'KR').toUpperCase();
-      const keyword = String(args?.keyword || '').trim();
-      const pageToken = String(args?.pageToken || '').trim();
-      const orderRaw = String(args?.order || '').trim().toLowerCase();
-      const orderMap = {
-        date: 'date',
-        viewcount: 'viewCount',
-      };
-      const order = orderMap[orderRaw] || 'relevance';
-
-      if (!keyword) {
-        const url =
-          'https://www.googleapis.com/youtube/v3/videos' +
-          '?part=snippet,statistics&chart=mostPopular&videoCategoryId=10' +
-          `&maxResults=50&regionCode=${encodeURIComponent(region)}` +
-          `&key=${encodeURIComponent(apiKey)}`;
-
-        const items = await searchYoutube(url);
-        if (!items.length) {
-          return '인기 음악 결과를 찾지 못했습니다.';
-        }
-
-        return buildListResponse(items, region, '유튜브 인기 음악', '', { displayLimit: limit });
-      }
-
-        const searchUrl =
-          'https://www.googleapis.com/youtube/v3/search' +
-          `?part=snippet&type=video&videoCategoryId=10&order=${order}` +
-          `&maxResults=50&q=${encodeURIComponent(keyword)} -shorts -short -틱톡 -tiktok` +
-          '&topicId=/m/04rlf' +
-          `&regionCode=${encodeURIComponent(region)}` +
-          (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '') +
-          `&key=${encodeURIComponent(apiKey)}`;
-
-        const items = await searchYoutube(searchUrl);
-
-        if (!Array.isArray(items)) {
-          return items || 'API 요청 실패';
-        }
-        if (!items.length) {
-          return '키워드 인기 음악 결과를 찾지 못했습니다.';
-        }
-
-        let filteredItems = items;
-        const ids = items
-            .map((item) => item?.id?.videoId)
-            .filter((id) => typeof id === 'string' && id.length > 0);
-
-        if (ids.length) {
-          const detailsUrl =
-            'https://www.googleapis.com/youtube/v3/videos' +
-            `?part=contentDetails&id=${encodeURIComponent(ids.join(','))}` +
-            `&key=${encodeURIComponent(apiKey)}`;
-
-          try {
-            const res = await fetch(detailsUrl);
-
-            if (res.ok) {
-              const detailsData = await res.json();
-              const detailsItems = Array.isArray(detailsData?.items) ? detailsData.items : [];
-              const detailsById = detailsItems.reduce((acc, item) => {
-                if (item?.id) {
-                  acc[item.id] = item?.contentDetails || {};
-                }
-                return acc;
-              }, {});
-
-              filteredItems = items.filter((item) => {
-                const id = item?.id?.videoId;
-                const duration = id ? detailsById?.[id]?.duration : null;
-                if (!duration) {
-                  return true;
-                }
-                return !isShortOrLongDuration(duration);
-              });
-            }
-          }
-          catch (err) {
-            console.error(err);
-          }
-      }
-      const nextToken = String(items?.nextPageToken || '');
-      const response = buildListResponse(filteredItems, region, '키워드 인기 음악', keyword, {
-        displayLimit: limit,
-        requestedLimit: limit,
-        nextPageToken: nextToken || null,
-        filteredCount: filteredItems.length,
-        filterApplied: true,
-      });
-      console.log(response?.text);
-      return response;
-    },
+    get_youtube_popular_music: getYoutubePopularMusic,
     get_recent_played_music: async (args, obj) => {
       const guildId = obj?.message?.guild?.id;
       if (!guildId) {
@@ -257,6 +300,59 @@ module.exports = {
           url: track?.musicInfo?.info?.uri || null,
           requestedBy: track?.musicInfo?.requestedBy || null,
           createAt: track?.createdAt || null,
+        })),
+      };
+    },
+    get_recommand_list: async (args, obj) => {
+      const guildId = obj?.message?.guild?.id;
+      if (!guildId) {
+        return {
+          ok: false,
+          reason: 'GuildId가 존재하지 않습니다.',
+        };
+      }
+
+      const count = clampRecommendationCount(args?.count);
+      const region = String(args?.region || 'KR').toUpperCase();
+      const targetUserId = parseUserIdFromArg(args?.user);
+      const historyResult = await obj?.context?.music?.history(guildId, targetUserId || undefined);
+      const allHistoryItems = Array.isArray(historyResult?.items) ? historyResult.items : [];
+
+      const result = await recommendFromHistory({
+        historyItems: allHistoryItems,
+        count,
+        fetchPopularByKeyword: fetchPopularByKeywordViaSkill,
+        searchTracks: (query) => obj?.context?.music?.searchTracks(query),
+        region,
+      });
+
+      if (!result.ok) {
+        return {
+          ok: false,
+          reason: result.reason,
+          guildId,
+          userId: targetUserId || null,
+          keywords: result.keywords || [],
+          historyUsed: result.historyUsed || 0,
+        };
+      }
+
+      return {
+        ok: true,
+        guildId,
+        userId: targetUserId || null,
+        historyUsed: result.historyUsed,
+        keywords: result.keywords,
+        count: result.count,
+        items: result.items.map((track, index) => ({
+          index: index + 1,
+          title: track.title || 'Unknown title',
+          author: track.author || 'Unknown artist',
+          url: track.uri || null,
+          lengthMs: Number.isFinite(track.length) ? track.length : null,
+          artworkUrl: track.artworkUrl || null,
+          source: track.source || null,
+          keyword: track.keyword || null,
         })),
       };
     },

@@ -100,6 +100,24 @@ module.exports = {
       },
     },
     {
+      name: 'slash_recommand',
+      description: '사용자에게 최근 재생된 히스토리를 기반으로 추천 노래 목록을 보여줍니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          user: {
+            type: 'STRING',
+            description: '히스토리를 조회할 특정 사용자 ID 또는 멘션(예: 123..., <@123...>)',
+          },
+          count: {
+            type: 'STRING',
+            description: '추천 곡의 개수 (max 10)',
+          },
+        },
+        required: [],
+      },
+    },
+    {
       name: 'slash_loop',
       description: '반복 모드의 활성화/비활성화를 전환합니다.',
       parameters: {
@@ -183,6 +201,7 @@ module.exports = {
     slash_add: async (args, obj) => executeSlash(obj, 'add', { music: args?.music }),
     slash_clear: async (args, obj) => executeSlash(obj, 'clear'),
     slash_history: async (args, obj) => executeSlash(obj, 'history', { user: args?.user }),
+    slash_recommand: async (args, obj) => executeSlash(obj, 'recommand', { user: args?.user, count: args?.count }),
     slash_loop: async (args, obj) => executeSlash(obj, 'loop', { enable: args?.enable }),
     slash_playlist: async (args, obj) => executeSlash(obj, 'playlist'),
     slash_queue: async (args, obj) => executeSlash(obj, 'queue'),
