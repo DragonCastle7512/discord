@@ -90,15 +90,6 @@ function extractTagsFromTrackInfo(info) {
             return true;
         });
 
-    if (uri) {
-        const hostTag = uri.includes('youtube.com') || uri.includes('youtu.be')
-            ? 'youtube'
-            : (uri.includes('soundcloud.com') ? 'soundcloud' : '');
-        if (hostTag) {
-            cleaned.push(hostTag);
-        }
-    }
-
     return uniqueTags(cleaned, 12);
 }
 
