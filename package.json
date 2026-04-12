@@ -3,8 +3,9 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node --env-file=.env index.js",
-    "deploy": "node --env-file=.env deploy-commands.js",
+    "start": "tsx --env-file=.env index.ts",
+    "dev": "tsx watch --env-file=.env index.ts",
+    "deploy": "tsx --env-file=.env deploy-commands.js",
     "backfill:history-tags": "node --env-file=.env scripts/backfill-history-tags.js",
     "backfill:remove-youtube-tag": "node --env-file=.env scripts/backfill-remove-youtube-tag.js"
   },
@@ -23,6 +24,10 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "eslint": "^9.39.2"
+    "@types/node": "^20.12.7",
+    "@types/express": "^4.17.21",
+    "eslint": "^9.39.2",
+    "typescript": "^5.4.5",
+    "tsx": "^4.7.2"
   }
 }
