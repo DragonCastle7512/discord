@@ -183,6 +183,41 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   }
 });
 
+client.on('voiceStateUpdate', (oldState: VoiceState, newState: VoiceState) => {
+  const guildId: string = oldState.guild.id;
+  const botMember = oldState.guild.members.me;
+
+  if (!botMember || !botMember.voice.channelId) return;
+
+  const botChannelId: string = botMember.voice.channelId;
+
+  if (oldState.channelId === botChannelId && newState.channelId !== botChannelId) {
+    const channel = oldState.channel;
+    if (!channel) return;
+
+    const humanMembers = channel.members.filter(m => !m.user.bot);
+
+    if (humanMembers.size === 0) {
+      setTimeout(async () => {
+        const currentChannel = client.channels.cache.get(botChannelId);
+        if (!currentChannel || !('members' in currentChannel)) return;
+
+        // @ts-ignore
+        const stillNoHumans = currentChannel.members.filter((m: any) => !m.user.bot).size === 0;
+
+        if (stillNoHumans) {
+          try {
+            await runtimeUtils.stopShoukaku(guildId);
+          }
+          catch (error) {
+            console.error('Error during leave:', error);
+          }
+        }
+      }, 3000);
+    }
+  }
+});
+
 client.on('messageCreate', async (message: Message) => {
   if (message.author.bot) return;
   const msg: string = message.content;
