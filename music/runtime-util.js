@@ -33,7 +33,6 @@ function uniqueTags(tags, limit = 12) {
 function extractTagsFromTrackInfo(info) {
     const title = String(info?.title || '');
     const author = String(info?.author || '');
-    const uri = String(info?.uri || '');
     const sourceName = String(info?.sourceName || '');
     const tags = [];
 

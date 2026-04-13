@@ -149,7 +149,7 @@ client.login(token);
 client.on(Events.InteractionCreate, async (interaction: Interaction) => {
   try {
     if (interaction.isButton() || interaction.isStringSelectMenu()) {
-      if (interaction.isButton() && interaction.customId.startsWith('recommand_play:')) {
+      if (interaction.isButton() && interaction.customId.startsWith('recommand_')) {
         const recommandCommand = (interaction.client as MyClient).commands.get('recommand');
         if (recommandCommand?.handleComponent) {
           await recommandCommand.handleComponent(interaction, context);

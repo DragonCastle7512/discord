@@ -244,7 +244,7 @@ module.exports = {
           },
           count: {
             type: 'NUMBER',
-            description: '추천 개수 (기본 5, 최대 10)',
+            description: '추천 개수 (기본 5, 최대 15)',
           },
           region: {
             type: 'STRING',

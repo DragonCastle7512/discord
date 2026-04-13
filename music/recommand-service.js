@@ -1,5 +1,5 @@
 const DEFAULT_COUNT = 5;
-const MAX_COUNT = 10;
+const MAX_COUNT = 15;
 const HISTORY_LIMIT = 100;
 const POPULAR_LIMIT = 50;
 const TAG_KEYWORD_LIMIT = 4;
