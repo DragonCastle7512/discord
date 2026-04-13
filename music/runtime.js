@@ -16,7 +16,6 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     const { channelId } = context;
     const guild = context.guild || client.guilds.cache.get(message.guildId);
     if (!guild) throw new Error('Guild only command');
-    const trimmedQuery = (query || '').trim();
 
     const userId = context.user?.id || context.author?.id;
     const member = await guild.members.fetch(userId);
@@ -33,43 +32,86 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       };
     }
 
+    const rawQueries = Array.isArray(query) ? query : [query];
+    const queries = rawQueries
+      .flatMap(q => (typeof q === 'string' ? q.split(',') : q))
+      .map(q => (typeof q === 'string' ? q.trim() : q))
+      .filter(Boolean);
+
+    const BATCH_SIZE = 10;
+    const resolvedBatches = [];
+
+    for (let i = 0; i < queries.length; i += BATCH_SIZE) {
+      const batch = queries.slice(i, i + BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (q) => {
+          const trimmed = (q || '').trim();
+          if (!trimmed) return null;
+          try {
+            return await resolveTracks(trimmed);
+          }
+          catch (e) {
+            console.error(`Resolve failed for ${trimmed}:`, e);
+            return null;
+          }
+        }),
+      );
+      resolvedBatches.push(...batchResults);
+    }
+
     const state = await joinOrMovePlayer(guild, channelId, voiceChannel);
-    if (!trimmedQuery) {
-      const res = await findPlaylist(userId);
-      const playlist = res.map((music) => music.musicInfo);
-      if (!playlist.length) {
-        return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
+
+    let addedCount = 0;
+    let firstTrackTitle = '';
+
+    for (const res of resolvedBatches) {
+      if (!res || !res.tracks.length) continue;
+
+      const { tracks, playlistName } = res;
+      if (playlistName) {
+        const requestedTracks = tracks.map((track) => ({
+          ...track,
+          requestedBy: userId,
+        }));
+        state.queue.push(...requestedTracks);
+        addedCount += requestedTracks.length;
+        if (!firstTrackTitle) firstTrackTitle = playlistName;
       }
-
-      const queuedTracks = playlist.map((track) => ({
-        encoded: track.encoded,
-        info: track.info || {},
-        requestedBy: userId,
-      }));
-
-      state.queue.push(...queuedTracks);
-      await playNext(guild.id);
-      return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
+      else {
+        const first = { ...tracks[0], requestedBy: userId };
+        state.queue.push(first);
+        addedCount += 1;
+        if (!firstTrackTitle) firstTrackTitle = first.info?.title;
+      }
     }
 
-    const { tracks, playlistName } = await resolveTracks(trimmedQuery);
+    if (addedCount === 0) {
+      if (queries.length === 1 && !queries[0]) {
+        const res = await findPlaylist(userId);
+        const playlist = res.map((music) => music.musicInfo);
+        if (!playlist.length) {
+          return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
+        }
 
-    if (!tracks.length) return { ok: false, message: '찾을 수 없는 노래에요!' };
+        const queuedTracks = playlist.map((track) => ({
+          encoded: track.encoded,
+          info: track.info || {},
+          requestedBy: userId,
+        }));
 
-    if (playlistName) {
-      const requestedTracks = tracks.map((track) => ({
-        ...track,
-        requestedBy: userId,
-      }));
-      state.queue.push(...requestedTracks);
-      await playNext(guild.id);
-      return { ok: true, message: `Playlist에 추가했어요 : **${playlistName}** (${tracks.length} tracks)` };
+        state.queue.push(...queuedTracks);
+        await playNext(guild.id);
+        return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
+      }
+      return { ok: false, message: '찾을 수 없는 노래에요!' };
     }
 
-    const first = { ...tracks[0], requestedBy: userId };
-    state.queue.push(first);
     await playNext(guild.id);
-    return { ok: true, message: `**${first.info?.title || 'Unknown title'}**을(를) 추가했어요!` };
+
+    if (addedCount > 1) {
+      return { ok: true, message: `**${firstTrackTitle}** 외 ${addedCount - 1}곡을 추가했어요!` };
+    }
+    return { ok: true, message: `**${firstTrackTitle || 'Unknown title'}**을(를) 추가했어요!` };
   }
 
   async function skip(guildId) {

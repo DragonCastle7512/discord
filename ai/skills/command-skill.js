@@ -50,13 +50,12 @@ module.exports = {
       name: 'slash_play',
       description: `음악을 재생합니다. 
         1. 'query'를 비워둔 채 호출하면 플레이리스트(재생 목록)의 모든 곡을 재생합니다.
-        2. 'query'에 곡 제목, 또는 유튜브 URL를 넣으면, 해당 곡을 재생합니다.`,
+        2. 'query'에 단일 곡 제목/URL 또는 여러 곡의 제목/URL 배열을 넣으면, 해당 곡들을 모두 재생 대기열에 추가합니다.`,
       parameters: {
         type: 'OBJECT',
         properties: {
           query: {
-            type: 'STRING',
-            description: '재생하고 싶은 노래 제목 또는 YouTube URL입니다. 플레이리스트 곡 재생 시에는 이 값을 생략하세요.',
+            description: '재생하고 싶은 노래 제목/URL 또는 이들의 배열입니다. 여러 곡을 한 번에 틀려면 배열 형식을 사용하세요.',
           },
         },
         required: [],
