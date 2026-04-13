@@ -244,39 +244,50 @@ async function collectFromPopularItems({
   keyword,
 }) {
   const collected = [];
-  for (const item of popularItems || []) {
-    const videoUrl = item?.url || (item?.id ? `https://www.youtube.com/watch?v=${item.id}` : '');
-    if (!videoUrl) continue;
+  const items = popularItems || [];
+  const BATCH_SIZE = 10;
 
-    let resolved;
-    try {
-      resolved = await searchTracks(videoUrl);
+  for (let i = 0; i < items.length; i += BATCH_SIZE) {
+    const batch = items.slice(i, i + BATCH_SIZE);
+    const results = await Promise.all(
+      batch.map(async (item) => {
+        const videoUrl = item?.url || (item?.id ? `https://www.youtube.com/watch?v=${item.id}` : '');
+        if (!videoUrl) return null;
+        try {
+          const resolved = await searchTracks(videoUrl);
+          return { resolved, videoUrl };
+        }
+        catch {
+          return null;
+        }
+      }),
+    );
+
+    for (const result of results) {
+      if (!result) continue;
+      const { resolved, videoUrl } = result;
+      const first = Array.isArray(resolved?.tracks) ? resolved.tracks[0] : null;
+      if (!first) continue;
+
+      const track = getTrackInfo(first);
+      const key = getTrackKey(track);
+      if (!key || globalSeenKeys.has(key)) continue;
+      if (excludedTrackKeys.has(key)) continue;
+      if (!isDurationInRange(track.length)) continue;
+
+      const videoId = getVideoIdFromUrl(videoUrl);
+      const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
+      if (!track.artworkUrl && fallbackThumb) {
+        track.artworkUrl = fallbackThumb;
+      }
+
+      track.source = source;
+      track.keyword = keyword;
+
+      globalSeenKeys.add(key);
+      collected.push(track);
+      if (collected.length >= maxCount) return collected;
     }
-    catch {
-      continue;
-    }
-
-    const first = Array.isArray(resolved?.tracks) ? resolved.tracks[0] : null;
-    if (!first) continue;
-
-    const track = getTrackInfo(first);
-    const key = getTrackKey(track);
-    if (!key || globalSeenKeys.has(key)) continue;
-    if (excludedTrackKeys.has(key)) continue;
-    if (!isDurationInRange(track.length)) continue;
-
-    const videoId = getVideoIdFromUrl(videoUrl);
-    const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
-    if (!track.artworkUrl && fallbackThumb) {
-      track.artworkUrl = fallbackThumb;
-    }
-
-    track.source = source;
-    track.keyword = keyword;
-
-    globalSeenKeys.add(key);
-    collected.push(track);
-    if (collected.length >= maxCount) break;
   }
   return collected;
 }
@@ -339,25 +350,26 @@ async function recommendFromHistory({
   const secondTarget = Math.max(0, normalizedCount - firstTarget);
 
   const globalSeenKeys = new Set();
-  const firstCandidates = await collectFromPopularItems({
-    popularItems: firstPopularItems,
-    searchTracks,
-    excludedTrackKeys,
-    globalSeenKeys,
-    maxCount: Math.max(normalizedCount * 2, firstTarget),
-    source: 'history-tag-1-popular',
-    keyword: firstKeyword,
-  });
-
-  const secondCandidates = await collectFromPopularItems({
-    popularItems: secondPopularItems,
-    searchTracks,
-    excludedTrackKeys,
-    globalSeenKeys,
-    maxCount: Math.max(normalizedCount * 2, secondTarget + firstTarget),
-    source: 'history-tag-2-popular',
-    keyword: secondKeyword,
-  });
+  const [firstCandidates, secondCandidates] = await Promise.all([
+    collectFromPopularItems({
+      popularItems: firstPopularItems,
+      searchTracks,
+      excludedTrackKeys,
+      globalSeenKeys,
+      maxCount: Math.max(normalizedCount * 2, firstTarget),
+      source: 'history-tag-1-popular',
+      keyword: firstKeyword,
+    }),
+    collectFromPopularItems({
+      popularItems: secondPopularItems,
+      searchTracks,
+      excludedTrackKeys,
+      globalSeenKeys,
+      maxCount: Math.max(normalizedCount * 2, secondTarget + firstTarget),
+      source: 'history-tag-2-popular',
+      keyword: secondKeyword,
+    }),
+  ]);
 
   const selectedFirst = firstCandidates.slice(0, firstTarget);
   if (selectedFirst.length < firstTarget) {
