@@ -86,7 +86,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     }
 
     if (addedCount === 0) {
-      if (queries.length === 1 && !queries[0]) {
+      try {
         const res = await findPlaylist(userId);
         const playlist = res.map((music) => music.musicInfo);
         if (!playlist.length) {
@@ -103,7 +103,10 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
         await playNext(guild.id);
         return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
       }
-      return { ok: false, message: '찾을 수 없는 노래에요!' };
+      catch (err) {
+        console.error(err);
+        return { ok: false, message: '찾을 수 없는 노래에요!' };
+      }
     }
 
     await playNext(guild.id);
