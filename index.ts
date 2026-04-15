@@ -50,12 +50,16 @@ app.get('/health', (req: Request, res: Response) => {
 app.get('/tts/:id.wav', (req: Request, res: Response) => {
   const entry = ttsHttpStore.get(req.params.id);
   if (!entry) {
-    res.status(404).send('Not found');
+    res.status(404).sendFile(path.join(__dirname, 'public/error/404.html'));
     return;
   }
   res.set('Content-Type', entry.contentType);
   res.set('Cache-Control', 'no-store');
   res.send(entry.buffer);
+});
+
+app.use((req: Request, res: Response) => {
+  res.status(404).sendFile(path.join(__dirname, 'public/error/404.html'));
 });
 
 app.listen(httpPort, httpHost, () => {

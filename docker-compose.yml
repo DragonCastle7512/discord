@@ -76,6 +76,8 @@ services:
     restart: always
     env_file:
       - ./.env
+    ports:
+      - '3000:3000'
     environment:
       - TTS_SERVER_URL=http://tts-engine:9880
       - LAVALINK_HOST=lavalink
