@@ -207,6 +207,18 @@ module.exports = {
     slash_skip: async (args, obj) => executeSlash(obj, 'skip'),
     slash_stop: async (args, obj) => executeSlash(obj, 'stop'),
     slash_echo: async (args, obj) => executeSlash(obj, 'echo', { input: args?.input }),
-    slash_tts: async (args, obj) => executeSlash(obj, 'tts', { input: args?.input }),
+    slash_tts: async (args, obj) => {
+      const whitelist = (process.env.TTS_GUILD_WHITELIST || '').split(',').map(id => id.trim());
+      const guildId = obj?.message?.guild?.id;
+      const isWhitelisted = whitelist.includes(guildId);
+
+      if (!isWhitelisted && process.env.NODE_ENV === 'production') {
+        return {
+          ok: false,
+          reason: '죄송해요, 현재 이 서버에서는 TTS 기능을 사용할 권한이 없어요.',
+        };
+      }
+      return executeSlash(obj, 'tts', { input: args?.input });
+    },
   },
 };

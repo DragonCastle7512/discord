@@ -7,6 +7,16 @@ module.exports = {
         .setDescription('치사가 메세지를 읽어줍니다')
         .addStringOption((option) => option.setName('input').setDescription('메세지').setRequired(true)),
     async execute(interaction, context) {
+        const whitelist = (process.env.TTS_GUILD_WHITELIST || '').split(',').map(id => id.trim());
+        const isWhitelisted = whitelist.includes(interaction.guildId);
+
+        if (!isWhitelisted && process.env.NODE_ENV === 'production') {
+            return interaction.reply({
+                content: '선배, 죄송해요. 현재 이 서버에서는 TTS 기능을 사용할 수 없도록 제한되어 있어요.',
+                ephemeral: true,
+            });
+        }
+
         const input = interaction.options.getString('input');
         await interaction.deferReply({ ephemeral: true });
         try {
