@@ -1,0 +1,382 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>치사 봇 — Discord Assistant</title>
+<link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=Noto+Sans+KR:wght@300;400;500;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ─── NAV ─── -->
+<nav>
+  <a class="nav-logo" href="#">
+    <svg class="scissor-icon-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+      <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+      <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+      <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+    </svg>
+    CHISA BOT
+  </a>
+  <ul class="nav-links">
+    <li><a href="#features">주요 기능</a></li>
+    <li><a href="#commands">명령어</a></li>
+    <li><a href="#persona">SKILLS</a></li>
+  </ul>
+</nav>
+
+<!-- ─── HERO ─── -->
+<div class="hero-card">
+  <div class="hero">
+    <div class="hero-content">
+        <div class="hero-badge">✦ Tactical Analysis Bot · v1.0</div>
+        <h1>
+        구조를 분석하고<br>
+        <span>날카롭게 재단합니다.</span>
+        치사 봇
+        </h1>
+        <p class="hero-sub">
+        명조:워더링 웨이브의 '치사'를 모티브로 한 페르소나 봇.<br>
+        음악 재생과 나만의 플레이리스트, 최근 재생한 노래 기반 추천까지.<br>
+        일상 대화는 물론이며, 모든 기능을 대화만으로 제어 가능합니다.
+        </p>
+        <div class="hero-actions">
+        <a href="https://discord.com/oauth2/authorize?client_id=1465657511997739018&permissions=8&integration_type=0&scope=bot" target="_blank" class="btn-primary">✦ 서버에 초대하기</a>
+        <a href="#commands" class="btn-ghost">명령어 보기 →</a>
+        </div>
+    </div>
+
+    <div class="hero-visual">
+        <div class="scissor-stage">
+        <div class="scissor-ring"></div>
+        <!-- 메인 가위 SVG (치사의 152g 니켈 가위 컨셉) -->
+        <svg class="scissor-main" width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g transform="translate(100,100) rotate(-25)">
+            <ellipse cx="-55" cy="-10" rx="22" ry="14" fill="#1a0a0a" stroke="#cd2929" stroke-width="1.5"/>
+            <circle cx="-55" cy="-10" r="8" fill="none" stroke="#cd2929" stroke-width="1.5"/>
+            <line x1="-33" y1="-10" x2="60" y2="0" stroke="#f0f0f0" stroke-width="4" stroke-linecap="round"/>
+            <polygon points="60,0 56,-5 56,5" fill="#f0f0f0"/>
+            </g>
+            <g transform="translate(100,100) rotate(25)">
+            <ellipse cx="-55" cy="10" rx="22" ry="14" fill="#1a0a0a" stroke="#cd2929" stroke-width="1.5"/>
+            <circle cx="-55" cy="10" r="8" fill="none" stroke="#cd2929" stroke-width="1.5"/>
+            <line x1="-33" y1="10" x2="60" y2="0" stroke="#cd2929" stroke-width="4" stroke-linecap="round"/>
+            <polygon points="60,0 56,-5 56,5" fill="#cd2929"/>
+            </g>
+            <circle cx="100" cy="100" r="7" fill="#8b0000" stroke="#cd2929" stroke-width="1.5"/>
+            <circle cx="100" cy="100" r="3" fill="#cd2929"/>
+        </svg>
+        </div>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FEATURES ─── -->
+<section id="features">
+  <div class="section-label">// 주요 기능</div>
+  <h2 class="section-title">분석과 재단을 위한<br>고성능 시스템</h2>
+  <p class="section-desc">치사 봇은 단순한 음악 재생을 넘어, AI 기반 디스코드 제어가 가능한 비서입니다.</p>
+
+  <div class="features-grid">
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <circle cx="12" cy="12" r="3"/><path d="M19.07 4.93a10 10 0 0 1 0 14.14M4.93 4.93a10 10 0 0 0 0 14.14"/>
+        </svg>
+      </div>
+      <div class="feature-title">음악 스트리밍</div>
+      <p class="feature-desc">Lavalink 엔진을 사용하여 지연 없는 고음질 음악을 제공합니다. Youtube, SoundCloud 등 다양한 소스를 완벽하게 해석합니다.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 1 1-7.6-10.6 8.38 8.38 0 0 1 3.9.9"/>
+          <path d="M11 12h1v4h1"/>
+        </svg>
+      </div>
+      <div class="feature-title">대화 맥락 인식</div>
+      <p class="feature-desc">디스코드 내의 최근 대화 흐름을 분석하여 자연스러운 대화를 이어나갑니다. '치사,' 또는 '치사야'라고 부르면 응답합니다.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-bot-icon lucide-bot">
+            <path d="M12 8V4H8"/>
+            <rect width="16" height="12" x="4" y="8" rx="2"/>
+            <path d="M2 14h2"/>
+            <path d="M20 14h2"/>
+            <path d="M15 13v2"/>
+            <path d="M9 13v2"/>
+        </svg>
+      </div>
+      <div class="feature-title">Agent 시스템</div>
+      <p class="feature-desc">복잡한 요청을 간단한 대화만으로 지시할 수 있습니다.(예: '치사야 노래 10곡 틀어줘.') 지시 가능한 요청은 아래의 SKILLS 목록을 참고해주세요. </p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+        </svg>
+      </div>
+      <div class="feature-title">음악 추천 엔진</div>
+      <p class="feature-desc">최근 재생한 히스토리를 분석하여, 최적의 추천 목록을 제공합니다.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+        </svg>
+      </div>
+      <div class="feature-title">영구 데이터 베이스</div>
+      <p class="feature-desc">플레이리스트와 히스토리를 안전하게 저장합니다. 서버를 다시 시작해도 데이터는 유지됩니다.</p>
+    </div>
+
+    <div class="feature-card">
+      <div class="feature-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+          <polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/>
+        </svg>
+      </div>
+      <div class="feature-title">인터랙티브 UI 제어</div>
+      <p class="feature-desc">버튼, 선택 메뉴, 임베드 메시지를 통한 직관적인 조작을 지원합니다. 대기열 편집부터 재생 목록 관리까지 마우스 클릭만으로 가능합니다.</p>
+    </div>
+
+  </div>
+</section>
+
+<hr class="divider">
+
+<!-- ─── COMMANDS ─── -->
+<div class="commands-section" id="commands">
+  <div class="commands-inner">
+    <div class="section-label">// 명령어</div>
+    <h2 class="section-title">시스템 커맨드</h2>
+    <p class="section-desc">접두사 <code style="font-family:'JetBrains Mono',monospace; background:rgba(205,41,41,0.1); padding:0.1rem 0.4rem; border-radius:3px; color:#cd2929; font-size:0.9em;">/</code> 슬래시 명령어를 사용합니다.</p>
+
+    <!-- 음악 재생 -->
+    <div class="cmd-category">
+      <div class="cmd-cat-label">음악 재생 & 제어</div>
+      <div class="cmd-list">
+        <div class="cmd-item">
+          <span class="cmd-name">/play</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">음악을 재생합니다. (쉼표로 구분 시 여러 곡 재생 가능)</div>
+            <div class="cmd-args">[제목 또는 URL | 비어있는 경우 플레이리스트 재생]</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/skip</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">현재 재생 중인 트랙을 넘기고, 다음 곡으로 넘어갑니다.</div>
+            <div class="cmd-args">—</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/stop</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">모든 재생을 중지하고 연결된 채널에서 퇴장합니다.</div>
+            <div class="cmd-args">—</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/queue</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">대기중인 음악들을 확인/편집할 수 있는 UI를 엽니다.</div>
+            <div class="cmd-args">—</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/loop</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">반복 재생 모드를 전환합니다. (On / Off)</div>
+            <div class="cmd-args">[활성화 여부]</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 데이터 분석 -->
+    <div class="cmd-category">
+      <div class="cmd-cat-label">데이터 분석 & 저장</div>
+      <div class="cmd-list">
+        <div class="cmd-item">
+          <span class="cmd-name">/recommand</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">히스토리 기반 AI 추천 리스트를 생성합니다.</div>
+            <div class="cmd-args">[사용자] [개수(1~15)]</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/playlist</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">저장된 플레이리스트 목록을 조회하고 편집 UI를 엽니다.</div>
+            <div class="cmd-args">—</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/add</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">곡을 플레이리스트에 추가합니다.</div>
+            <div class="cmd-args">[제목 또는 URL | 비어있는 경우 현재 재생중인 곡]</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/history</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">서버에서 재생되었던 음악 기록을 보여줍니다.</div>
+            <div class="cmd-args">[사용자]</div>
+          </div>
+        </div>
+        <div class="cmd-item">
+          <span class="cmd-name">/clear</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">자신의 플레이리스트 데이터를 모두 제거합니다.</div>
+            <div class="cmd-args">—</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 유틸리티 -->
+    <div class="cmd-category">
+      <div class="cmd-cat-label">시스템 유틸리티</div>
+      <div class="cmd-list">
+        <div class="cmd-item">
+          <span class="cmd-name">/echo</span>
+          <div class="cmd-info">
+            <div class="cmd-desc">치사가 지정한 메시지를 채널에 전송합니다.</div>
+            <div class="cmd-args">[내용]</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ─── PERSONA ─── -->
+<section class="persona-section" id="persona">
+  <div class="persona-inner">
+    <div>
+      <div class="section-label">// skills</div>
+      <h2 class="section-title">Tactical Profile</h2>
+      <blockquote class="persona-quote">
+        치사가 사용할 수 있는 도구 목록들입니다.<br>
+        '치사야' 또는 '치사,'를 붙여서 메세지를 보내는 경우 필요하다고 판단될 때 알아서 사용합니다.<br>
+      </blockquote>
+    </div>
+    <div class="persona-art">
+      <div class="art-frame">
+        <div class="cut-line"></div>
+        <!-- 치사 가위 테마 장식 -->
+        <svg width="260" height="260" viewBox="0 0 260 260" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <circle cx="130" cy="130" r="90" fill="rgba(205,41,41,0.04)" stroke="rgba(205,41,41,0.15)" stroke-width="1"/>
+          <circle cx="130" cy="130" r="60" fill="rgba(205,41,41,0.04)" stroke="rgba(205,41,41,0.08)" stroke-width="1" stroke-dasharray="4 4"/>
+
+          <g transform="translate(130,130)">
+            <ellipse cx="-62" cy="-30" rx="24" ry="18" fill="#1a0a0a" stroke="#cd2929" stroke-width="2"/>
+            <path d="M-38,-28 Q-10,-20 80,5" stroke="#f0f0f0" stroke-width="6" stroke-linecap="round" fill="none"/>
+          </g>
+
+          <g transform="translate(130,130)">
+            <ellipse cx="-62" cy="30" rx="24" ry="18" fill="#1a0a0a" stroke="#cd2929" stroke-width="2"/>
+            <path d="M-38,28 Q-10,20 80,-5" stroke="#cd2929" stroke-width="6" stroke-linecap="round" fill="none"/>
+          </g>
+
+          <circle cx="130" cy="130" r="10" fill="#0a0a0a" stroke="#cd2929" stroke-width="2"/>
+          <text x="130" y="230" text-anchor="middle" font-family="JetBrains Mono, monospace" font-size="9" fill="rgba(205,41,41,0.4)" letter-spacing="4">ANALYSIS ────── COMPLETE</text>
+        </svg>
+      </div>
+    </div>
+  </div>
+  <div style="margin-top: 20px;">
+    <div class="cmd-list">
+      <div class="cmd-item">
+        <span class="cmd-name">명령어 사용</span>
+        <div class="cmd-info">
+          <div class="cmd-desc">치사 봇에 등록된 모든 명령어 사용이 가능합니다.</div>
+          <div class="cmd-args">ex) 노래 틀어줘. 지금 재생 중인 노래 목록 좀 보여줘.</div>
+        </div>
+      </div>
+
+      <div class="cmd-item">
+        <span class="cmd-name">인기 음악 탐색</span>
+        <div class="cmd-info">
+          <div class="cmd-desc">유튜브 실시간 인기 차트의 목록을 조회합니다.</div>
+          <div class="cmd-args">ex) 요즘 인기있는 노래 틀어줘.</div>
+        </div>
+      </div>
+
+      <div class="cmd-item">
+        <span class="cmd-name">playlist 조회</span>
+        <div class="cmd-info">
+          <div class="cmd-desc">사용자의 플레이리스트를 조회합니다.</div>
+          <div class="cmd-args">ex) 내 플레이리스트에서 몇 곡 선정해줘.</div>
+        </div>
+      </div>
+
+      <div class="cmd-item">
+        <span class="cmd-name">메세지 읽기</span>
+        <div class="cmd-info">
+          <div class="cmd-desc">현재 채널의 최근 대화 내역을 조회합니다.</div>
+          <div class="cmd-args">ex) 이 채널에서 욕한 사람 찾아줘.</div>
+        </div>
+      </div>
+
+      <div class="cmd-item">
+        <span class="cmd-name">메세지 고정</span>
+        <div class="cmd-info">
+          <div class="cmd-desc">특정 메시지를 고정합니다.</div>
+          <div class="cmd-args">ex) ~메세지 찾아서 고정시켜줘.</div>
+        </div>
+      </div>
+
+      <div class="cmd-item">
+        <span class="cmd-name">이모지 반응</span>
+        <div class="cmd-info">
+          <div class="cmd-desc">특정 메세지에 이모지를 달아줍니다.</div>
+          <div class="cmd-args">ex) ~중에 고민되는데, O, X로 투표해줘.</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
+<!-- ─── CTA ─── -->
+<div style="background: var(--black-card); border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 5rem 3rem; text-align:center;">
+  <div style="max-width:600px; margin:0 auto;">
+    <div class="section-label" style="text-align:center; justify-content:center; display:flex;">// 연결 대기 중</div>
+    <h2 style="font-family:'Black Han Sans', sans-serif; line-height: 1.05; font-weight: 100; font-size:clamp(2rem,5vw,3.5rem); color:var(--text-main); margin: 0.8rem 0 1rem;">최상의 전술 비서를<br>초대해 보세요</h2>
+    <p style="color:var(--text-muted); margin-bottom:2.5rem; line-height:1.8;">치사와 함께 서버의 모든 구조를 분석하고 다듬으세요.
+    <div style="display:flex; gap:1rem; justify-content:center; flex-wrap:wrap;">
+      <a href="https://discord.com/oauth2/authorize?client_id=1465657511997739018&permissions=8&integration_type=0&scope=bot" target="_blank" class="btn-primary">✦ 지금 초대하기</a>
+    </div>
+  </div>
+</div>
+
+<!-- ─── FOOTER ─── -->
+<footer>
+  <div class="footer-inner">
+    <div class="footer-logo">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#cd2929" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="6" cy="6" r="3"/><circle cx="6" cy="18" r="3"/>
+        <line x1="20" y1="4" x2="8.12" y2="15.88"/>
+        <line x1="14.47" y1="14.48" x2="20" y2="20"/>
+        <line x1="8.12" y1="8.12" x2="12" y2="12"/>
+      </svg>
+      CHISA BOT
+    </div>
+    <div class="footer-copy">✂ CHISA Project · Inspired by Wuthering Waves (© KURO GAMES)</div>
+  </div>
+</footer>
+
+</body>
+</html>
