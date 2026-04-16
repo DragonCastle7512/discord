@@ -41,9 +41,10 @@ const ai = {};
 ai.gemini = new GoogleGenAI({
     apiKey: process.env.GEMINI_API_KEY,
 });
-/* gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3-flash-preview gemini-3.1-flash-lite-preview */
+/* gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3-flash-preview gemini-3.1-flash-lite-preview gemma-4-26b-a4b-it gemma-4-31b-it*/
 const modelCandidates = [
-    'gemini-3.1-flash-lite-preview',
+    'gemma-4-26b-a4b-it',
+    'gemma-4-31b-it',
     'gemini-2.5-flash-lite',
     'gemini-3-flash-preview',
     'gemini-2.5-flash',
@@ -53,6 +54,9 @@ ai.currentModelIndex = 0;
 ai.currentModel = uniqueModels[ai.currentModelIndex];
 ai.createChat = (model) => ai.gemini.chats.create({
     model,
+    thinkingConfig: {
+        includeThoughts: false,
+    },
     config: {
         systemInstruction: systemInstructions,
         tools: [{ functionDeclarations }],
