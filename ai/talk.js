@@ -1,8 +1,10 @@
 const { GoogleGenAI } = require('@google/genai');
 const fs = require('fs');
+const axios = require('axios');
 const { music_declarations, handlers: musicHandlers } = require('./skills/music-skill');
 const { command_declarations, handlers: commandHandlers } = require('./skills/command-skill');
 const { handlers: utilHandlers, util_declarations } = require('./skills/util-skill');
+
 const chisaInfo = fs.readFileSync('ai/data/chisa.txt', 'utf8');
 const chisaVoice = fs.readFileSync('ai/data/chisa_voice.txt', 'utf8');
 
@@ -25,158 +27,77 @@ ${chisaVoice}
 필요한 경우 학습 데이터를 참고하여 답하세요.
 `;
 
-const handlers = {
-    ...musicHandlers,
-    ...commandHandlers,
-    ...utilHandlers,
+const handlers = { ...musicHandlers, ...commandHandlers, ...utilHandlers };
+const functionDeclarations = [ ...music_declarations, ...command_declarations, ...util_declarations ];
+
+const ai = {
+    gemini: new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }),
+    models: ['gemma-4-26b-a4b-it', 'gemma-4-31b-it', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.5-flash'],
+    index: 0,
 };
-
-const functionDeclarations = [
-    ...music_declarations,
-    ...command_declarations,
-    ...util_declarations,
-];
-
-const ai = {};
-ai.gemini = new GoogleGenAI({
-    apiKey: process.env.GEMINI_API_KEY,
-});
-/* gemini-2.5-flash-lite, gemini-2.5-flash, gemini-3-flash-preview gemini-3.1-flash-lite-preview gemma-4-26b-a4b-it gemma-4-31b-it*/
-const modelCandidates = [
-    'gemma-4-26b-a4b-it',
-    'gemma-4-31b-it',
-    'gemini-2.5-flash-lite',
-    'gemini-3-flash-preview',
-    'gemini-2.5-flash',
-];
-const uniqueModels = [...new Set(modelCandidates.filter(Boolean))];
-ai.currentModelIndex = 0;
-ai.currentModel = uniqueModels[ai.currentModelIndex];
-ai.createChat = (model) => ai.gemini.chats.create({
-    model,
-    thinkingConfig: {
-        includeThoughts: false,
-    },
-    config: {
-        systemInstruction: systemInstructions,
-        tools: [{ functionDeclarations }],
-    },
-});
-ai.chat = ai.createChat(ai.currentModel);
-
-const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-
-const isThoughtSignatureError = (err) => String(err?.message || '').includes('thought_signature');
 
 const isRetriableError = (err) => {
     const status = Number(err?.status || err?.error?.code || 0);
     const text = String(err?.message || '');
-    return status === 429
-        || status === 503
-        || status >= 500
-        || text.includes('UNAVAILABLE')
-        || text.includes('high demand');
+    return [429, 503].includes(status) || status >= 500 || text.includes('UNAVAILABLE') || text.includes('high demand');
 };
 
-const switchToNextModel = () => {
-    if (uniqueModels.length < 2) {
-        return false;
-    }
-
-    const previousModel = ai.currentModel;
-    ai.currentModelIndex = (ai.currentModelIndex + 1) % uniqueModels.length;
-    ai.currentModel = uniqueModels[ai.currentModelIndex];
-    if (ai.currentModel === previousModel) {
-        return false;
-    }
-
-    ai.chat = ai.createChat(ai.currentModel);
-    console.warn(`[Gemini] 모델 교체: ${previousModel} -> ${ai.currentModel}`);
-    return true;
-};
-
-async function sendMessageWithRetry(payload) {
-    const maxModelSwitches = Math.max(0, uniqueModels.length - 1);
-    let switchCount = 0;
-
-    while (true) {
+async function generateWithRetry(contents) {
+    for (let i = 0; i < ai.models.length; i++) {
+        const model = ai.models[ai.index];
         try {
-            return await ai.chat.sendMessage(payload);
+            return await ai.gemini.models.generateContent({
+                model,
+                config: { thinkingConfig: { includeThoughts: false }, systemInstruction: systemInstructions, tools: [{ functionDeclarations }] },
+                contents,
+            });
         }
         catch (err) {
-            if (!isRetriableError(err)) {
-                throw err;
-            }
-            console.warn(
-                `[Gemini] ${ai.currentModel} 호출 중 오류 발생: ${err?.status || err?.message}`,
-            );
+            if (!isRetriableError(err)) throw err;
+            console.warn(`[Gemini] ${model} 오류: ${err.message}`);
+            ai.index = (ai.index + 1) % ai.models.length;
+            await new Promise(r => setTimeout(r, 300));
         }
-
-        if (switchCount++ >= maxModelSwitches || !switchToNextModel()) {
-            break;
-        }
-        await sleep(300);
     }
-
-    throw new Error('Gemini API is temporarily unavailable after retries and model fallback.');
+    throw new Error('Gemini API Unavailable');
 }
 
 async function talk(message, context) {
     try {
-        let response = await sendMessageWithRetry({
-            message: `[UserID: ${message.author.id}] ${message.content}`,
-        });
-        const obj = { message, context };
+        const parts = [{ text: `[UserID: ${message.author.id}] ${message.content}` }];
+        for (const a of (message.attachments?.values() || [])) {
+            if (a.contentType?.startsWith('image/')) {
+                const img = await axios.get(a.url, { responseType: 'arraybuffer' }).catch(() => null);
+                if (img) {
+                parts.push({
+                    inlineData: {
+                        data: Buffer.from(img.data).toString('base64'),
+                        mimeType: img.headers['content-type'] || 'image/jpeg' },
+                    });
+                }
+            }
+        }
 
-        while (Array.isArray(response.functionCalls) && response.functionCalls.length > 0) {
-            const toolResponses = await Promise.all(
-                response.functionCalls.map(async (fn) => {
-                    console.log(`[Tool Call] ${fn.name}:`, fn.args);
-                    const handler = handlers?.[fn.name];
-                    try {
-                        const output = handler
-                            ? await handler(fn.args, obj)
-                            : `Unknown function: ${fn.name}`;
-                        return {
-                            functionResponse: {
-                                id: fn.id,
-                                name: fn.name,
-                                response: { output },
-                            },
-                        };
-                    }
-                    catch (error) {
-                        console.error(`[Handler Error] ${fn.name}:`, error);
-                        return {
-                            functionResponse: {
-                                id: fn.id,
-                                name: fn.name,
-                                response: { output: `Error: ${error.message || error}` },
-                            },
-                        };
-                    }
-                }),
-            );
-            response = await sendMessageWithRetry({
-                message: toolResponses,
-            });
+        const contents = [{ role: 'user', parts }];
+        let response = await generateWithRetry(contents);
+
+        while (response.functionCalls?.length > 0) {
+            contents.push({ role: 'model', parts: response.functionCalls.map(fc => ({ functionCall: fc })) });
+            const toolParts = await Promise.all(response.functionCalls.map(async (fc) => {
+                console.log(`[Tool Call] ${fc.name}:`, fc.args);
+                const handler = handlers[fc.name];
+                const output = handler ? await handler(fc.args, { message, context }).catch(e => `Error: ${e.message}`) : `Unknown: ${fc.name}`;
+                return { functionResponse: { id: fc.id, name: fc.name, response: { output } } };
+            }));
+            contents.push({ role: 'user', parts: toolParts });
+            response = await generateWithRetry(contents);
         }
         return response.text;
     }
     catch (err) {
         console.error(err);
-        if (isThoughtSignatureError(err)) {
-            console.warn(`[Gemini] thought_signature 매칭 실패 history 초기화 ${ai.currentModel}`);
-            ai.chat = ai.createChat(ai.currentModel);
-            return;
-        }
-        if (isRetriableError(err)) {
-            return '지금은 AI 응답 요청이 몰려 있어요. 잠시 후 다시 시도해 주세요.';
-        }
-        return '문제가 발생했어요';
+        return '문제가 발생했어요.';
     }
 }
 
-module.exports = {
-    talk: talk,
-};
+module.exports = { talk };
