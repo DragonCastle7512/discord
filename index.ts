@@ -8,7 +8,8 @@ import {
   TtsRuntime, 
   RuntimeUtils, 
   AppContext, 
-  GuildState 
+  GuildState, 
+  RuntimeResponse
 } from './types';
 
 const { talk } = require('./ai/talk');
@@ -237,6 +238,6 @@ client.on('messageCreate', async (message: Message) => {
     await message.channel.sendTyping();
   }
 
-	const response: string = await talk(message, context);
-	await message.reply(`${response}`);
+	const response: RuntimeResponse = await talk(message, context);
+  await message.reply(response.message);
 });

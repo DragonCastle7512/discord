@@ -1,4 +1,9 @@
-const { GoogleGenAI } = require('@google/genai');
+import { Message } from "discord.js";
+import { AppContext, RuntimeResponse } from "../types";
+// @ts-ignore
+import { ContentListUnion, GenerateContentResponse, GoogleGenAI, Part } from "@google/genai";
+import { ToolName } from "./skills/tool-names";
+
 const fs = require('fs');
 const axios = require('axios');
 const { music_declarations, handlers: musicHandlers } = require('./skills/music-skill');
@@ -26,22 +31,39 @@ ${chisaVoice}
 필요한 경우 학습 데이터를 참고하여 답하세요.
 `;
 
-const handlers = { ...musicHandlers, ...commandHandlers, ...utilHandlers };
+export const toolStatusMap: Record<ToolName, string> & { [key: string]: string } = {
+    [ToolName.GetRecommendList]: '취향에 딱 맞는 노래를 고르고 있어요... 🎵',
+    [ToolName.GetYoutubePopular]: '요즘 가장 핫한 인기 곡들을 찾아보고 있어요... 🔥',
+    [ToolName.GetRecentPlayed]: '최근에 재생한 노래를 확인하고 있어요... 🔍',
+    [ToolName.ReadMessages]: '이전 대화 내용을 살펴보고 있어요... 📖',
+    [ToolName.GetQueue]: '현재 재생중인 노래 목록을 확인하고 있어요... 📋',
+    [ToolName.GetPlaylist]: '소중한 플레이리스트를 확인하고 있어요... 📂',
+    [ToolName.SlashPlay]: '노래를 추가하고 있어요... 🎧',
+    [ToolName.React]: '적절한 반응을 추가하고 있어요... ✨',
+    [ToolName.Pin]: '잊지 않게 메시지를 고정해 둘게요... 📌',
+};
+
+const handlers: Record<string, Function> = { ...musicHandlers, ...commandHandlers, ...utilHandlers };
 const functionDeclarations = [ ...music_declarations, ...command_declarations, ...util_declarations ];
 
-const ai = {
+interface AI {
+    gemini: GoogleGenAI,
+    models: string[],
+    index: number,
+}
+const ai: AI = {
     gemini: new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }),
     models: ['gemma-4-26b-a4b-it', 'gemma-4-31b-it', 'gemini-3.1-flash-lite-preview', 'gemini-2.5-flash', 'gemini-3-flash-preview'],
     index: 0,
 };
 
-const isRetriableError = (err) => {
+const isRetriableError = (err: any) => {
     const status = Number(err?.status || err?.error?.code || 0);
     const text = String(err?.message || '');
     return [429, 503].includes(status) || status >= 500 || text.includes('UNAVAILABLE') || text.includes('high demand');
 };
 
-async function generateWithRetry(contents) {
+async function generateWithRetry(contents: ContentListUnion): Promise<GenerateContentResponse> {
     for (let i = 0; i < ai.models.length; i++) {
         const model = ai.models[ai.index];
         try {
@@ -51,7 +73,7 @@ async function generateWithRetry(contents) {
                 contents,
             });
         }
-        catch (err) {
+        catch (err: any) {
             if (!isRetriableError(err)) throw err;
             console.warn(`[Gemini] ${model} 오류: ${err.message}`);
             ai.index = (ai.index + 1) % ai.models.length;
@@ -61,10 +83,12 @@ async function generateWithRetry(contents) {
     throw new Error('Gemini API Unavailable');
 }
 
-async function talk(message, context) {
+async function talk(message: Message, context: AppContext): Promise<RuntimeResponse> {
+    let replyMsg = null;
     try {
-        const contents = [];
+        const contents: ContentListUnion = [];
 
+        replyMsg = await message.reply('생각 중... 💭').catch(() => null);
         const fetchLimit = 10;
         const fetched = await message.channel.messages.fetch({ limit: fetchLimit + 1 }).catch(() => null);
         if (fetched) {
@@ -80,7 +104,7 @@ async function talk(message, context) {
             });
         }
 
-        const parts = [{ text: `[UserID: ${message.author.id}] ${message.content}` }];
+        const parts: Part[] = [{ text: `[UserID: ${message.author.id}] ${message.content}` }];
         for (const a of (message.attachments?.values() || [])) {
             if (a.contentType?.startsWith('image/')) {
                 const img = await axios.get(a.url, { responseType: 'arraybuffer' }).catch(() => null);
@@ -94,23 +118,41 @@ async function talk(message, context) {
             }
         }
         contents.push({ role: 'user', parts });
-        let response = await generateWithRetry(contents);
+        let response: GenerateContentResponse = await generateWithRetry(contents);
 
-        while (response?.functionCalls?.length > 0) {
+        while (response?.functionCalls && response.functionCalls?.length > 0) {
+            const firstTool: string | undefined = response.functionCalls[0].name;
+            if(!firstTool) break;
+            const statusText = toolStatusMap[firstTool] || '잠시만 기다려주세요... ⏳';
+            if (replyMsg) await replyMsg.edit(statusText).catch(() => null);
+
             const toolParts = await Promise.all(response.functionCalls.map(async (fc) => {
                 console.log(`[Tool Call] ${fc.name}:`, fc.args);
+                if (!fc.name) {
+                    console.error("[Tool Call] 함수 이름이 누락되었습니다.", fc);
+                    return { 
+                        functionResponse: { 
+                            name: "unknown_function",
+                            response: { output: "Error: Function name is missing." } 
+                        } 
+                    };
+                }
                 const handler = handlers[fc.name];
-                const output = handler ? await handler(fc.args, { message, context }).catch(e => `Error: ${e.message}`) : `Unknown: ${fc.name}`;
+                const output = handler ? await handler(fc.args, { message, context }).catch((e: Error) => `Error: ${e.message}`) : `Unknown: ${fc.name}`;
                 return { functionResponse: { id: fc.id, name: fc.name, response: { output } } };
             }));
             contents.push({ role: 'user', parts: toolParts });
             response = await generateWithRetry(contents);
         }
-        return response.text;
+
+        if(replyMsg?.deletable) await replyMsg?.delete();
+        if(!response.text) return { ok: false, message: '문제가 발생했어요.' };
+        return { ok: true, message: response.text };
     }
     catch (err) {
         console.error(err);
-        return '문제가 발생했어요.';
+        if(replyMsg?.deletable) await replyMsg?.delete();
+        return { ok: false, message: '문제가 발생했어요.' };
     }
 }
 
