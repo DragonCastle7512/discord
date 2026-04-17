@@ -19,7 +19,6 @@ Persona: 당신은 게임 "명조: 워더링 웨이브"의 공명자 "치사"입
 7. 별다른 요청 없이 노래를 선정 해야하는 경우는 반드시 'get_recommand_list' 함수의 추천 목록 기반으로 선정하세요.
 8. 최신 인기 음악이 필요하거나 특정 키워드의 곡을 요청한 경우 'get_youtube_popular_music' 함수를 호츌하여 현재 리스트를 확보하세요. 제목에서 음악이 아니라고 유추되면 다른 음악을 찾아보세요.
 9. 'get_youtube_popular_music' 결과에서는 항상 상위 고정곡만 고르지 말고, 반환된 최대 50곡 풀에서 무작위로 선별하세요. 가장 최근/인기 있는 곡을 요청하는 경우 상위 N개를 선별하세요.
-10. 질문/요청에 응답하기 전 항상 'read_messages' 함수로 최근 대화내역을 확인하여 맥락을 파악한 후 다음 명령을 수행하세요. 
 [학습 데이터1: 치사의 상세 설정 및 세계관]
 ${chisaInfo}
 [학습 데이터2: 치사 실제 대사]
@@ -32,7 +31,7 @@ const functionDeclarations = [ ...music_declarations, ...command_declarations, .
 
 const ai = {
     gemini: new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY }),
-    models: ['gemma-4-26b-a4b-it', 'gemma-4-31b-it', 'gemini-2.5-flash-lite', 'gemini-3-flash-preview', 'gemini-2.5-flash'],
+    models: ['gemma-4-26b-a4b-it', 'gemma-4-31b-it', 'gemini-3.1-flash-lite-preview', 'gemini-2.5-flash', 'gemini-3-flash-preview'],
     index: 0,
 };
 
@@ -56,7 +55,7 @@ async function generateWithRetry(contents) {
             if (!isRetriableError(err)) throw err;
             console.warn(`[Gemini] ${model} 오류: ${err.message}`);
             ai.index = (ai.index + 1) % ai.models.length;
-            await new Promise(r => setTimeout(r, 300));
+            await new Promise(r => setTimeout(r, 100));
         }
     }
     throw new Error('Gemini API Unavailable');
@@ -64,6 +63,23 @@ async function generateWithRetry(contents) {
 
 async function talk(message, context) {
     try {
+        const contents = [];
+
+        const fetchLimit = 10;
+        const fetched = await message.channel.messages.fetch({ limit: fetchLimit + 1 }).catch(() => null);
+        if (fetched) {
+            const history = Array.from(fetched.values())
+                .filter(m => m.id !== message.id)
+                .sort((a, b) => a.createdTimestamp - b.createdTimestamp)
+                .slice(-fetchLimit);
+
+            history.forEach(m => {
+                const role = m.author.id === message.client.user.id ? 'model' : 'user';
+                const prefix = role === 'user' ? `[UserID: ${m.author.id}] ` : '';
+                contents.push({ role, parts: [{ text: prefix + m.cleanContent }] });
+            });
+        }
+
         const parts = [{ text: `[UserID: ${message.author.id}] ${message.content}` }];
         for (const a of (message.attachments?.values() || [])) {
             if (a.contentType?.startsWith('image/')) {
@@ -77,12 +93,10 @@ async function talk(message, context) {
                 }
             }
         }
-
-        const contents = [{ role: 'user', parts }];
+        contents.push({ role: 'user', parts });
         let response = await generateWithRetry(contents);
 
-        while (response.functionCalls?.length > 0) {
-            contents.push({ role: 'model', parts: response.functionCalls.map(fc => ({ functionCall: fc })) });
+        while (response?.functionCalls?.length > 0) {
             const toolParts = await Promise.all(response.functionCalls.map(async (fc) => {
                 console.log(`[Tool Call] ${fc.name}:`, fc.args);
                 const handler = handlers[fc.name];
