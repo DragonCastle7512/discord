@@ -1,7 +1,28 @@
-const { findHistoryByRequester } = require('./repositorys/music-history.repository');
-const { insertPlaylist, findPlaylist, clearPlaylist, updatePlaylist, deletePlaylist } = require('./repositorys/playlist.repository');
+import { 
+  MusicRuntime, 
+  RuntimeUtils, 
+  Track, 
+  PlaylistEntry, 
+  HistoryEntry, 
+  GuildState,
+} from './types';
+import { RuntimeResponse } from '../types';
+import { findHistoryByRequester } from './repositorys/music-history.repository';
+import { 
+  insertPlaylist, 
+  findPlaylist, 
+  clearPlaylist, 
+  updatePlaylist, 
+  deletePlaylist 
+} from './repositorys/playlist.repository';
 
-function createMusicRuntime({ guildStates, runtimeUtils }) {
+export function createMusicRuntime({ 
+  guildStates, 
+  runtimeUtils 
+}: { 
+  guildStates: Map<string, GuildState>, 
+  runtimeUtils: RuntimeUtils 
+}): MusicRuntime {
 
   const {
     waitForReadyNode,
@@ -11,14 +32,14 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     playNext,
   } = runtimeUtils;
 
-  /* interaction과 message객체 모두 호환 */
-  async function play(context, query) {
-    const { channelId } = context;
-    const guild = context.guild || client.guilds.cache.get(message.guildId);
+  async function play(context: any, query: string | string[]): Promise<RuntimeResponse> {
+    const { channelId, guild, member: contextMember, author, user } = context;
     if (!guild) throw new Error('Guild only command');
 
-    const userId = context.user?.id || context.author?.id;
-    const member = await guild.members.fetch(userId);
+    const userId = user?.id || author?.id;
+    if (!userId) throw new Error('User not found in context');
+
+    const member = contextMember || await guild.members.fetch(userId);
     const voiceChannel = member.voice.channel;
     if (!voiceChannel) {
       return { ok: false, message: '음성채널에 먼저 입장해주세요!' };
@@ -37,10 +58,10 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       .flatMap(q => (typeof q === 'string' ? q.split(',') : q))
       .map(q => (typeof q === 'string' ? q.trim() : q))
       .filter(Boolean);
-
-    const BATCH_SIZE = 10;
+    
+    const BATCH_SIZE = 25;
     const resolvedBatches = [];
-
+    
     for (let i = 0; i < queries.length; i += BATCH_SIZE) {
       const batch = queries.slice(i, i + BATCH_SIZE);
       const batchResults = await Promise.all(
@@ -49,12 +70,11 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
           if (!trimmed) return null;
           try {
             return await resolveTracks(trimmed);
-          }
-          catch (e) {
+          } catch (e) {
             console.error(`Resolve failed for ${trimmed}:`, e);
             return null;
           }
-        }),
+        })
       );
       resolvedBatches.push(...batchResults);
     }
@@ -76,8 +96,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
         state.queue.push(...requestedTracks);
         addedCount += requestedTracks.length;
         if (!firstTrackTitle) firstTrackTitle = playlistName;
-      }
-      else {
+      } else {
         const first = { ...tracks[0], requestedBy: userId };
         state.queue.push(first);
         addedCount += 1;
@@ -86,7 +105,8 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     }
 
     if (addedCount === 0) {
-      try {
+      const isInitialEmptyCall = queries.length === 1 && !queries[0];
+      if (isInitialEmptyCall) {
         const res = await findPlaylist(userId);
         const playlist = res.map((music) => music.musicInfo);
         if (!playlist.length) {
@@ -103,13 +123,12 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
         await playNext(guild.id);
         return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
       }
-      catch (err) {
-        console.error(err);
-        return { ok: false, message: '찾을 수 없는 노래에요!' };
-      }
+      return { ok: false, message: '찾을 수 있는 노래가 없어요.' };
     }
 
-    await playNext(guild.id);
+    if (!state.playing) {
+      await playNext(guild.id);
+    }
 
     if (addedCount > 1) {
       return { ok: true, message: `**${firstTrackTitle}** 외 ${addedCount - 1}곡을 추가했어요!` };
@@ -117,7 +136,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `**${firstTrackTitle || 'Unknown title'}**을(를) 추가했어요!` };
   }
 
-  async function skip(guildId) {
+  async function skip(guildId: string): Promise<RuntimeResponse> {
     const state = guildStates.get(guildId);
     if (!state || !state.player || !state.playing) {
       return { ok: false, message: '아무것도 재생 중이지 않아요!' };
@@ -127,18 +146,18 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: '현재 노래를 넘겼어요!' };
   }
 
-  async function stop(guildId) {
+  async function stop(guildId: string): Promise<RuntimeResponse> {
     const state = guildStates.get(guildId);
     if (!state || !state.player) {
       return { ok: false, message: '재생 중인 노래가 없어요!' };
     }
 
-    await runtimeUtils.stopShoukaku(guildId);
+    await (runtimeUtils as any).stopShoukaku(guildId);
 
     return { ok: true, message: '모든 노래를 중지했어요!' };
   }
 
-  function queue(guildId) {
+  function queue(guildId: string) {
     const state = guildStates.get(guildId);
     if (!state || (!state.current && state.queue.length === 0)) {
       return { message: 'Queue가 비어있어요!', count: 0 };
@@ -155,15 +174,15 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { message: `${currentLine}\n\n대기 중인 곡\n**${upcoming || 'none'}**`, count: state.queue.length + 1 };
   }
 
-  async function getPlaylist(userId) {
-    const res = await findPlaylist(userId);
-    const playlist = res.map((music) => music.musicInfo);
+  async function getPlaylist(userId: string): Promise<Track[]> {
+    const res: PlaylistEntry[] = await findPlaylist(userId);
+    const playlist: Track[] = res.map((music: PlaylistEntry) => music.musicInfo);
     return playlist;
   }
 
-  async function addToPlaylist(guildId, userId, query) {
+  async function addToPlaylist(guildId: string, userId: string, query: string): Promise<RuntimeResponse> {
     const trimmedQuery = (query || '').trim();
-    let track = null;
+    let track: Track | null = null;
     let note = '';
 
     if (!trimmedQuery) {
@@ -183,17 +202,13 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       }
     }
 
-    await insertPlaylist(userId, {
-      encoded: track.encoded,
-      info: track.info || {},
-      addedAt: Date.now(),
-    });
+    await insertPlaylist(userId, track);
 
     const title = track.info?.title || 'Unknown title';
     return { ok: true, message: `Playlist에 노래를 추가했어요!\n **${title}**${note}` };
   }
 
-  async function clearToPlaylist(userId) {
+  async function clearToPlaylist(userId: string): Promise<RuntimeResponse> {
     const cleared = await clearPlaylist(userId);
     if (!cleared) {
       return { ok: true, message: 'Playlist가 이미 비어있어요!' };
@@ -201,7 +216,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `총 ${cleared}개의 항목을 비웠어요!` };
   }
 
-  async function deleteFromPlaylist(userId, index) {
+  async function deleteFromPlaylist(userId: string, index: number | string): Promise<RuntimeResponse> {
     const entries = await findPlaylist(userId);
     if (!entries.length) {
       return { ok: false, message: 'Playlist가 비어있어요' };
@@ -218,7 +233,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `Playlist에서 노래를 삭제했어요!\n **${title}**` };
   }
 
-  function getQueueSnapshot(guildId) {
+  function getQueueSnapshot(guildId: string) {
     const state = guildStates.get(guildId);
     return {
       current: state?.current || null,
@@ -226,8 +241,10 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     };
   }
 
-  function moveQueueItem(guildId, fromIndex, toIndex) {
+  function moveQueueItem(guildId: string, fromIndex: number | string, toIndex: number | string): RuntimeResponse {
     const state = guildStates.get(guildId);
+    if (!state) return { ok: false, message: '재생 중인 서버가 아니에요.' };
+    
     const length = state.queue.length;
     const from = Number(fromIndex);
     const to = Number(toIndex);
@@ -246,8 +263,10 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `Moved: ${title} (${from} -> ${to})` };
   }
 
-  function removeQueueItem(guildId, index) {
+  function removeQueueItem(guildId: string, index: number | string): RuntimeResponse {
     const state = guildStates.get(guildId);
+    if (!state) return { ok: false, message: '재생 중인 서버가 아니에요.' };
+    
     const length = state.queue.length;
     const target = Number(index);
 
@@ -260,7 +279,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return { ok: true, message: `Removed: ${title}` };
   }
 
-  async function history(guildId, requestedBy) {
+  async function history(guildId: string, requestedBy?: string): Promise<{ total: number; items: HistoryEntry[] }> {
     const items = await findHistoryByRequester(guildId, requestedBy);
 
     return {
@@ -269,7 +288,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     };
   }
 
-  async function searchTracks(query) {
+  async function searchTracks(query: string) {
     const trimmedQuery = String(query || '').trim();
     if (!trimmedQuery) {
       return { tracks: [], playlistName: null };
@@ -277,13 +296,14 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     return resolveTracks(trimmedQuery);
   }
 
-  async function loop(guildId, enable) {
+  async function loop(guildId: string, enable: boolean | null): Promise<{ enabled: boolean }> {
     const state = guildStates.get(guildId);
+    if (!state) return { enabled: false };
     state.loop = (enable !== null) ? Boolean(enable) : !state.loop;
     return { enabled: Boolean(state.loop) };
   }
 
-  async function movePlaylistItem(userId, fromIndex, toIndex) {
+  async function movePlaylistItem(userId: string, fromIndex: number | string, toIndex: number | string): Promise<RuntimeResponse> {
     const entries = await findPlaylist(userId);
     if (!entries.length) {
       return { ok: false, message: 'Playlist가 비어있어요' };
@@ -299,20 +319,19 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       return { ok: true, message: '노래 위치가 이미 같아요' };
     }
 
-    const original = entries.map((entry) => entry.musicInfo);
-    const moved = original.slice();
+    const moved = entries.slice();
     const [item] = moved.splice(from - 1, 1);
     moved.splice(to - 1, 0, item);
 
     const start = Math.min(from, to) - 1;
     const end = Math.max(from, to) - 1;
 
-    const sequelize = entries[0].sequelize || entries[0].constructor?.sequelize;
+    const sequelize = (entries[0] as any).sequelize || (entries[0] as any).constructor?.sequelize;
     const transaction = sequelize ? await sequelize.transaction() : null;
     try {
       for (let i = start; i <= end; i += 1) {
         const entry = entries[i];
-        await updatePlaylist(userId, entry.id, moved[i], transaction || undefined);
+        await updatePlaylist(userId, entry.id, moved[i].musicInfo, transaction || undefined);
       }
       if (transaction) {
         await transaction.commit();
@@ -325,7 +344,7 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
       throw error;
     }
 
-    const title = item?.info?.title || 'Unknown title';
+    const title = item.musicInfo?.info?.title || 'Unknown title';
     return { ok: true, message: `Playlist에서 노래 위치를 이동했어요!\n **${title}** (${from} -> ${to})` };
   }
 
@@ -347,5 +366,3 @@ function createMusicRuntime({ guildStates, runtimeUtils }) {
     movePlaylistItem,
   };
 }
-
-module.exports = { createMusicRuntime };

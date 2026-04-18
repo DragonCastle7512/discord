@@ -4,14 +4,12 @@ import { Client, Events, GatewayIntentBits, Collection, Message, Interaction, Vo
 // @ts-ignore
 import express, { Request, Response, Express } from 'express';
 import { 
-  MusicRuntime, 
   TtsRuntime, 
-  RuntimeUtils, 
   AppContext, 
-  GuildState, 
   RuntimeResponse
 } from './types';
 import { safeReply } from './common/reply-util';
+import { GuildState, MusicRuntime, RuntimeUtils } from './music/types';
 
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
