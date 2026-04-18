@@ -1,3 +1,5 @@
+import { safeReply } from '../../common/reply-util';
+
 const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
@@ -6,6 +8,6 @@ module.exports = {
     .setDescription('플레이리스트를 초기화합니다.'),
   async execute(interaction, context) {
     const result = await context.music.clearToPlaylist(interaction.user.id);
-    await interaction.reply({ content: result.message, ephemeral: true });
+    await safeReply(interaction, { content: result.message, ephemeral: true });
   },
 };

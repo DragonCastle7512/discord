@@ -1,3 +1,5 @@
+import { safeReply } from '../../common/reply-util';
+
 const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
@@ -11,6 +13,6 @@ module.exports = {
     await interaction.deferReply({ ephemeral: true });
     const query = interaction.options.getString('music') || '';
     const result = await context.music.addToPlaylist(interaction.guildId, interaction.user.id, query);
-    await interaction.editReply(result.message);
+    await safeReply(interaction, result.message);
   },
 };

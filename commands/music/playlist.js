@@ -1,5 +1,6 @@
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
 const { buildEmbed } = require('../../music/embeds/buildEmbed');
+import { safeReply } from '../../common/reply-util';
 
 const MAX_VISIBLE = 25;
 const COLLECTOR_MS = 5 * 60 * 1000;
@@ -87,7 +88,7 @@ module.exports = {
 
     if (!tracks.length) {
       const embed = buildEmbed('PlayList', 'Playlist가 비어있어요', '0 track(s)');
-      await interaction.editReply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] });
       return;
     }
 
@@ -98,7 +99,7 @@ module.exports = {
       buildDescription(tracks, selectedIndex),
       `${tracks.length} track(s)`,
     );
-    const message = await interaction.editReply({
+    const message = await safeReply(interaction, {
       embeds: [embed],
       components: buildComponents(tracks, selectedIndex, userId),
       fetchReply: true,
@@ -122,7 +123,7 @@ module.exports = {
           tracks = await context.music.getPlaylist(userId);
           if (!tracks.length) {
             const emptyEmbed = buildEmbed('PlayList', 'Playlist가 비어있어요', '0 track(s)');
-            await interaction.editReply({ embeds: [emptyEmbed], components: [] });
+            await safeReply(interaction, { embeds: [emptyEmbed], components: [] });
             collector.stop('empty');
             return;
           }
@@ -153,25 +154,20 @@ module.exports = {
           buildDescription(tracks, selectedIndex),
           `${tracks.length} track(s)`,
         );
-        await interaction.editReply({
+        await safeReply(interaction, {
           embeds: [nextEmbed],
           components: buildComponents(tracks, selectedIndex, userId),
         });
       }
       catch (error) {
         console.error('Playlist component error:', error);
-        if (component.deferred || component.replied) {
-          await component.editReply({ content: '조작 중 오류가 발생했어요.' });
-        }
-        else {
-          await component.reply({ content: '조작 중 오류가 발생했어요.', ephemeral: true });
-        }
+        await safeReply(component, { content: '조작 중 오류가 발생했어요.', ephemeral: true });
       }
     });
 
     collector.on('end', async () => {
       try {
-        await interaction.deleteReply();
+        await interaction.deleteReply().catch(() => null);
       }
       catch (error) {
         if (isUnknownMessageError(error)) return;

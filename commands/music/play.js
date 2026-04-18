@@ -1,3 +1,5 @@
+import { safeReply } from '../../common/reply-util';
+
 const { SlashCommandBuilder } = require('discord.js');
 
 module.exports = {
@@ -11,6 +13,6 @@ module.exports = {
     await interaction.deferReply();
     const query = (interaction.options.getString('query') || '').trim();
     const result = await context.music.play(interaction, query);
-    await interaction.editReply(result.message);
+    await safeReply(interaction, result.message);
   },
 };

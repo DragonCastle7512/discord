@@ -3,6 +3,7 @@ import { AppContext, RuntimeResponse } from "../types";
 // @ts-ignore
 import { ContentListUnion, GenerateContentResponse, GoogleGenAI, Part } from "@google/genai";
 import { ToolName } from "./skills/tool-names";
+import { safeReply } from "../common/reply-util";
 
 const fs = require('fs');
 const axios = require('axios');
@@ -88,7 +89,7 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
     try {
         const contents: ContentListUnion = [];
 
-        replyMsg = await message.reply('생각 중... 💭').catch(() => null);
+        replyMsg = await safeReply(message, '생각 중... 💭');
         const fetchLimit = 10;
         const fetched = await message.channel.messages.fetch({ limit: fetchLimit + 1 }).catch(() => null);
         if (fetched) {
@@ -124,7 +125,7 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
             const firstTool: string | undefined = response.functionCalls[0].name;
             if(!firstTool) break;
             const statusText = toolStatusMap[firstTool] || '잠시만 기다려주세요... ⏳';
-            if (replyMsg) await replyMsg.edit(statusText).catch(() => null);
+            replyMsg = await safeReply(message, statusText, replyMsg);
 
             const toolParts = await Promise.all(response.functionCalls.map(async (fc) => {
                 console.log(`[Tool Call] ${fc.name}:`, fc.args);

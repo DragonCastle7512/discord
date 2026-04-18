@@ -102,8 +102,14 @@ function createSyntheticInteraction(message, options) {
     async editReply(payload) {
       const normalized = normalizeReplyPayload(payload);
       if (this._replyMessage) {
-        this._replyMessage = await this._replyMessage.edit(normalized);
-        return this._replyMessage;
+        try {
+          this._replyMessage = await this._replyMessage.edit(normalized);
+          return this._replyMessage;
+        }
+        catch (err) {
+          console.error('[EditReply Error]:' + err);
+          return this.reply(normalized);
+        }
       }
       return this.reply(normalized);
     },

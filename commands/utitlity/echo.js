@@ -1,3 +1,5 @@
+import { safeReply } from '../../common/reply-util';
+
 const { SlashCommandBuilder } = require('discord.js');
 module.exports = {
     data: new SlashCommandBuilder()
@@ -8,7 +10,7 @@ module.exports = {
         const input = interaction.options.getString('input');
         try {
             await interaction.channel.send(input);
-            await interaction.reply({ content: '메시지를 전송했어요', ephemeral: true });
+            await safeReply(interaction, { content: '메시지를 전송했어요', ephemeral: true });
             setTimeout(() => interaction.deleteReply(), 1000);
         }
         catch (err) {

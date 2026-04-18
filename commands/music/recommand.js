@@ -16,6 +16,7 @@ const {
   formatDuration,
   recommendFromHistory,
 } = require('../../music/recommand-service');
+import { safeReply } from '../../common/reply-util';
 
 // 사용자별 추천 결과를 저장할 인메모리 캐시
 const recommendationCache = new Map();
@@ -152,7 +153,7 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName('count')
-        .setDescription('추천 곡 개수 (최대 15)')
+        .setDescription('추천 곡 개수 (최대 10)')
         .setRequired(false),
     ),
 
@@ -175,21 +176,19 @@ module.exports = {
       region: 'KR',
     });
 
-    const tracks = result.items;
-
     // 결과를 캐시에 저장 (사용자 ID 기준)
-    recommendationCache.set(interaction.user.id, tracks);
+    recommendationCache.set(interaction.user.id, result);
 
-    if (!tracks || (Array.isArray(tracks) && tracks.length === 0)) {
-      await interaction.editReply({ content: '추천 결과가 없어요.' });
+    if (!result || (Array.isArray(result) && result.length === 0)) {
+      await safeReply(interaction, { content: '추천 결과가 없어요.' });
       return;
     }
 
-    await interaction.editReply({ content: '추천 결과를 불러왔어요!' });
+    await safeReply(interaction, { content: '추천 결과를 불러왔어요!' });
 
     // 첫 페이지(index 0) 표시
-    const components = buildRecommendationComponents(tracks, interaction.user.id, 0);
-    await interaction.followUp({
+    const components = buildRecommendationComponents(result, interaction.user.id, 0);
+    await safeReply(interaction, {
       flags: MessageFlags.IsComponentsV2,
       components,
     });
@@ -204,7 +203,7 @@ module.exports = {
     const [prefix, ownerUserId, arg] = customId.split(':');
 
     if (interaction.user.id !== ownerUserId) {
-      await interaction.reply({ content: '명령 실행자만 사용할 수 있어요.', ephemeral: true });
+      await safeReply(interaction, { content: '명령 실행자만 사용할 수 있어요.', ephemeral: true });
       return;
     }
 
@@ -212,7 +211,7 @@ module.exports = {
     if (prefix === 'recommand_play') {
       const uri = findUriByButtonCustomId(interaction.message?.components, interaction.customId);
       if (!uri) {
-        await interaction.reply({
+        await safeReply(interaction, {
           content: '추천 메시지에서 곡 URL을 읽지 못했어요. `/recommand`를 다시 실행해주세요.',
           ephemeral: true,
         });
@@ -222,7 +221,7 @@ module.exports = {
       await interaction.deferUpdate();
       const playResult = await context.music.play(interaction, uri);
       const notice = playResult?.message || '선택한 곡을 큐에 추가했어요.';
-      await interaction.followUp({ content: notice, ephemeral: true }).catch(async () => {
+      await safeReply(interaction, { content: notice, ephemeral: true }).catch(async () => {
         if (interaction.channel) await interaction.channel.send(notice);
       });
       return;
@@ -234,7 +233,7 @@ module.exports = {
       const cachedResult = recommendationCache.get(ownerUserId);
 
       if (!cachedResult) {
-        await interaction.reply({
+        await safeReply(interaction, {
           content: '캐시된 추천 결과가 없어요. `/recommand`를 다시 실행해 주세요.',
           ephemeral: true,
         });

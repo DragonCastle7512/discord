@@ -1,3 +1,5 @@
+import { safeReply } from '../../common/reply-util';
+
 const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
 const { buildEmbed } = require('../../music/embeds/buildEmbed');
 
@@ -82,7 +84,7 @@ module.exports = {
     }
     if (!result.total) {
       const empty = buildEmbed(header, '최근 재생한 음악이 없습니다.', '0 track(s)');
-      await interaction.reply({ embeds: [empty] });
+      await safeReply(interaction, { embeds: [empty] });
       return;
     }
 
@@ -98,7 +100,7 @@ module.exports = {
       `${result.total} track(s) | Page ${page + 1}/${totalPages}`,
     );
 
-    const message = await interaction.reply({
+    const message = await safeReply(interaction, {
       embeds: [embed],
       components: buildComponents(page, totalPages, userId),
       fetchReply: true,
@@ -110,7 +112,7 @@ module.exports = {
 
     collector.on('collect', async (component) => {
       // if (component.user.id !== userId) {
-      //   await component.reply({ content: 'Only the command user can change pages.', ephemeral: true });
+      //   await safeReply(component, { content: 'Only the command user can change pages.', ephemeral: true });
       //   return;
       // }
 

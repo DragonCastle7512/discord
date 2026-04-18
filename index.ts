@@ -11,6 +11,7 @@ import {
   GuildState, 
   RuntimeResponse
 } from './types';
+import { safeReply } from './common/reply-util';
 
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
@@ -239,5 +240,5 @@ client.on('messageCreate', async (message: Message) => {
   }
 
 	const response: RuntimeResponse = await talk(message, context);
-  await message.reply(response.message);
+  await safeReply(message, `${response.message}`);
 });

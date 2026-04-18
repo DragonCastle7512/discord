@@ -7,6 +7,7 @@ const {
   ButtonStyle,
 } = require('discord.js');
 const { buildEmbed } = require('../../music/embeds/buildEmbed');
+import { safeReply } from '../../common/reply-util';
 
 const PAGE_SIZE = 10;
 const CUSTOM_PREFIX = 'qctl';
@@ -187,11 +188,11 @@ module.exports = {
     const snapshot = context.music.getQueueSnapshot(interaction.guildId);
     if (!snapshot.current && snapshot.queue.length <= 0) {
       const embed = buildEmbed('Queue', 'Queue가 비어있어요', '0 track(s)');
-      await interaction.reply({ embeds: [embed] });
+      await safeReply(interaction, { embeds: [embed] });
       return;
     }
     const view = buildQueueView(snapshot, { page: 1 });
-    await interaction.reply(view);
+    await safeReply(interaction, view);
   },
   async handleComponent(interaction, context) {
     const parsed = parseCustomId(interaction.customId);
@@ -199,7 +200,7 @@ module.exports = {
 
     const guildId = interaction.guildId;
     if (!guildId) {
-      await interaction.reply({ content: '서버에서만 사용할 수 있어요.', ephemeral: true });
+      await safeReply(interaction, { content: '서버에서만 사용할 수 있어요.', ephemeral: true });
       return true;
     }
 
