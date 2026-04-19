@@ -21,13 +21,14 @@
     "oracledb": "^6.10.0",
     "sequelize": "^6.37.7",
     "shoukaku": "^4.1.1",
-    "typescript": "^5.4.5",
-    "tsx": "^4.7.2"
+    "socket.io": "^4.8.3",
+    "tsx": "^4.7.2",
+    "typescript": "^5.4.5"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.2",
-    "@types/node": "^20.12.7",
     "@types/express": "^4.17.21",
+    "@types/node": "^20.12.7",
     "eslint": "^9.39.2"
   }
 }

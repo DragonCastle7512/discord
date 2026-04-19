@@ -1,0 +1,301 @@
+// URL 파라미터에서 guildId와 userId 추출
+const urlParams = new URLSearchParams(window.location.search);
+const guildId = urlParams.get('guildId');
+const userId = urlParams.get('userId');
+
+let dashboardData = {
+  server: { name: '연결 중...', channelName: '...', serverIcon: null, userIcon: null },
+  musicInfo: { currentMusic: null, queue: [], trending: [], playlists: [] },
+  stats: { queueCount: 0, todayPlays: 0, playlistCount: 0 },
+};
+
+// --- WebSocket 설정 (Socket.io) ---
+const socket = io({ query: { guildId } });
+
+socket.on('musicUpdate', () => {
+  fetchDashboardData();
+});
+
+// --- 전역 타이머 관리 (진행 바 보간) ---
+let progressInterval = null;
+let currentPos = 0;
+let totalDuration = 0;
+let isPlaying = false;
+
+function startProgressTimer() {
+  if (progressInterval) clearInterval(progressInterval);
+
+  progressInterval = setInterval(() => {
+    if (!isPlaying || currentPos >= totalDuration) return;
+
+    currentPos += 200;
+    updateProgressBarUI();
+  }, 200);
+}
+
+function updateProgressBarUI() {
+  const progressStart = document.querySelector('.progress-times span:first-child');
+  const progressFill = document.querySelector('.progress-fill');
+  const progressDot = document.querySelector('.progress-dot');
+
+  if (progressStart) progressStart.textContent = formatTime(currentPos);
+
+  const progress = (currentPos / (totalDuration || 1)) * 100;
+  if (progressFill) progressFill.style.width = `${Math.min(progress, 100)}%`;
+  if (progressDot) progressDot.style.left = `${Math.min(progress, 100)}%`;
+}
+
+/**
+ * 썸네일 또는 아이콘 요소를 생성합니다.
+ */
+function createThumbnail(src, fallbackSvgHtml, className = '') {
+  if (src) {
+    const img = document.createElement('img');
+    img.src = src;
+    img.style.width = '100%';
+    img.style.height = '100%';
+    img.style.objectFit = 'cover';
+    if (className) img.className = className;
+    return img;
+  }
+  const div = document.createElement('div');
+  div.innerHTML = fallbackSvgHtml;
+  return div.firstChild;
+}
+
+/**
+ * 재생 큐 아이템 생성
+ */
+function createQueueItem(s, i) {
+  const item = document.createElement('div');
+  item.className = 'queue-item';
+
+  const num = document.createElement('div');
+  num.className = 'queue-num';
+  num.textContent = String(i + 1);
+
+  const thumb = document.createElement('div');
+  thumb.className = 'queue-thumb';
+  thumb.appendChild(createThumbnail(s.artwork, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+
+  const info = document.createElement('div');
+  info.className = 'queue-info';
+  const title = document.createElement('div');
+  title.className = 'queue-title';
+  title.textContent = s.title;
+  const artist = document.createElement('div');
+  artist.className = 'queue-artist';
+  artist.textContent = s.artist;
+  info.append(title, artist);
+
+  const dur = document.createElement('div');
+  dur.className = 'queue-dur';
+  dur.textContent = formatTime(s.duration || 0);
+
+  item.append(num, thumb, info, dur);
+  return item;
+}
+
+/**
+ * 인기 차트 아이템 생성
+ */
+function createTrendItem(s, i) {
+  const item = document.createElement('div');
+  item.className = 'trend-item';
+
+  const rank = document.createElement('div');
+  rank.className = 'trend-rank' + (i < 3 ? ' top' : '');
+  rank.textContent = String(i + 1);
+
+  const thumb = document.createElement('div');
+  thumb.className = 'queue-thumb';
+  thumb.style.width = '38px';
+  thumb.style.height = '38px';
+  thumb.style.marginRight = '8px';
+  thumb.appendChild(createThumbnail(s.artwork, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+
+  const barWrap = document.createElement('div');
+  barWrap.className = 'trend-bar-wrap';
+  const title = document.createElement('div');
+  title.className = 'trend-title';
+  title.textContent = s.title;
+  const artist = document.createElement('div');
+  artist.className = 'trend-artist';
+  artist.textContent = s.artist;
+  const bar = document.createElement('div');
+  bar.className = 'trend-bar';
+  const fill = document.createElement('div');
+  fill.className = 'trend-bar-fill';
+  fill.style.width = `${s.pct || 0}%`;
+  bar.appendChild(fill);
+  barWrap.append(title, artist, bar);
+
+  const plays = document.createElement('div');
+  plays.className = 'trend-plays';
+  plays.textContent = `${s.count || 0}회`;
+
+  item.append(rank, thumb, barWrap, plays);
+  return item;
+}
+
+/**
+ * 플레이리스트 카드 생성
+ */
+function createPlaylistCard(p) {
+  const card = document.createElement('div');
+  card.className = 'pl-card';
+
+  const icon = document.createElement('div');
+  icon.className = 'pl-icon';
+  icon.appendChild(createThumbnail(p.artwork, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>', 'border-radius:7px'));
+
+  const name = document.createElement('div');
+  name.className = 'pl-name';
+  name.textContent = p.title;
+
+  const btn = document.createElement('button');
+  btn.className = 'pl-btn';
+  btn.textContent = '▶';
+
+  card.append(icon, name, btn);
+  return card;
+}
+
+async function fetchDashboardData() {
+  if (!guildId) return;
+  try {
+    const res = await fetch(`/api/dashboard-data?guildId=${guildId}&userId=${userId || ''}`);
+    dashboardData = await res.json();
+
+    const cm = dashboardData.musicInfo.currentMusic;
+    if (cm) {
+      currentPos = cm.position;
+      totalDuration = cm.duration || 0;
+      isPlaying = cm.isPlaying;
+      startProgressTimer();
+    }
+    else {
+      isPlaying = false;
+    }
+    updateUI();
+  }
+  catch (e) {
+    console.error('데이터 로드 실패:', e);
+  }
+}
+
+function formatTime(ms) {
+  if (!ms) return '0:00';
+  const sec = Math.floor(ms / 1000);
+  const min = Math.floor(sec / 60);
+  const rem = sec % 60;
+  return `${min}:${String(rem).padStart(2, '0')}`;
+}
+
+function updateUI() {
+  const { server, musicInfo: mi, stats } = dashboardData;
+  const cm = mi.currentMusic;
+
+  document.querySelector('.server-name').textContent = '현재 서버 - ' + server.name;
+
+  // const serverLogo = document.querySelector('.server-img');
+  // if (server.serverIcon) {
+  //   serverLogo.replaceChildren(createThumbnail(server.serverIcon, '', 'server-icon-img'));
+  //   serverLogo.querySelector('img').style.cssText = 'width:40px;height:40px;border-radius:30%;object-fit:cover;';
+  // }
+
+  const userAv = document.querySelector('.user-av');
+  if (server.userIcon) {
+    userAv.replaceChildren(createThumbnail(server.userIcon, '', 'user-avatar-img'));
+    userAv.querySelector('img').style.cssText = 'width:40px;height:40px;border-radius:50%;object-fit:cover;';
+  }
+  else {
+    userAv.textContent = '나';
+  }
+
+  // 2. Now Playing
+  const npSection = document.querySelector('.now-playing');
+  const thumbEl = document.querySelector('.thumb');
+
+  if (cm && cm.title) {
+    npSection.style.display = 'flex';
+    document.querySelector('.np-title').textContent = cm.title;
+    document.querySelector('.np-artist').textContent = cm.artist;
+    document.querySelector('.progress-times span:first-child').textContent = formatTime(cm.position);
+    document.querySelector('.progress-times span:last-child').textContent = formatTime(cm.duration);
+
+    const progress = (cm.position / (cm.duration || 1)) * 100 || 0;
+    document.querySelector('.progress-fill').style.width = `${progress}%`;
+    document.querySelector('.progress-dot').style.left = `${progress}%`;
+
+    updateProgressBarUI();
+
+    thumbEl.replaceChildren(createThumbnail(cm.artwork, '<svg viewBox="0 0 24 24" fill="currentColor" style="width:28px;height:28px;color:var(--red);"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>', 'np-thumb-img'));
+
+    const reqAvWrap = document.querySelector('.now-playing div:last-child div:nth-child(2) div');
+    if (cm.avatar) {
+      reqAvWrap.replaceChildren(createThumbnail(cm.avatar, '', 'req-avatar-img'));
+      reqAvWrap.querySelector('img').style.cssText = 'width:100%;height:100%;border-radius:50%;object-fit:cover;';
+    }
+  }
+  else {
+    document.querySelector('.np-title').textContent = '재생 중인 곡 없음';
+    document.querySelector('.np-artist').textContent = '대기열에 곡을 추가해보세요';
+    if (progressInterval) clearInterval(progressInterval);
+    document.querySelector('.progress-fill').style.width = '0%';
+    document.querySelector('.progress-dot').style.left = '0%';
+    thumbEl.replaceChildren(createThumbnail(null, '<svg viewBox="0 0 24 24" fill="currentColor" style="width:28px;height:28px;color:var(--muted);"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+  }
+
+  // 3. Stats
+  const statVals = document.querySelectorAll('.stat-val');
+  if (statVals.length >= 3) {
+    statVals[0].textContent = String(stats.queueCount);
+    statVals[1].textContent = String(stats.todayPlays);
+    statVals[2].textContent = String(stats.playlistCount);
+  }
+
+  // 4. Lists (Queue, Trending, Playlists)
+  const qCountSpan = document.querySelector('.section-title span');
+  if (qCountSpan) qCountSpan.textContent = `${stats.queueCount}곡`;
+
+  // 효율적인 리스트 교체 (replaceChildren 사용)
+  document.getElementById('queueList').replaceChildren(...mi.queue.map(createQueueItem));
+  document.getElementById('trendList').replaceChildren(...mi.trending.map(createTrendItem));
+  document.getElementById('playlistGrid').replaceChildren(...mi.playlists.map(createPlaylistCard));
+}
+
+// 초기 로드 및 주기적 갱신
+if (guildId) {
+  fetchDashboardData();
+  // setInterval(fetchCurrentTimeline, 3000);
+}
+else {
+  alert('URL에 guildId 파라미터가 필요합니다.');
+}
+
+window.togglePlay = function() {
+  const playIcon = document.getElementById('playIcon');
+  if (playIcon) {
+    const isPlayingIcon = playIcon.innerHTML.includes('rect');
+    playIcon.replaceChildren();
+    if (isPlayingIcon) {
+      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
+      poly.setAttribute('points', '5 3 19 12 5 21 5 3');
+      playIcon.appendChild(poly);
+    }
+    else {
+      const r1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r1.setAttribute('x', '6');
+      r1.setAttribute('y', '4');
+      r1.setAttribute('width', '4');
+      r1.setAttribute('height', '16');
+      const r2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      r2.setAttribute('x', '14');
+      r2.setAttribute('y', '4');
+      r2.setAttribute('width', '4');
+      r2.setAttribute('height', '16');
+      playIcon.append(r1, r2);
+    }
+  }
+};

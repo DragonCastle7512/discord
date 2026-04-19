@@ -4,12 +4,17 @@ import { Client, Events, GatewayIntentBits, Collection, Message, Interaction, Vo
 // @ts-ignore
 import express, { Request, Response, Express } from 'express';
 import { 
-  TtsRuntime, 
-  AppContext, 
+  TtsRuntime,  
+  AppContext,
   RuntimeResponse
 } from './types';
 import { safeReply } from './common/reply-util';
 import { GuildState, MusicRuntime, RuntimeUtils } from './music/types';
+import { createDashboardRouter } from './routes/dashboard';
+import { createSystemRouter } from './routes/system';
+import { createTtsRouter } from './routes/tts';
+import { createServer } from 'node:http';
+import { initSocket } from './common/socket';
 
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
@@ -32,38 +37,12 @@ const httpPort: number = 3000;
 const httpHost: string = '0.0.0.0';
 const ttsPublicUrl: string = (process.env.TTS_PUBLIC_BASE_URL || `http://localhost:${httpPort}`);
 const app: Express = express();
+const httpServer = createServer(app);
+
+initSocket(httpServer);
 
 const ttsHttpStore = createTtsHttpStore({
   baseUrl: ttsPublicUrl,
-});
-
-app.use(express.static(path.join(__dirname, 'public')));
-
-app.get('/intro', (req: Request, res: Response) => {
-    res.sendFile(path.join(__dirname, 'public/index.html'));
-});
-
-app.get('/health', (req: Request, res: Response) => {
-  res.json({ ok: true });
-});
-
-app.get('/tts/:id.wav', (req: Request, res: Response) => {
-  const entry = ttsHttpStore.get(req.params.id);
-  if (!entry) {
-    res.status(404).sendFile(path.join(__dirname, 'public/error/404.html'));
-    return;
-  }
-  res.set('Content-Type', entry.contentType);
-  res.set('Cache-Control', 'no-store');
-  res.send(entry.buffer);
-});
-
-app.use((req: Request, res: Response) => {
-  res.status(404).sendFile(path.join(__dirname, 'public/error/404.html'));
-});
-
-app.listen(httpPort, httpHost, () => {
-  console.log(`[HTTP] listening on ${httpHost}:${httpPort}`);
 });
 
 if (!token || !lavalinkHost || !lavalinkPassword) {
@@ -139,6 +118,20 @@ context.slashCommands = createSlashCommandInvoker({
   commands: client.commands,
   context,
 });
+
+app.use(express.static(path.join(__dirname, 'public')));
+app.use('/', createSystemRouter());
+app.use('/tts', createTtsRouter(ttsHttpStore));
+app.use('/api', createDashboardRouter(client, guildStates, music));
+
+app.use((req: Request, res: Response) => {
+  res.status(404).sendFile(path.join(__dirname, 'public/error/404.html'));
+});
+
+httpServer.listen(httpPort, httpHost, () => {
+  console.log(`[HTTP] listening on ${httpHost}:${httpPort}`);
+});
+
 
 shoukaku.on('ready', (name: string) => {
   readyNodes.add(name);

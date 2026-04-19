@@ -120,6 +120,8 @@ function createRuntimeUtils({
   lavalinkReadyTimeoutMs,
   guildStates,
 }) {
+    const { notifyMusicUpdate } = require('../common/socket');
+
     function getGuildState(guildId) {
         if (!guildStates.has(guildId)) {
             guildStates.set(guildId, {
@@ -205,6 +207,7 @@ function createRuntimeUtils({
                      info: endedTrack.info ? { ...endedTrack.info } : {},
                   });
              }
+            notifyMusicUpdate(guild.id);
             await playNext(guild.id);
         });
 
@@ -212,6 +215,7 @@ function createRuntimeUtils({
             console.error('Player exception:', event);
             state.playing = false;
             state.current = null;
+            notifyMusicUpdate(guild.id);
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
                 textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
@@ -221,6 +225,7 @@ function createRuntimeUtils({
         player.on('stuck', async () => {
             state.playing = false;
             state.current = null;
+            notifyMusicUpdate(guild.id);
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
                 textChannel.send('Track got stuck. Skipping to next.').catch((err) => console.log(err));
@@ -232,6 +237,7 @@ function createRuntimeUtils({
             state.player = null;
             state.playing = false;
             state.current = null;
+            notifyMusicUpdate(guild.id);
         });
 
         state.player = player;
@@ -339,6 +345,7 @@ function createRuntimeUtils({
         await shoukaku.leaveVoiceChannel(guildId);
         state.player = null;
         state.voiceChannelId = null;
+        notifyMusicUpdate(guildId);
       }
     }
 
@@ -364,6 +371,7 @@ function createRuntimeUtils({
         );
 
         state.playing = true;
+        notifyMusicUpdate(guildId);
         try {
             await state.player.playTrack({ track: { encoded: next.encoded } });
             const textChannel = getTextChannel(state.textChannelId);
