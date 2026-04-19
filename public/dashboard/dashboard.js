@@ -1,7 +1,6 @@
 // URL 파라미터에서 guildId와 userId 추출
 const urlParams = new URLSearchParams(window.location.search);
-const guildId = urlParams.get('guildId');
-const userId = urlParams.get('userId');
+const token = urlParams.get('token');
 
 let dashboardData = {
   server: { name: '연결 중...', channelName: '...', serverIcon: null, userIcon: null },
@@ -9,12 +8,17 @@ let dashboardData = {
   stats: { queueCount: 0, todayPlays: 0, playlistCount: 0 },
 };
 
-// --- WebSocket 설정 (Socket.io) ---
-const socket = io({ query: { guildId } });
+let socket = null;
 
-socket.on('musicUpdate', () => {
-  fetchDashboardData();
-});
+function initSocketConnection(guildId) {
+  if (socket || !guildId) return;
+
+socket = io({ query: { guildId } });
+
+  socket.on('musicUpdate', () => {
+    fetchDashboardData();
+  });
+}
 
 // --- 전역 타이머 관리 (진행 바 보간) ---
 let progressInterval = null;
@@ -162,10 +166,18 @@ function createPlaylistCard(p) {
 }
 
 async function fetchDashboardData() {
-  if (!guildId) return;
+  if (!token) return;
   try {
-    const res = await fetch(`/api/dashboard-data?guildId=${guildId}&userId=${userId || ''}`);
+    const res = await fetch(`/api/dashboard-data?token=${token}`);
+    if (res.status === 401) {
+      alert('토큰이 만료되었습니다. Discord에서 /dashboard 명령어를 다시 입력해주세요.');
+      return;
+    }
     dashboardData = await res.json();
+
+    if (dashboardData.server.guildId) {
+      initSocketConnection(dashboardData.server.guildId);
+    }
 
     const cm = dashboardData.musicInfo.currentMusic;
     if (cm) {
@@ -266,12 +278,11 @@ function updateUI() {
 }
 
 // 초기 로드 및 주기적 갱신
-if (guildId) {
+if (token) {
   fetchDashboardData();
-  // setInterval(fetchCurrentTimeline, 3000);
 }
 else {
-  alert('URL에 guildId 파라미터가 필요합니다.');
+  alert('인증 토큰이 없습니다. Discord에서 /dashboard 명령어를 입력해 주세요.');
 }
 
 window.togglePlay = function() {

@@ -119,7 +119,7 @@ context.slashCommands = createSlashCommandInvoker({
   context,
 });
 
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), { redirect: false }));
 app.use('/', createSystemRouter());
 app.use('/tts', createTtsRouter(ttsHttpStore));
 app.use('/api', createDashboardRouter(client, guildStates, music));

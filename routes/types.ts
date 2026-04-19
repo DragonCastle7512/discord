@@ -27,6 +27,7 @@ export interface CurrentMusic extends MusicItem {
  */
 export interface DashboardResponse {
   server: {
+    guildId: string;
     name: string;
     // serverIcon: string | null;
     userIcon: string | null;

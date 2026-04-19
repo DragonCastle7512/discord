@@ -1,10 +1,11 @@
 // @ts-ignore
 import { Router, Request, Response } from 'express';
-import { Client, Guild } from 'discord.js';
+import { Client } from 'discord.js';
 import { MusicRuntime, GuildState, PlaylistEntry, TrackInfo, HistoryEntry } from '../music/types';
 import { findAllHistory } from '../music/repositorys/music-history.repository';
 import { findPlaylist } from '../music/repositorys/playlist.repository';
 import { DashboardResponse, MusicItem } from './types';
+import { verifyDashboardToken } from '../common/auth';
 
 export function createDashboardRouter(
   client: Client,
@@ -14,17 +15,18 @@ export function createDashboardRouter(
   const router = Router();
 
   router.get('/dashboard-data', async (req: Request, res: Response) => {
-    const guildId = req.query.guildId as string;
-    const userId = req.query.userId as string;
-    const user = userId ? await client.users.fetch(userId).catch(() => null) : null;
-    const avatarURL = user?.displayAvatarURL() || null;
-
-    if (!guildId) {
-      res.status(400).json({ error: 'Missing guildId' });
+    const token = req.query.token as string;
+    
+    const session = verifyDashboardToken(token);
+    if (!session) {
+      res.status(401).json({ error: '인증되지 않은 접근이거나 만료된 토큰입니다.' });
       return;
     }
 
-    const guild: Guild | undefined = client.guilds.cache.get(guildId);
+    const { guildId, userId } = session;
+    const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+    const user = userId ? await client.users.fetch(userId).catch(() => null) : null;
+    const avatarURL = user?.displayAvatarURL() || null;
     const state = guildStates.get(guildId);
     const snapshot = music.getQueueSnapshot(guildId);
 
@@ -73,6 +75,7 @@ export function createDashboardRouter(
 
     const response: DashboardResponse = {
       server: {
+        guildId,
         name: guild?.name || 'Unknown Server',
         // serverIcon: guild?.iconURL() || null,
         userIcon: avatarURL,

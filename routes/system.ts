@@ -18,5 +18,9 @@ export function createSystemRouter(): Router {
     res.json(response);
   });
 
+  router.get('/dashboard', (req: Request, res: Response) => {
+    res.sendFile(path.join(__dirname, '../public/dashboard/dashboard.html'));
+  });
+
   return router;
 }
