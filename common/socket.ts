@@ -19,7 +19,7 @@ export function initSocket(httpServer: HttpServer) {
   return io;
 }
 
-export function notifyMusicUpdate(guildId: string) {
+export function notifyMusicUpdate(guildId: string, type: 'music' | 'queue' | 'playlist' | 'all' = 'all') {
   if (!io) return;
-  io.to(`guild:${guildId}`).emit('musicUpdate');
+  io.to(`guild:${guildId}`).emit('musicUpdate', { type });
 }

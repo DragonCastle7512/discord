@@ -207,7 +207,7 @@ function createRuntimeUtils({
                      info: endedTrack.info ? { ...endedTrack.info } : {},
                   });
              }
-            notifyMusicUpdate(guild.id);
+            notifyMusicUpdate(guild.id, 'music');
             await playNext(guild.id);
         });
 
@@ -215,7 +215,7 @@ function createRuntimeUtils({
             console.error('Player exception:', event);
             state.playing = false;
             state.current = null;
-            notifyMusicUpdate(guild.id);
+            notifyMusicUpdate(guild.id, 'music');
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
                 textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
@@ -225,7 +225,7 @@ function createRuntimeUtils({
         player.on('stuck', async () => {
             state.playing = false;
             state.current = null;
-            notifyMusicUpdate(guild.id);
+            notifyMusicUpdate(guild.id, 'music');
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
                 textChannel.send('Track got stuck. Skipping to next.').catch((err) => console.log(err));
@@ -237,7 +237,7 @@ function createRuntimeUtils({
             state.player = null;
             state.playing = false;
             state.current = null;
-            notifyMusicUpdate(guild.id);
+            notifyMusicUpdate(guild.id, 'music');
         });
 
         state.player = player;
@@ -345,7 +345,7 @@ function createRuntimeUtils({
         await shoukaku.leaveVoiceChannel(guildId);
         state.player = null;
         state.voiceChannelId = null;
-        notifyMusicUpdate(guildId);
+        notifyMusicUpdate(guildId, 'music');
       }
     }
 
@@ -371,7 +371,7 @@ function createRuntimeUtils({
         );
 
         state.playing = true;
-        notifyMusicUpdate(guildId);
+        notifyMusicUpdate(guildId, 'music');
         try {
             await state.player.playTrack({ track: { encoded: next.encoded } });
             const textChannel = getTextChannel(state.textChannelId);

@@ -120,7 +120,7 @@ export function createMusicRuntime({
         }));
 
         state.queue.push(...queuedTracks);
-        notifyMusicUpdate(guild.id);
+        notifyMusicUpdate(guild.id, 'queue');
         await playNext(guild.id);
         return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
       }
@@ -134,7 +134,7 @@ export function createMusicRuntime({
       await playNext(guild.id);
     }
 
-    notifyMusicUpdate(guild.id);
+    notifyMusicUpdate(guild.id, 'queue');
 
     if (addedCount > 1) {
       return { ok: true, message: `**${firstTrackTitle}** 외 ${addedCount - 1}곡을 추가했어요!` };
@@ -265,7 +265,7 @@ export function createMusicRuntime({
 
     const [item] = state.queue.splice(from - 1, 1);
     state.queue.splice(to - 1, 0, item);
-    notifyMusicUpdate(guildId);
+    notifyMusicUpdate(guildId, 'queue');
     const title = item?.info?.title || 'Unknown title';
     return { ok: true, message: `Moved: ${title} (${from} -> ${to})` };
   }
@@ -282,7 +282,7 @@ export function createMusicRuntime({
     }
 
     const [removed] = state.queue.splice(target - 1, 1);
-    notifyMusicUpdate(guildId);
+    notifyMusicUpdate(guildId, 'queue');
     const title = removed?.info?.title || 'Unknown title';
     return { ok: true, message: `Removed: ${title}` };
   }

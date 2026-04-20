@@ -1,9 +1,8 @@
-// URL 파라미터에서 guildId와 userId 추출
 const urlParams = new URLSearchParams(window.location.search);
 const token = urlParams.get('token');
 
-let dashboardData = {
-  server: { name: '연결 중...', channelName: '...', serverIcon: null, userIcon: null },
+const dashboardData = {
+  server: { guildId: null, name: '연결 중...', channelName: '...', serverIcon: null, userIcon: null },
   musicInfo: { currentMusic: null, queue: [], trending: [], playlists: [] },
   stats: { queueCount: 0, todayPlays: 0, playlistCount: 0 },
 };
@@ -15,8 +14,8 @@ function initSocketConnection(guildId) {
 
 socket = io({ query: { guildId } });
 
-  socket.on('musicUpdate', () => {
-    fetchDashboardData();
+  socket.on('musicUpdate', ({ type }) => {
+    fetchDashboardData(type || 'all');
   });
 }
 
@@ -150,6 +149,41 @@ function setupTouchEvents(el, type, index) {
     draggedItem = null;
     lastTouchTarget = null;
   }, { passive: true });
+}
+
+function mergeDashboardData(newData, type) {
+  if (newData.server && newData.server.guildId) {
+    dashboardData.server = newData.server;
+  }
+
+  if (newData.musicInfo) {
+    if (newData.musicInfo.currentMusic !== null) {
+      const cm = newData.musicInfo.currentMusic;
+      dashboardData.musicInfo.currentMusic = cm;
+      currentPos = cm.position;
+      totalDuration = cm.duration || 0;
+      isPlaying = cm.isPlaying;
+      startProgressTimer();
+    }
+
+    if (newData.musicInfo.queue && (newData.musicInfo.queue.length > 0 || type === 'music' || type === 'queue' || type === 'all')) {
+      dashboardData.musicInfo.queue = newData.musicInfo.queue;
+    }
+
+    if (newData.musicInfo.trending && (newData.musicInfo.trending.length > 0 || type === 'music' || type === 'all')) {
+      dashboardData.musicInfo.trending = newData.musicInfo.trending;
+    }
+
+    if (newData.musicInfo.playlists && (newData.musicInfo.playlists.length > 0 || type === 'playlist' || type === 'all')) {
+      dashboardData.musicInfo.playlists = newData.musicInfo.playlists;
+    }
+  }
+
+  if (newData.stats) {
+    if (type === 'all' || type === 'queue' || type === 'music') dashboardData.stats.queueCount = newData.stats.queueCount;
+    if (type === 'all' || type === 'music') dashboardData.stats.todayPlays = newData.stats.todayPlays;
+    if (type === 'all' || type === 'playlist') dashboardData.stats.playlistCount = newData.stats.playlistCount;
+  }
 }
 
 /**
@@ -287,27 +321,22 @@ function createPlaylistCard(p, i) {
   return card;
 }
 
-async function fetchDashboardData() {
+async function fetchDashboardData(type = 'all') {
   if (!token) return;
   try {
-    const res = await fetch(`/api/dashboard-data?token=${token}`);
+    const res = await fetch(`/api/dashboard-data?token=${token}&type=${type}`);
     if (res.status === 401) {
       alert('토큰이 만료되었습니다. Discord에서 /dashboard 명령어를 다시 입력해주세요.');
       return;
     }
-    dashboardData = await res.json();
+    const response = await res.json();
+
+    mergeDashboardData(response, type);
 
     if (dashboardData.server.guildId) {
       initSocketConnection(dashboardData.server.guildId);
     }
 
-    const cm = dashboardData.musicInfo.currentMusic;
-    if (cm) {
-      currentPos = cm.position;
-      totalDuration = cm.duration || 0;
-      isPlaying = cm.isPlaying;
-      startProgressTimer();
-    }
     else {
       isPlaying = false;
     }
