@@ -83,10 +83,12 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:1
 .pl-icon{width:60px;height:60px;border-radius:7px;background:#1f0d0d;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .pl-icon svg{width:16px;height:16px;color:var(--red);}
 .pl-name{font-size:13px;font-weight:700;color:var(--text);flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
-.pl-meta{font-size:11px;color:var(--muted);}
-.pl-btn{position:absolute;top:5px;right:5px;width:30px;height:30px;border-radius:50%;background:var(--red);border:none;color:#fff;cursor:pointer;display:flex;line-height:30px; justify-content:center;opacity:0;transition:opacity 0.15s;}
-.pl-btn:hover{background:var(--red-dim); transition:background 0.3s;}
-.pl-card:hover .pl-btn{opacity:1;}
+.pl-actions{position:absolute;top:5px;right:5px;display:flex;gap:4px;opacity:0;transition:opacity 0.15s;}
+.pl-btn{width:30px;height:30px;border-radius:50%;background:var(--red);border:none;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background 0.3s;}
+.pl-btn:hover{background:var(--red-dim);}
+.pl-btn.del{background:var(--card);border:1px solid var(--border);color:var(--muted);}
+.pl-btn.del:hover{background:var(--red-glow);border-color:var(--red);color:var(--red);}
+.pl-card:hover .pl-actions{opacity:1;}
 .stats-row{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
 .stat-card{background:var(--card);border:1px solid var(--border);border-radius:8px;padding:14px;text-align:center;}
 .stat-val{font-family:var(--head);font-size:24px;color:var(--red);margin-bottom:3px;}

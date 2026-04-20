@@ -209,6 +209,7 @@ export function createMusicRuntime({
     }
 
     await insertPlaylist(userId, track);
+    notifyMusicUpdate(userId, 'playlist');
 
     const title = track.info?.title || 'Unknown title';
     return { ok: true, message: `Playlist에 노래를 추가했어요!\n **${title}**${note}` };
@@ -235,6 +236,7 @@ export function createMusicRuntime({
 
     const entry = entries[targetIndex - 1];
     await deletePlaylist(userId, entry.id);
+    notifyMusicUpdate(userId, 'playlist');
     const title = entry.musicInfo?.info?.title || 'Unknown title';
     return { ok: true, message: `Playlist에서 노래를 삭제했어요!\n **${title}**` };
   }
@@ -344,6 +346,7 @@ export function createMusicRuntime({
       if (transaction) {
         await transaction.commit();
       }
+      notifyMusicUpdate(userId, 'playlist');
     }
     catch (error) {
       if (transaction) {

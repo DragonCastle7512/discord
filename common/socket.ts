@@ -10,16 +10,19 @@ export function initSocket(httpServer: HttpServer) {
 
   io.on('connection', (socket) => {
     const guildId = socket.handshake.query.guildId as string;
+    const userId = socket.handshake.query.userId as string;
     if (guildId) {
       socket.join(`guild:${guildId}`);
-      // console.log(`[Socket] Client joined guild room: ${guildId}`);
+    }
+    if (userId) {
+      socket.join(`user:${userId}`);
     }
   });
 
   return io;
 }
 
-export function notifyMusicUpdate(guildId: string, type: 'music' | 'queue' | 'playlist' | 'all' = 'all') {
+export function notifyMusicUpdate(id: string, type: 'music' | 'queue' | 'playlist' | 'all' = 'all') {
   if (!io) return;
-  io.to(`guild:${guildId}`).emit('musicUpdate', { type });
+  io.to(`guild:${id}`).to(`user:${id}`).emit('musicUpdate', { type });
 }

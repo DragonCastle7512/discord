@@ -9,10 +9,10 @@ const dashboardData = {
 
 let socket = null;
 
-function initSocketConnection(guildId) {
-  if (socket || !guildId) return;
+function initSocketConnection(guildId, userId) {
+  if (socket || (!guildId && !userId)) return;
 
-socket = io({ query: { guildId } });
+  socket = io({ query: { guildId, userId } });
 
   socket.on('musicUpdate', ({ type }) => {
     fetchDashboardData(type || 'all');
@@ -113,6 +113,36 @@ async function handleDrop(e, type, toIndex) {
   }
 }
 
+async function deleteItem(type, index) {
+  if (!confirm('정말 삭제하시겠습니까?')) return;
+  try {
+    const res = await fetch('/api/delete-item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, type, index }),
+    });
+    if (!res.ok) console.error('삭제 실패');
+  }
+  catch (err) {
+    console.error('삭제 요청 오류:', err);
+  }
+}
+
+async function playMusic(url) {
+  try {
+    const res = await fetch('/api/play-music', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, url }),
+    });
+    const result = await res.json();
+    if (!result.ok) alert(result.message || '재생 요청에 실패했습니다.');
+  }
+  catch (err) {
+    console.error('재생 요청 오류:', err);
+  }
+}
+
 function setupTouchEvents(el, type, index) {
   el.addEventListener('touchstart', () => {
     draggedItem = index;
@@ -153,7 +183,7 @@ function setupTouchEvents(el, type, index) {
 
 function mergeDashboardData(newData, type) {
   if (newData.server && newData.server.guildId) {
-    dashboardData.server = newData.server;
+    dashboardData.server = { ...dashboardData.server, ...newData.server };
   }
 
   if (newData.musicInfo) {
@@ -243,7 +273,18 @@ function createQueueItem(s, i) {
   dur.className = 'queue-dur';
   dur.textContent = formatTime(s.duration || 0);
 
-  item.append(num, thumb, info, dur);
+  const actions = document.createElement('div');
+  actions.className = 'queue-actions';
+  const delBtn = document.createElement('button');
+  delBtn.className = 'qa-btn';
+  delBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+  delBtn.onclick = (e) => {
+    e.stopPropagation();
+    deleteItem('queue', i);
+  };
+  actions.appendChild(delBtn);
+
+  item.append(num, thumb, info, dur, actions);
   return item;
 }
 
@@ -314,11 +355,27 @@ function createPlaylistCard(p, i) {
   name.className = 'pl-name';
   name.textContent = p.title;
 
-  const btn = document.createElement('button');
-  btn.className = 'pl-btn';
-  btn.textContent = '▶';
+  const actions = document.createElement('div');
+  actions.className = 'pl-actions';
 
-  card.append(icon, name, btn);
+  const playBtn = document.createElement('button');
+  playBtn.className = 'pl-btn';
+  playBtn.textContent = '▶';
+  playBtn.onclick = (e) => {
+    e.stopPropagation();
+    playMusic(p.uri);
+  };
+
+  const delBtn = document.createElement('button');
+  delBtn.className = 'pl-btn del';
+  delBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+  delBtn.onclick = (e) => {
+    e.stopPropagation();
+    deleteItem('playlist', i);
+  };
+
+  actions.append(playBtn, delBtn);
+  card.append(icon, name, actions);
   return card;
 }
 
@@ -334,8 +391,8 @@ async function fetchDashboardData(type = 'all') {
 
     mergeDashboardData(response, type);
 
-    if (dashboardData.server.guildId) {
-      initSocketConnection(dashboardData.server.guildId);
+    if (dashboardData.server.guildId || dashboardData.server.userId) {
+      initSocketConnection(dashboardData.server.guildId, dashboardData.server.userId);
     }
 
     else {

@@ -29,6 +29,7 @@ export function createDashboardRouter(
     const response: DashboardResponse = {
       server: {
         guildId: '',
+        userId: '',
         name: '',
         // serverIcon: null,
         userIcon: null,
@@ -53,12 +54,14 @@ export function createDashboardRouter(
       const snapshot = music.getQueueSnapshot(guildId);
 
       const guild = client.guilds.cache.get(guildId) || await client.guilds.fetch(guildId).catch(() => null);
+      response.stats.existCurrentMusic = (snapshot?.current) ? true : false;
 
       // 1. 서버 및 프로필 사진 등 정보
       if (type === 'all') {
         const user = await client.users.fetch(userId).catch(() => null);
         response.server = {
           guildId,
+          userId,
           name: guild?.name || 'Unknown Server',
           // serverIcon: guild?.iconURL() || null,
           userIcon: user?.displayAvatarURL() || null,
@@ -124,7 +127,6 @@ export function createDashboardRouter(
             requestedBy: t.requestedBy || null
           })),
         response.stats.queueCount = response.musicInfo.queue.length + (snapshot.current ? 1 : 0);
-        response.stats.existCurrentMusic = (snapshot?.current) ? true : false;
       }
 
       // 4. 플레이리스트 목록 및 개수
@@ -160,14 +162,61 @@ export function createDashboardRouter(
       let result;
       if (type === 'queue') {
         result = music.moveQueueItem(session.guildId, from + 1, to + 1);
-        if (result.ok) notifyMusicUpdate(session.guildId, 'queue');
       } else if (type === 'playlist') {
         result = await music.movePlaylistItem(session.userId, from + 1, to + 1);
-        if (result.ok) notifyMusicUpdate(session.guildId, 'playlist');
       }
       res.json({ ok: true });
     } catch (e: any) {
       res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/delete-item', async (req: Request, res: Response) => {
+    const { token, type, index } = req.body;
+    const session = verifyDashboardToken(token);
+
+    if (!session) {
+      res.status(401).json({ error: '인증되지 않은 접근입니다.' });
+      return;
+    }
+
+    try {
+      let result;
+      if (type === 'queue') {
+        result = music.removeQueueItem(session.guildId, index + 1);
+      } else if (type === 'playlist') {
+        result = await music.deleteFromPlaylist(session.userId, index + 1);
+      }
+      res.json({ ok: result?.ok || false, message: result?.message });
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
+  });
+
+  router.post('/play-music', async (req: Request, res: Response) => {
+    const { token, url } = req.body;
+    const session = verifyDashboardToken(token);
+
+    if (!session) {
+      res.status(401).json({ error: '인증되지 않은 접근입니다.' });
+      return;
+    }
+
+    try {
+      const guild = await client.guilds.fetch(session.guildId);
+      const member = await guild.members.fetch(session.userId);
+      
+      const context = {
+        guild,
+        member,
+        user: member.user,
+        channelId: member.voice.channelId
+      };
+
+      const result = await music.play(context, url);
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ ok: false, message: e.message });
     }
   });
 
