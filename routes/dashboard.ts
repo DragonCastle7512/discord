@@ -6,6 +6,7 @@ import { findAllHistory } from '../music/repositorys/music-history.repository';
 import { findPlaylist } from '../music/repositorys/playlist.repository';
 import { DashboardResponse, MusicItem } from './types';
 import { verifyDashboardToken } from '../common/auth';
+import { notifyMusicUpdate } from '../common/socket';
 
 export function createDashboardRouter(
   client: Client,
@@ -123,6 +124,34 @@ export function createDashboardRouter(
     };
 
     res.json(response);
+  });
+
+  router.post('/move-item', async (req: Request, res: Response) => {
+    const { token, type, from, to } = req.body;
+    const session = verifyDashboardToken(token);
+
+    if (!session) {
+      res.status(401).json({ error: '인증되지 않은 접근입니다.' });
+      return;
+    }
+
+    try {
+      let result;
+      if (type === 'queue') {
+        result = music.moveQueueItem(session.guildId, from + 1, to + 1);
+      } else if (type === 'playlist') {
+        result = await music.movePlaylistItem(session.userId, from + 1, to + 1);
+      }
+
+      if (result?.ok) {
+        notifyMusicUpdate(session.guildId);
+        res.json({ ok: true });
+      } else {
+        res.status(400).json({ error: result?.message || '이동 실패' });
+      }
+    } catch (e: any) {
+      res.status(500).json({ error: e.message });
+    }
   });
 
   return router;

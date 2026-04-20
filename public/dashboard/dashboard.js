@@ -49,6 +49,109 @@ function updateProgressBarUI() {
   if (progressDot) progressDot.style.left = `${Math.min(progress, 100)}%`;
 }
 
+// --- Drag & Drop 관리 ---
+let draggedItem = null;
+let draggedType = null;
+let lastTouchTarget = null;
+
+function setDraggingState(active) {
+  if (active) document.body.classList.add('is-dragging');
+  else document.body.classList.remove('is-dragging');
+}
+
+function handleDragStart(e, type, index) {
+  draggedItem = index;
+  draggedType = type;
+  setDraggingState(true);
+  e.currentTarget.style.opacity = '0.4';
+  // e.dataTransfer.effectAllowed = 'move';
+}
+
+function handleDragEnd(e) {
+  setDraggingState(false);
+  e.currentTarget.style.opacity = '1';
+  document.querySelectorAll('.queue-item, .pl-card').forEach(el => el.classList.remove('drag-over'));
+}
+
+function handleDragOver(e) {
+  e.preventDefault();
+  // e.dataTransfer.dropEffect = 'move';
+  e.currentTarget.classList.add('drag-over');
+  return false;
+}
+
+function handleDragEnter(e) {
+  e.preventDefault();
+  e.currentTarget.classList.add('drag-over');
+}
+
+function handleDragLeave(e) {
+  e.currentTarget.classList.remove('drag-over');
+}
+
+async function handleDrop(e, type, toIndex) {
+  // if (e.preventDefault) e.preventDefault();
+  if (e.stopPropagation) e.stopPropagation();
+  setDraggingState(false);
+
+  document.querySelectorAll('.queue-item, .pl-card').forEach(el => el.classList.remove('drag-over'));
+
+  if (draggedItem === null || draggedType !== type || draggedItem === toIndex) return;
+
+  const fromIndex = draggedItem;
+  draggedItem = null;
+
+  try {
+    const res = await fetch('/api/move-item', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, type, from: fromIndex, to: toIndex }),
+    });
+    if (!res.ok) console.error('이동 실패');
+  }
+  catch (err) {
+    console.error('이동 요청 오류:', err);
+  }
+}
+
+function setupTouchEvents(el, type, index) {
+  el.addEventListener('touchstart', () => {
+    draggedItem = index;
+    draggedType = type;
+    el.style.opacity = '0.4';
+    setDraggingState(true);
+  }, { passive: true });
+
+  el.addEventListener('touchmove', (e) => {
+    if (draggedItem === null) return;
+
+    if (e.cancelable) e.preventDefault();
+
+    const touch = e.touches[0];
+    const target = document.elementFromPoint(touch.clientX, touch.clientY);
+    const item = target?.closest('.queue-item, .pl-card');
+
+    document.querySelectorAll('.queue-item, .pl-card').forEach(i => i.classList.remove('drag-over'));
+    if (item && draggedType === (item.classList.contains('queue-item') ? 'queue' : 'playlist')) {
+      item.classList.add('drag-over');
+      lastTouchTarget = item;
+    }
+  }, { passive: false });
+
+  el.addEventListener('touchend', async (e) => {
+    el.style.opacity = '1';
+    setDraggingState(false);
+    if (lastTouchTarget) {
+      const parent = lastTouchTarget.parentNode;
+      const toIndex = Array.from(parent.children).indexOf(lastTouchTarget);
+      lastTouchTarget.classList.remove('drag-over');
+      await handleDrop(e, type, toIndex);
+    }
+    draggedItem = null;
+    lastTouchTarget = null;
+  }, { passive: true });
+}
+
 /**
  * 썸네일 또는 아이콘 요소를 생성합니다.
  */
@@ -73,6 +176,15 @@ function createThumbnail(src, fallbackSvgHtml, className = '') {
 function createQueueItem(s, i) {
   const item = document.createElement('div');
   item.className = 'queue-item';
+  item.draggable = true;
+
+  // 드래그 이벤트 연결
+  item.addEventListener('dragstart', (e) => handleDragStart(e, 'queue', i));
+  item.addEventListener('dragend', handleDragEnd);
+  item.addEventListener('dragover', handleDragOver);
+  item.addEventListener('dragleave', handleDragLeave);
+  item.addEventListener('drop', (e) => handleDrop(e, 'queue', i));
+  setupTouchEvents(item, 'queue', i);
 
   const num = document.createElement('div');
   num.className = 'queue-num';
@@ -145,9 +257,19 @@ function createTrendItem(s, i) {
 /**
  * 플레이리스트 카드 생성
  */
-function createPlaylistCard(p) {
+function createPlaylistCard(p, i) {
   const card = document.createElement('div');
   card.className = 'pl-card';
+  card.draggable = true;
+
+  // 드래그 이벤트 연결
+  card.addEventListener('dragstart', (e) => handleDragStart(e, 'playlist', i));
+  card.addEventListener('dragend', handleDragEnd);
+  card.addEventListener('dragover', handleDragOver);
+  card.addEventListener('dragenter', handleDragEnter);
+  card.addEventListener('dragleave', handleDragLeave);
+  card.addEventListener('drop', (e) => handleDrop(e, 'playlist', i));
+  setupTouchEvents(card, 'playlist', i);
 
   const icon = document.createElement('div');
   icon.className = 'pl-icon';

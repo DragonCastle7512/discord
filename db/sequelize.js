@@ -11,6 +11,12 @@ const sequelize = new Sequelize({
   dialectOptions: {
     connectString: process.env.DB_CONNECT_STRING,
   },
+  pool: {
+    max: 20,
+    min: 5,
+    acquire: 30000,
+    idle: 10000,
+  },
 });
 
 module.exports = {
