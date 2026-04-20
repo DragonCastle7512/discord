@@ -194,6 +194,15 @@ module.exports = {
         required: ['input'],
       },
     },
+    {
+      name: 'slash_dashboard',
+      description: '사용자에게 대시보드 접속 링크를 보여줍니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: [],
+      },
+    },
   ],
   handlers: {
     slash_play: async (args, obj) => executeSlash(obj, 'play', { query: args?.query }),
@@ -220,5 +229,6 @@ module.exports = {
       }
       return executeSlash(obj, 'tts', { input: args?.input });
     },
+    slash_dashboard: async (args, obj) => executeSlash(obj, 'dashboard'),
   },
 };
