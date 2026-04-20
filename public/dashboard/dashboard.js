@@ -4,7 +4,7 @@ const token = urlParams.get('token');
 const dashboardData = {
   server: { guildId: null, name: '연결 중...', channelName: '...', serverIcon: null, userIcon: null },
   musicInfo: { currentMusic: null, queue: [], trending: [], playlists: [] },
-  stats: { queueCount: 0, todayPlays: 0, playlistCount: 0 },
+  stats: { queueCount: 0, todayPlays: 0, playlistCount: 0, existCurrentMusic: false },
 };
 
 let socket = null;
@@ -165,6 +165,7 @@ function mergeDashboardData(newData, type) {
       isPlaying = cm.isPlaying;
       startProgressTimer();
     }
+    if (!newData.stats.existCurrentMusic) dashboardData.musicInfo.currentMusic = newData.musicInfo.currentMusic;
 
     if (newData.musicInfo.queue && (newData.musicInfo.queue.length > 0 || type === 'music' || type === 'queue' || type === 'all')) {
       dashboardData.musicInfo.queue = newData.musicInfo.queue;
@@ -404,9 +405,14 @@ function updateUI() {
   else {
     document.querySelector('.np-title').textContent = '재생 중인 곡 없음';
     document.querySelector('.np-artist').textContent = '대기열에 곡을 추가해보세요';
+    const currentRequester = document.querySelector('.now-playing div:last-child div:nth-child(2) div');
+    currentRequester.textContent = '나';
+    currentRequester.style = 'width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;font-size:10px;overflow:hidden;';
     if (progressInterval) clearInterval(progressInterval);
     document.querySelector('.progress-fill').style.width = '0%';
     document.querySelector('.progress-dot').style.left = '0%';
+    document.querySelector('.progress-times span:first-child').textContent = '0:00';
+    document.querySelector('.progress-times span:last-child').textContent = '0:00';
     thumbEl.replaceChildren(createThumbnail(null, '<svg viewBox="0 0 24 24" fill="currentColor" style="width:28px;height:28px;color:var(--muted);"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
   }
 

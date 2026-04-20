@@ -43,6 +43,7 @@ export interface DashboardResponse {
     queueCount: number;
     todayPlays: number;
     playlistCount: number;
+    existCurrentMusic: boolean
   };
 }
 

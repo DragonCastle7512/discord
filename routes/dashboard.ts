@@ -43,7 +43,8 @@ export function createDashboardRouter(
       stats: {
         queueCount: 0,
         todayPlays: 0,
-        playlistCount: 0
+        playlistCount: 0,
+        existCurrentMusic: false,
       }
     };
 
@@ -85,9 +86,13 @@ export function createDashboardRouter(
           console.error('History fetch failed:', e);
         }
 
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-        const todayPlays = allHistory.filter((h: any) => new Date(h.createdAt) >= today).length;
+        const now = Date.now();
+        const KST_OFFSET = 9 * 60 * 60 * 1000;
+        const todayKstStr = new Date(now + KST_OFFSET).toISOString().split('T')[0];
+        const todayPlays = allHistory.filter((h: any) => {
+          const hDateKst = new Date(new Date(h.createdAt).getTime() + KST_OFFSET);
+          return hDateKst.toISOString().split('T')[0] === todayKstStr;
+        }).length;
 
         const counts = new Map<string, { title: string, artist: string, count: number, artwork: string | null }>();
         allHistory.forEach((h: any) => {
@@ -119,6 +124,7 @@ export function createDashboardRouter(
             requestedBy: t.requestedBy || null
           })),
         response.stats.queueCount = response.musicInfo.queue.length + (snapshot.current ? 1 : 0);
+        response.stats.existCurrentMusic = (snapshot?.current) ? true : false;
       }
 
       // 4. 플레이리스트 목록 및 개수
