@@ -220,5 +220,41 @@ export function createDashboardRouter(
     }
   });
 
+  router.post('/control', async (req: Request, res: Response) => {
+    const { token, action } = req.body;
+    const session = verifyDashboardToken(token);
+
+    if (!session) {
+      res.status(401).json({ error: '인증되지 않은 접근입니다.' });
+      return;
+    }
+
+    try {
+      let result;
+      switch (action) {
+        case 'skip':
+          result = await music.skip(session.guildId);
+          break;
+        case 'previous':
+          result = await music.previous(session.guildId);
+          break;
+        case 'loop':
+          result = await music.loop(session.guildId, null);
+          break;
+        case 'pause':
+          result = await music.pause(session.guildId);
+          break;
+        case 'addPlaylist':
+          result = await music.addToPlaylist(session.guildId, session.userId, '');
+          break;
+        default:
+          return res.status(400).json({ ok: false, message: 'Unknown action' });
+      }
+      res.json(result);
+    } catch (e: any) {
+      res.status(500).json({ ok: false, message: e.message });
+    }
+  });
+
   return router;
 }

@@ -143,6 +143,21 @@ async function playMusic(url) {
   }
 }
 
+async function sendControl(action) {
+  try {
+    const res = await fetch('/api/control', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token, action }),
+    });
+    const result = await res.json();
+    if (!result.ok) console.error(`${action} 실패:`, result.message);
+  }
+  catch (err) {
+    console.error(`${action} 요청 오류:`, err);
+  }
+}
+
 function setupTouchEvents(el, type, index) {
   el.addEventListener('touchstart', () => {
     draggedItem = index;
@@ -501,6 +516,10 @@ else {
 
 window.togglePlay = function() {
   const playIcon = document.getElementById('playIcon');
+  const cm = dashboardData.musicInfo.currentMusic;
+  if (!cm) return;
+
+  sendControl('pause');
   if (playIcon) {
     const isPlayingIcon = playIcon.innerHTML.includes('rect');
     playIcon.replaceChildren();
