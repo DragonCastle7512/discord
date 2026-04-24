@@ -374,6 +374,38 @@ export function createMusicRuntime({
     return { ok: true, message: isPaused ? '노래를 일시정지했어요!' : '노래를 다시 재생할게요!' };
   }
 
+  async function previous(guildId: string): Promise<RuntimeResponse> {
+    const state = guildStates.get(guildId);
+    if (!state || !state.player) {
+      return { ok: false, message: '재생 중인 노래가 없어요!' };
+    }
+
+    const prevTrack = state.history.pop();
+    if (!prevTrack) {
+      return { ok: false, message: '이전 세션에 재생된 곡이 없어요.' };
+    }
+
+    console.log(state.history);
+    if (state.current) {
+      state.queue.unshift(state.current);
+    }
+
+    state.queue.unshift(prevTrack);
+
+    if (!state.current) {
+        state.playing = false;
+        await playNext(guildId);
+        return { ok: true, message: `이전 곡을 재생합니다: **${prevTrack.info.title}**` };
+    }
+
+    state.current = null;
+    state.playing = false;
+
+    await state.player.stopTrack();
+
+    return { ok: true, message: `이전 곡을 재생합니다: **${prevTrack.info.title}**` };
+  }
+
   return {
     play,
     skip,
@@ -390,6 +422,7 @@ export function createMusicRuntime({
     removeQueueItem,
     deleteFromPlaylist,
     movePlaylistItem,
-    pause
+    pause,
+    previous
   };
 }

@@ -127,6 +127,7 @@ function createRuntimeUtils({
             guildStates.set(guildId, {
                 player: null,
                 queue: [],
+                history: [],
                 current: null,
                 textChannelId: null,
                 voiceChannelId: null,
@@ -201,6 +202,10 @@ function createRuntimeUtils({
             const endedTrack = state.current;
             state.playing = false;
             state.current = null;
+
+            if (endedTrack && event?.reason !== 'replaced') {
+                state.history.push(endedTrack);
+            }
             if (state.loop && endedTrack && (!event?.reason || event.reason === 'finished' || event.reason === 'stopped')) {
                 state.queue.push({
                    ...endedTrack,
@@ -237,6 +242,7 @@ function createRuntimeUtils({
             state.player = null;
             state.playing = false;
             state.current = null;
+            state.history = [];
             notifyMusicUpdate(guild.id, 'music');
         });
 
@@ -340,6 +346,7 @@ function createRuntimeUtils({
       const state = guildStates.get(guildId);
       if (state) {
         state.queue = [];
+        state.history = [];
         state.current = null;
         state.playing = false;
         await shoukaku.leaveVoiceChannel(guildId);

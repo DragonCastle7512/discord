@@ -35,6 +35,7 @@ export interface Track {
 export interface GuildState {
   player: Player | null;
   queue: Track[];
+  history: Track[];
   current: Track | null;
   textChannelId: string | null;
   voiceChannelId: string | null;
@@ -94,4 +95,5 @@ export interface MusicRuntime {
   deleteFromPlaylist: (userId: string, index: number | string) => Promise<RuntimeResponse>;
   movePlaylistItem: (userId: string, fromIndex: number | string, toIndex: number | string) => Promise<RuntimeResponse>;
   pause: (guildId: string) => Promise<RuntimeResponse>;
+  previous: (guildId: string) => Promise<RuntimeResponse>;
 }
