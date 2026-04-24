@@ -203,6 +203,15 @@ module.exports = {
         required: [],
       },
     },
+    {
+      name: 'slash_pause',
+      description: '현재 재생중인 노래를 일시정지/재개 합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: [],
+      },
+    },
   ],
   handlers: {
     slash_play: async (args, obj) => executeSlash(obj, 'play', { query: args?.query }),
@@ -230,5 +239,6 @@ module.exports = {
       return executeSlash(obj, 'tts', { input: args?.input });
     },
     slash_dashboard: async (args, obj) => executeSlash(obj, 'dashboard'),
+    slash_pause: async (args, obj) => executeSlash(obj, 'pause'),
   },
 };

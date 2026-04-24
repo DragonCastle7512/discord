@@ -359,6 +359,21 @@ export function createMusicRuntime({
     return { ok: true, message: `Playlist에서 노래 위치를 이동했어요!\n **${title}** (${from} -> ${to})` };
   }
 
+  async function pause(guildId: string): Promise<RuntimeResponse> {
+    const state = guildStates.get(guildId);
+    if (!state || !state.player) {
+      return { ok: false, message: '재생 중인 노래가 없어요!' };
+    }
+
+    const isPaused = !state.player.paused;
+    state.player.setPaused(isPaused);
+    state.playing = !isPaused;
+    
+    notifyMusicUpdate(guildId);
+    
+    return { ok: true, message: isPaused ? '노래를 일시정지했어요!' : '노래를 다시 재생할게요!' };
+  }
+
   return {
     play,
     skip,
@@ -375,5 +390,6 @@ export function createMusicRuntime({
     removeQueueItem,
     deleteFromPlaylist,
     movePlaylistItem,
+    pause
   };
 }
