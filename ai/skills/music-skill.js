@@ -244,7 +244,7 @@ module.exports = {
           },
           count: {
             type: 'NUMBER',
-            description: '추천 개수 (기본 5, 최대 15)',
+            description: '추천 개수 (기본 5, 최대 20)',
           },
           region: {
             type: 'STRING',
@@ -333,6 +333,7 @@ module.exports = {
           guildId,
           userId: targetUserId || null,
           keywords: result.keywords || [],
+          keywordStats: result.keywordStats || [],
           historyUsed: result.historyUsed || 0,
         };
       }
@@ -343,6 +344,7 @@ module.exports = {
         userId: targetUserId || null,
         historyUsed: result.historyUsed,
         keywords: result.keywords,
+        keywordStats: result.keywordStats,
         count: result.count,
         items: result.items.map((track, index) => ({
           index: index + 1,

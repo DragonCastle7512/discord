@@ -153,7 +153,7 @@ module.exports = {
     .addStringOption((option) =>
       option
         .setName('count')
-        .setDescription('추천 곡 개수 (최대 10)')
+        .setDescription('추천 곡 개수 (최대 20)')
         .setRequired(false),
     ),
 
@@ -176,18 +176,19 @@ module.exports = {
       region: 'KR',
     });
 
-    // 결과를 캐시에 저장 (사용자 ID 기준)
-    recommendationCache.set(interaction.user.id, result);
-
-    if (!result || (Array.isArray(result) && result.length === 0)) {
-      await safeReply(interaction, { content: '추천 결과가 없어요.' });
+    if (!result || !result.ok || !Array.isArray(result.items) || result.items.length === 0) {
+      await safeReply(interaction, { content: result?.reason || '추천 결과가 없어요.' });
       return;
     }
+
+    const tracks = result.items;
+    // 결과를 캐시에 저장 (사용자 ID 기준)
+    recommendationCache.set(interaction.user.id, tracks);
 
     await safeReply(interaction, { content: '추천 결과를 불러왔어요!' });
 
     // 첫 페이지(index 0) 표시
-    const components = buildRecommendationComponents(result, interaction.user.id, 0);
+    const components = buildRecommendationComponents(tracks, interaction.user.id, 0);
     await safeReply(interaction, {
       flags: MessageFlags.IsComponentsV2,
       components,
@@ -230,9 +231,9 @@ module.exports = {
     // 이전/다음 버튼 처리
     if (prefix === 'recommand_back' || prefix === 'recommand_next') {
       const startIndex = parseInt(arg, 10);
-      const cachedResult = recommendationCache.get(ownerUserId);
+      const tracks = recommendationCache.get(ownerUserId);
 
-      if (!cachedResult) {
+      if (!tracks || !Array.isArray(tracks)) {
         await safeReply(interaction, {
           content: '캐시된 추천 결과가 없어요. `/recommand`를 다시 실행해 주세요.',
           ephemeral: true,
@@ -240,7 +241,7 @@ module.exports = {
         return;
       }
 
-      const components = buildRecommendationComponents(cachedResult, ownerUserId, startIndex);
+      const components = buildRecommendationComponents(tracks, ownerUserId, startIndex);
       await interaction.update({
         flags: MessageFlags.IsComponentsV2,
         components,

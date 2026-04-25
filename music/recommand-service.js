@@ -1,9 +1,9 @@
 const DEFAULT_COUNT = 5;
-const MAX_COUNT = 15;
+const MAX_COUNT = 20;
 const HISTORY_LIMIT = 100;
 const POPULAR_LIMIT = 50;
 const TAG_KEYWORD_LIMIT = 4;
-const KEYWORD_SIMILARITY_THRESHOLD = 0.8;
+const KEYWORD_SIMILARITY_THRESHOLD = 0.6;
 const MIN_TAG_KEYWORD_LENGTH = 4;
 const MIN_DURATION_MS = 90 * 1000;
 const MAX_DURATION_MS = 6 * 60 * 1000;
@@ -320,111 +320,87 @@ async function recommendFromHistory({
   const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 6);
   const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw);
 
-  const firstKeyword = tagKeywords[0] || 'music';
-  const secondKeyword = tagKeywords.find((tag) => tag !== firstKeyword) || 'music';
-
   const excludedTrackKeys = new Set();
   recentHistoryItems.forEach((entry) => {
     const key = getTrackKey(getTrackInfo(entry));
     if (key) excludedTrackKeys.add(key);
   });
 
-  const [firstPopularItems, secondPopularItems] = await Promise.all([
-    fetchPopularByKeyword({ keyword: firstKeyword, limit: popularLimit, region }),
-    fetchPopularByKeyword({ keyword: secondKeyword, limit: popularLimit, region }),
-  ]);
-
-  if (!firstPopularItems.length && !secondPopularItems.length) {
-    return {
-      ok: false,
-      reason: 'No popular results found for recommendation keywords.',
-      count: 0,
-      historyUsed: recentHistoryItems.length,
-      items: [],
-      keywords: [firstKeyword, secondKeyword],
-      tagFrequencies,
-    };
-  }
-
-  const firstTarget = Math.max(1, Math.ceil(normalizedCount * 0.6));
-  const secondTarget = Math.max(0, normalizedCount - firstTarget);
-
   const globalSeenKeys = new Set();
-  const [firstCandidates, secondCandidates] = await Promise.all([
-    collectFromPopularItems({
-      popularItems: firstPopularItems,
+  const recommendations = [];
+  const keywordStats = [];
+  const usedKeywords = [];
+
+  const keywordsToTry = tagKeywords.length > 0 ? tagKeywords.slice(0, 5) : ['music'];
+  const firstHalfTarget = Math.ceil(normalizedCount / 2);
+
+  for (const keyword of keywordsToTry) {
+    const currentTotal = recommendations.length;
+    if (currentTotal >= normalizedCount) break;
+
+    const popularItems = await fetchPopularByKeyword({
+      keyword,
+      limit: popularLimit,
+      region,
+    });
+
+    if (!popularItems || popularItems.length === 0) {
+      keywordStats.push({ keyword, rawCount: 0, collectedCount: 0 });
+      continue;
+    }
+
+    usedKeywords.push(keyword);
+
+    const isFirstKeyword = usedKeywords.length === 1;
+    const maxToCollect = isFirstKeyword
+      ? Math.min(firstHalfTarget, normalizedCount - currentTotal)
+      : (normalizedCount - currentTotal);
+
+    const collected = await collectFromPopularItems({
+      popularItems,
       searchTracks,
       excludedTrackKeys,
       globalSeenKeys,
-      maxCount: Math.max(normalizedCount * 2, firstTarget),
-      source: 'history-tag-1-popular',
-      keyword: firstKeyword,
-    }),
-    collectFromPopularItems({
-      popularItems: secondPopularItems,
-      searchTracks,
-      excludedTrackKeys,
-      globalSeenKeys,
-      maxCount: Math.max(normalizedCount * 2, secondTarget + firstTarget),
-      source: 'history-tag-2-popular',
-      keyword: secondKeyword,
-    }),
-  ]);
+      maxCount: maxToCollect,
+      source: `history-tag-${usedKeywords.length}-popular`,
+      keyword,
+    });
 
-  const selectedFirst = firstCandidates.slice(0, firstTarget);
-  if (selectedFirst.length < firstTarget) {
-    const used = new Set(selectedFirst.map((track) => getTrackKey(track)));
-    for (const track of secondCandidates) {
-      if (selectedFirst.length >= firstTarget) break;
-      const key = getTrackKey(track);
-      if (!key || used.has(key)) continue;
-      used.add(key);
-      track.source = 'history-tag-2-force-fill';
-      selectedFirst.push(track);
-    }
-  }
+    keywordStats.push({
+      keyword,
+      rawCount: popularItems.length,
+      collectedCount: collected.length,
+      limitApplied: isFirstKeyword ? firstHalfTarget : null,
+    });
 
-  const selectedKeys = new Set(selectedFirst.map((track) => getTrackKey(track)));
-  const selectedSecond = [];
-  for (const track of secondCandidates) {
-    if (selectedSecond.length >= secondTarget) break;
-    const key = getTrackKey(track);
-    if (!key || selectedKeys.has(key)) continue;
-    selectedKeys.add(key);
-    selectedSecond.push(track);
-  }
-
-  const recommendations = [...selectedFirst, ...selectedSecond].slice(0, normalizedCount);
-  if (recommendations.length < normalizedCount) {
-    for (const track of [...firstCandidates, ...secondCandidates]) {
-      if (recommendations.length >= normalizedCount) break;
-      const key = getTrackKey(track);
-      if (!key || selectedKeys.has(key)) continue;
-      selectedKeys.add(key);
-      recommendations.push(track);
-    }
+    recommendations.push(...collected);
   }
 
   if (!recommendations.length) {
     return {
       ok: false,
-      reason: 'No recommendation candidates left after filters.',
+      reason: 'No recommendation candidates left after filters for all keywords.',
       count: 0,
       historyUsed: recentHistoryItems.length,
       items: [],
-      keywords: [firstKeyword, secondKeyword],
+      keywords: keywordsToTry,
+      keywordStats,
       tagFrequencies,
     };
   }
 
-  const displayOrder = interleaveBySource(recommendations, normalizedCount);
+  const finalItems = recommendations.slice(0, normalizedCount);
+
+  const displayOrder = interleaveBySource(finalItems, finalItems.length);
+
   return {
     ok: true,
     reason: null,
     count: displayOrder.length,
     historyUsed: recentHistoryItems.length,
     items: displayOrder,
-    keywords: [firstKeyword, secondKeyword],
+    keywords: usedKeywords,
+    keywordStats,
     tagFrequencies,
   };
 }
