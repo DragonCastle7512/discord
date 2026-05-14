@@ -1,6 +1,8 @@
 const fs = require('node:fs');
 const path = require('node:path');
 
+const { REST, Routes } = require('discord.js');
+
 function loadCommandModules(commandsRoot) {
   const commands = new Map();
   const warnings = [];
@@ -31,7 +33,27 @@ function buildCommandPayload(commands) {
   return [...commands.values()].map((command) => command.data.toJSON());
 }
 
+async function deployCommands({ clientId, token, commands, guildId = null }) {
+  const rest = new REST().setToken(token);
+  const commandPayload = buildCommandPayload(commands);
+
+  try {
+    if (guildId) {
+      const data = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commandPayload });
+      console.log(`[Deploy] Successfully reloaded ${data.length} application (/) commands for guild: ${guildId}`);
+    }
+    else {
+      const data = await rest.put(Routes.applicationCommands(clientId), { body: commandPayload });
+      console.log(`[Deploy] Successfully reloaded ${data.length} global application (/) commands.`);
+    }
+  }
+  catch (error) {
+    console.error('[Deploy] Error:', error);
+  }
+}
+
 module.exports = {
   loadCommandModules,
   buildCommandPayload,
+  deployCommands,
 };

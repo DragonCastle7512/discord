@@ -22,10 +22,11 @@ const { createTtsRuntime } = require('./tts/runtime');
 const { createRuntimeUtils } = require('./music/runtime-util');
 const { initDb } = require('./db/init');
 const { createTtsHttpStore } = require('./tts/http-store');
-const { loadCommandModules } = require('./commands/loader');
+const { loadCommandModules, deployCommands } = require('./commands/loader');
 const { createSlashCommandInvoker } = require('./commands/slash-command-invoker');
 
 const token: string = process.env.DISCORD_TOKEN || '';
+const clientId: string = process.env.CLIENT_ID || '';
 const allowSoundCloudFallback: boolean = process.env.ALLOW_SOUNDCLOUD_FALLBACK === 'true';
 const lavalinkReadyTimeoutMs: number = Number(process.env.LAVALINK_READY_TIMEOUT_MS || 20000);
 const lavalinkHost: string = process.env.LAVALINK_HOST || '';
@@ -144,9 +145,16 @@ shoukaku.on('error', (name: string, error: Error) => {
   console.error(`[Lavalink] Node error (${name}):`, error);
 });
 
-client.once(Events.ClientReady, (readyClient) => {
+client.once(Events.ClientReady, async (readyClient) => {
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
+
+  await deployCommands({
+    clientId,
+    token,
+    commands: loadedCommands,
+  });
 });
+
 
 client.login(token);
 
