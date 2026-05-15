@@ -83,7 +83,7 @@ module.exports = {
       }
     }
     if (!result.total) {
-      const empty = buildEmbed(header, '최근 재생한 음악이 없습니다.', '0 track(s)');
+      const empty = buildEmbed(header, '최근 재생한 음악이 없어요!', '0 track(s)');
       await safeReply(interaction, { embeds: [empty] });
       return;
     }

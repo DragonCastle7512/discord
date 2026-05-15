@@ -307,7 +307,7 @@ async function recommendFromHistory({
   if (!recentHistoryItems.length) {
     return {
       ok: false,
-      reason: 'No history found for recommendation.',
+      reason: '최근에 재생한 곡이 없어요. 재생 이후에 다시 시도해주세요!',
       count: 0,
       historyUsed: 0,
       items: [],
@@ -379,7 +379,7 @@ async function recommendFromHistory({
   if (!recommendations.length) {
     return {
       ok: false,
-      reason: 'No recommendation candidates left after filters for all keywords.',
+      reason: '적절한 추천 결과가 없어요!',
       count: 0,
       historyUsed: recentHistoryItems.length,
       items: [],

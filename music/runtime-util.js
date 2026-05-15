@@ -223,7 +223,7 @@ function createRuntimeUtils({
             notifyMusicUpdate(guild.id, 'music');
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
-                textChannel.send('Track failed. Skipping to next.').catch((err) => console.error(err));
+                textChannel.send('재생 도중에 오류가 발생했어요!').catch((err) => console.error(err));
             }
         });
 
