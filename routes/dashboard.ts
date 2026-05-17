@@ -244,6 +244,9 @@ export function createDashboardRouter(
         case 'pause':
           result = await music.pause(session.guildId);
           break;
+        case 'shuffle':
+          result = music.shuffleQueue(session.guildId);
+          break;
         case 'addPlaylist':
           result = await music.addToPlaylist(session.guildId, session.userId, '');
           break;

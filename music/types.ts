@@ -92,6 +92,7 @@ export interface MusicRuntime {
   getQueueSnapshot: (guildId: string) => { current: Track | null; queue: Track[] };
   moveQueueItem: (guildId: string, fromIndex: number | string, toIndex: number | string) => RuntimeResponse;
   removeQueueItem: (guildId: string, index: number | string) => RuntimeResponse;
+  shuffleQueue: (guildId: string) => RuntimeResponse;
   deleteFromPlaylist: (userId: string, index: number | string) => Promise<RuntimeResponse>;
   movePlaylistItem: (userId: string, fromIndex: number | string, toIndex: number | string) => Promise<RuntimeResponse>;
   pause: (guildId: string) => Promise<RuntimeResponse>;

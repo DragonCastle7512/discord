@@ -151,6 +151,7 @@ async function sendControl(action) {
       body: JSON.stringify({ token, action }),
     });
     const result = await res.json();
+    if (result.ok && action === 'shuffle') fetchDashboardData('queue');
     if (!result.ok) console.error(`${action} 실패:`, result.message);
   }
   catch (err) {

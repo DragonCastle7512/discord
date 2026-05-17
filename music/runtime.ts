@@ -289,6 +289,24 @@ export function createMusicRuntime({
     return { ok: true, message: `Removed: ${title}` };
   }
 
+  function shuffleQueue(guildId: string): RuntimeResponse {
+    const state = guildStates.get(guildId);
+    if (!state || state.queue.length === 0) {
+      return { ok: false, message: '대기열이 비어 있어요.' };
+    }
+    if (state.queue.length < 2) {
+      return { ok: false, message: '대기열에 섞을 곡이 2곡 이상 필요해요.' };
+    }
+
+    for (let i = state.queue.length - 1; i > 0; i -= 1) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [state.queue[i], state.queue[j]] = [state.queue[j], state.queue[i]];
+    }
+
+    notifyMusicUpdate(guildId, 'queue');
+    return { ok: true, message: `대기열 ${state.queue.length}곡을 무작위로 섞었어요.` };
+  }
+
   async function history(guildId: string, requestedBy?: string): Promise<{ total: number; items: HistoryEntry[] }> {
     const items = await findHistoryByRequester(guildId, requestedBy);
 
@@ -420,6 +438,7 @@ export function createMusicRuntime({
     getQueueSnapshot,
     moveQueueItem,
     removeQueueItem,
+    shuffleQueue,
     deleteFromPlaylist,
     movePlaylistItem,
     pause,

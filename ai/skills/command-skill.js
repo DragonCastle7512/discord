@@ -163,6 +163,15 @@ module.exports = {
       },
     },
     {
+      name: 'slash_shuffle',
+      description: '현재 서버의 재생 대기열 순서를 무작위로 섞습니다. 현재 재생 중인 곡은 유지하고 대기 중인 곡 목록만 섞습니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: [],
+      },
+    },
+    {
       name: 'slash_skip',
       description: '현재 재생 중인 곡을 건너뜁니다.',
       parameters: {
@@ -237,6 +246,7 @@ module.exports = {
     slash_loop: async (args, obj) => executeSlash(obj, 'loop', { enable: args?.enable }),
     slash_playlist: async (args, obj) => executeSlash(obj, 'playlist'),
     slash_queue: async (args, obj) => executeSlash(obj, 'queue'),
+    slash_shuffle: async (args, obj) => executeSlash(obj, 'shuffle'),
     slash_skip: async (args, obj) => executeSlash(obj, 'skip'),
     slash_stop: async (args, obj) => executeSlash(obj, 'stop'),
     slash_echo: async (args, obj) => executeSlash(obj, 'echo', { input: args?.input }),
