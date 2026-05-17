@@ -14,8 +14,17 @@ const rest = new REST().setToken(token);
 
 (async () => {
 	try {
-		const data = await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: commandPayload });
-		console.log(`Successfully reloaded ${data.length} application (/) commands.`);
+		if (!token || !clientId) {
+			throw new Error('DISCORD_TOKEN and CLIENT_ID are required.');
+		}
+
+		const data = await rest.put(Routes.applicationCommands(clientId), { body: commandPayload });
+		console.log(`Successfully reloaded ${data.length} global application (/) commands.`);
+
+		if (guildId) {
+			await rest.put(Routes.applicationGuildCommands(clientId, guildId), { body: [] });
+			console.log(`Cleared guild-specific application (/) commands for guild: ${guildId}`);
+		}
 	}
 	catch (error) {
 		console.error(error);
