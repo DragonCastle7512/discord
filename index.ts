@@ -168,6 +168,13 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
         }
         return;
       }
+      if (interaction.isButton() && interaction.customId.startsWith('search_')) {
+        const searchCommand = (interaction.client as MyClient).commands.get('search');
+        if (searchCommand?.handleComponent) {
+          await searchCommand.handleComponent(interaction, context);
+        }
+        return;
+      }
       if (interaction.customId.startsWith('qctl|')) {
         const queueCommand = (interaction.client as MyClient).commands.get('queue');
         if (queueCommand?.handleComponent) {

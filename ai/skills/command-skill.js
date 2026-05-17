@@ -62,6 +62,20 @@ module.exports = {
       },
     },
     {
+      name: 'slash_search',
+      description: '노래를 검색하고 상위 5개 결과를 버튼으로 선택해 재생할 수 있는 UI를 보여줍니다. 바로 재생하지 않고 사용자가 결과를 고르게 할 때 사용합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          query: {
+            type: 'STRING',
+            description: '검색할 노래 제목 또는 URL',
+          },
+        },
+        required: ['query'],
+      },
+    },
+    {
       name: 'slash_add',
       description: '사용자의 플레이리스트에 노래를 추가합니다. music을 생략하면 현재 재생곡을 추가합니다.',
       parameters: {
@@ -215,6 +229,7 @@ module.exports = {
   ],
   handlers: {
     slash_play: async (args, obj) => executeSlash(obj, 'play', { query: args?.query }),
+    slash_search: async (args, obj) => executeSlash(obj, 'search', { query: args?.query }),
     slash_add: async (args, obj) => executeSlash(obj, 'add', { music: args?.music }),
     slash_clear: async (args, obj) => executeSlash(obj, 'clear'),
     slash_history: async (args, obj) => executeSlash(obj, 'history', { user: args?.user }),
