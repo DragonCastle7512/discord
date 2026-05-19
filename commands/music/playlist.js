@@ -1,8 +1,20 @@
-const { SlashCommandBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, StringSelectMenuBuilder } = require('discord.js');
-const { buildEmbed } = require('../../music/embeds/buildEmbed');
+const {
+  SlashCommandBuilder,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+  StringSelectMenuBuilder,
+  ContainerBuilder,
+  SectionBuilder,
+  TextDisplayBuilder,
+  ThumbnailBuilder,
+  SeparatorBuilder,
+  MessageFlags,
+} = require('discord.js');
+const { formatDuration } = require('../../music/recommand-service');
 import { safeReply } from '../../common/reply-util';
 
-const MAX_VISIBLE = 25;
+const PAGE_SIZE = 4;
 const COLLECTOR_MS = 5 * 60 * 1000;
 
 function isUnknownMessageError(error) {
@@ -19,61 +31,118 @@ function formatTitle(title, max = 80) {
   return `${title.slice(0, max - 3)}...`;
 }
 
-function buildDescription(tracks, selectedIndex) {
-  if (!tracks.length) return 'Playlist가 비어있어요';
+function buildPlaylistComponents(tracks, userId, startIndex, selectedIndex) {
+  const currentChunk = tracks.slice(startIndex, startIndex + PAGE_SIZE);
 
-  const visible = tracks.slice(0, MAX_VISIBLE);
-  const lines = visible.map((track, index) => {
-    const title = formatTitle(track.info?.title);
-    const marker = index + 1 === selectedIndex ? '>> ' : '';
-    return `${marker}${index + 1}. ${title}`;
+  const beforeChunk = [];
+  const selectedChunk = [];
+  const afterChunk = [];
+
+  currentChunk.forEach((track, index) => {
+    const displayIdx = startIndex + index;
+    const itemIndex = displayIdx + 1;
+    if (itemIndex < selectedIndex) {
+      beforeChunk.push({ track, displayIdx });
+    }
+    else if (itemIndex === selectedIndex) {
+      selectedChunk.push({ track, displayIdx });
+    }
+    else {
+      afterChunk.push({ track, displayIdx });
+    }
   });
 
-  const moreCount = tracks.length - visible.length;
-  const moreLine = moreCount > 0 ? `\n...그리고 ${moreCount}개 더 있음` : '';
+  const containers = [];
 
-  return `${lines.join('\n')}${moreLine}`;
-}
+  const createTrackSections = (chunk) => {
+    const sections = [];
+    chunk.forEach(({ track, displayIdx }) => {
+      const info = track.info || {};
+      const titleContent = `### ${displayIdx + 1}. ${formatTitle(info.title)}\n**Artist** - ${info.author || 'Unknown artist'} \n**Duration** - ${formatDuration(info.length)}`;
 
-function buildComponents(tracks, selectedIndex, userId) {
-  const options = tracks.slice(0, MAX_VISIBLE).map((track, index) => ({
-    label: formatTitle(track.info?.title, 95),
-    value: String(index + 1),
-    default: index + 1 === selectedIndex,
+      const thumbnailSection = new SectionBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(titleContent));
+
+      if (info.artworkUrl) {
+        thumbnailSection.setThumbnailAccessory(new ThumbnailBuilder().setURL(info.artworkUrl));
+      }
+
+      const infoContent = `**URL** ${info.uri || 'no url'}`;
+      const infoSection = new SectionBuilder()
+        .addTextDisplayComponents(new TextDisplayBuilder().setContent(infoContent))
+        .setButtonAccessory(
+          new ButtonBuilder()
+            .setCustomId(`playlist_play_item:${userId}:${displayIdx}`)
+            .setLabel('Play')
+            .setStyle(ButtonStyle.Primary),
+        );
+
+      sections.push({ thumbnailSection, infoSection });
+    });
+    return sections;
+  };
+
+  const addContainerForChunk = (chunk, isSelected) => {
+    if (chunk.length === 0) return;
+    const container = new ContainerBuilder();
+    if (isSelected) {
+      container.setAccentColor(0xcd2929);
+    }
+    const trackSections = createTrackSections(chunk);
+    trackSections.forEach((pair, i) => {
+      container.addSectionComponents(pair.thumbnailSection, pair.infoSection);
+      if (i < trackSections.length - 1) {
+        container.addSeparatorComponents(new SeparatorBuilder());
+      }
+    });
+    containers.push(container);
+  };
+
+  addContainerForChunk(beforeChunk, false);
+  addContainerForChunk(selectedChunk, true);
+  addContainerForChunk(afterChunk, false);
+
+  const options = currentChunk.map((track, index) => ({
+    label: `${startIndex + index + 1}. ${formatTitle(track.info?.title, 90)}`,
+    value: String(startIndex + index + 1),
+    default: (startIndex + index + 1) === selectedIndex,
   }));
 
   const selectRow = new ActionRowBuilder().addComponents(
     new StringSelectMenuBuilder()
-      .setCustomId(`playlist-select:${userId}`)
+      .setCustomId(`playlist_select:${userId}`)
       .setPlaceholder('조작할 노래를 선택하세요')
       .addOptions(options),
   );
 
-  const moveUpDisabled = selectedIndex <= 1;
-  const moveDownDisabled = selectedIndex >= tracks.length;
-
-  const buttonRow = new ActionRowBuilder().addComponents(
+  const controlRow = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
-      .setCustomId(`playlist-up:${userId}`)
-      .setLabel('위로 이동')
+      .setCustomId(`playlist_back:${userId}:${startIndex - PAGE_SIZE}`)
+      .setLabel('이전')
       .setStyle(ButtonStyle.Secondary)
-      .setDisabled(moveUpDisabled),
+      .setDisabled(startIndex === 0),
     new ButtonBuilder()
-      .setCustomId(`playlist-down:${userId}`)
-      .setLabel('아래로 이동')
+      .setCustomId(`playlist_next:${userId}:${startIndex + PAGE_SIZE}`)
+      .setLabel('다음')
       .setStyle(ButtonStyle.Secondary)
-      .setDisabled(moveDownDisabled),
+      .setDisabled(startIndex + PAGE_SIZE >= tracks.length),
     new ButtonBuilder()
-      .setCustomId(`playlist-play:${userId}`)
-      .setLabel('재생')
-      .setStyle(ButtonStyle.Primary),
+      .setCustomId(`playlist_up:${userId}`)
+      .setLabel('위로')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(selectedIndex <= 1),
     new ButtonBuilder()
-      .setCustomId(`playlist-delete:${userId}`)
+      .setCustomId(`playlist_down:${userId}`)
+      .setLabel('아래로')
+      .setStyle(ButtonStyle.Primary)
+      .setDisabled(selectedIndex >= tracks.length),
+    new ButtonBuilder()
+      .setCustomId(`playlist_delete:${userId}`)
       .setLabel('삭제')
       .setStyle(ButtonStyle.Danger),
   );
 
-  return [selectRow, buttonRow];
+  return [...containers, selectRow, controlRow];
 }
 
 module.exports = {
@@ -87,21 +156,16 @@ module.exports = {
     let tracks = await context.music.getPlaylist(userId);
 
     if (!tracks.length) {
-      const embed = buildEmbed('PlayList', 'Playlist가 비어있어요', '0 track(s)');
-      await safeReply(interaction, { embeds: [embed] });
+      await safeReply(interaction, { content: 'Playlist가 비어있어요.', components: [] });
       return;
     }
 
+    let startIndex = 0;
     let selectedIndex = 1;
 
-    const embed = buildEmbed(
-      'PlayList',
-      buildDescription(tracks, selectedIndex),
-      `${tracks.length} track(s)`,
-    );
     const message = await safeReply(interaction, {
-      embeds: [embed],
-      components: buildComponents(tracks, selectedIndex, userId),
+      flags: MessageFlags.IsComponentsV2,
+      components: buildPlaylistComponents(tracks, userId, startIndex, selectedIndex),
       fetchReply: true,
     });
 
@@ -112,51 +176,65 @@ module.exports = {
 
     collector.on('collect', async (component) => {
       try {
+        if (component.customId.startsWith('playlist_play_item:')) {
+          const [, , displayIdxStr] = component.customId.split(':');
+          const track = tracks[parseInt(displayIdxStr, 10)];
+          if (track) {
+            await component.deferUpdate();
+            await context.music.play(interaction, track.info.uri);
+            await interaction.channel.send(`추가된 곡\n**${track.info.title}**`);
+            return;
+          }
+        }
+
         await component.deferUpdate();
 
-        if (component.customId.startsWith('playlist-select:')) {
+        if (component.customId.startsWith('playlist_select:')) {
           selectedIndex = Number(component.values?.[0] || 1);
-          selectedIndex = clamp(selectedIndex, 1, Math.max(1, tracks.length));
         }
-        else if (component.customId.startsWith('playlist-delete:')) {
+        else if (component.customId.startsWith('playlist_back:')) {
+          startIndex = Math.max(0, startIndex - PAGE_SIZE);
+          if (selectedIndex > startIndex + PAGE_SIZE || selectedIndex <= startIndex) {
+             selectedIndex = startIndex + 1;
+          }
+        }
+        else if (component.customId.startsWith('playlist_next:')) {
+          startIndex = Math.min(tracks.length - 1, startIndex + PAGE_SIZE);
+          if (selectedIndex <= startIndex || selectedIndex > startIndex + PAGE_SIZE) {
+            selectedIndex = startIndex + 1;
+          }
+        }
+        else if (component.customId.startsWith('playlist_delete:')) {
           await context.music.deleteFromPlaylist(userId, selectedIndex);
           tracks = await context.music.getPlaylist(userId);
           if (!tracks.length) {
-            const emptyEmbed = buildEmbed('PlayList', 'Playlist가 비어있어요', '0 track(s)');
-            await safeReply(interaction, { embeds: [emptyEmbed], components: [] });
+            await safeReply(interaction, { content: 'Playlist가 비어있어요.', components: [] });
             collector.stop('empty');
             return;
           }
           selectedIndex = clamp(selectedIndex, 1, tracks.length);
+          if (selectedIndex <= startIndex) startIndex = Math.max(0, startIndex - PAGE_SIZE);
         }
-        else if (component.customId.startsWith('playlist-up:')) {
+        else if (component.customId.startsWith('playlist_up:')) {
           if (selectedIndex > 1) {
             await context.music.movePlaylistItem(userId, selectedIndex, selectedIndex - 1);
             selectedIndex -= 1;
             tracks = await context.music.getPlaylist(userId);
+            if (selectedIndex <= startIndex) startIndex = Math.max(0, startIndex - PAGE_SIZE);
           }
         }
-        else if (component.customId.startsWith('playlist-play:')) {
-          const track = tracks[selectedIndex - 1].info;
-          await context.music.play(interaction, track.uri);
-          await interaction.channel.send(`추가된 곡\n**${track.title}**`);
-        }
-        else if (component.customId.startsWith('playlist-down:')) {
+        else if (component.customId.startsWith('playlist_down:')) {
           if (selectedIndex < tracks.length) {
             await context.music.movePlaylistItem(userId, selectedIndex, selectedIndex + 1);
             selectedIndex += 1;
             tracks = await context.music.getPlaylist(userId);
+            if (selectedIndex > startIndex + PAGE_SIZE) startIndex += PAGE_SIZE;
           }
         }
 
-        const nextEmbed = buildEmbed(
-          'PlayList',
-          buildDescription(tracks, selectedIndex),
-          `${tracks.length} track(s)`,
-        );
         await safeReply(interaction, {
-          embeds: [nextEmbed],
-          components: buildComponents(tracks, selectedIndex, userId),
+          flags: MessageFlags.IsComponentsV2,
+          components: buildPlaylistComponents(tracks, userId, startIndex, selectedIndex),
         });
       }
       catch (error) {
@@ -177,12 +255,9 @@ module.exports = {
           }
           catch (deleteError) {
             if (!isUnknownMessageError(deleteError)) {
-              console.warn('Failed to delete playlist message:', deleteError);
+              console.warn('플레이리스트 자동 삭제 실패:', deleteError);
             }
           }
-        }
-        else {
-          console.warn('Failed to remove playlist components on collector end:', error);
         }
       }
     });
