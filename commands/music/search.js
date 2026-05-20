@@ -1,117 +1,18 @@
 const {
   SlashCommandBuilder,
-  ContainerBuilder,
-  SectionBuilder,
-  TextDisplayBuilder,
-  ThumbnailBuilder,
-  SeparatorBuilder,
-  ButtonBuilder,
-  ButtonStyle,
   MessageFlags,
 } = require('discord.js');
+const { buildTrackListContainer, findUriByButtonCustomId } = require('../../music/embeds/track-list-components');
 import { safeReply } from '../../common/reply-util';
 
 const RESULT_LIMIT = 5;
 
-function formatDuration(ms) {
-  const totalSeconds = Math.floor(Number(ms || 0) / 1000);
-  if (!totalSeconds) return 'Live';
-
-  const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
-  if (hours > 0) {
-    return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-  }
-  return `${minutes}:${String(seconds).padStart(2, '0')}`;
-}
-
-function getCustomIdValue(value) {
-  return value?.customId || value?.custom_id || null;
-}
-
-function getTextValue(value) {
-  return value?.content || value?.text || '';
-}
-
-function collectTextFromNode(node) {
-  if (!node || typeof node !== 'object') return '';
-  const chunks = [];
-  const text = getTextValue(node);
-  if (text) chunks.push(String(text));
-
-  const children = Array.isArray(node.components) ? node.components : [];
-  for (const child of children) {
-    const plain = (child && typeof child.toJSON === 'function') ? child.toJSON() : child;
-    const childText = collectTextFromNode(plain);
-    if (childText) chunks.push(childText);
-  }
-  return chunks.join('\n');
-}
-
-function extractFirstUrl(text) {
-  const match = String(text || '').match(/https?:\/\/\S+/i);
-  return match ? match[0] : null;
-}
-
-function findUriByButtonCustomId(components, targetCustomId) {
-  const stack = Array.isArray(components) ? [...components] : [];
-
-  while (stack.length > 0) {
-    const current = stack.pop();
-    const node = (current && typeof current.toJSON === 'function') ? current.toJSON() : current;
-    if (!node || typeof node !== 'object') continue;
-
-    const accessory = node.accessory || node.accessoryComponent || node.accessory_component;
-    if (accessory) {
-      const accessoryCustomId = getCustomIdValue(accessory);
-      if (accessoryCustomId === targetCustomId) {
-        const text = collectTextFromNode(node);
-        const url = extractFirstUrl(text);
-        if (url) return url;
-      }
-      stack.push(accessory);
-    }
-
-    const children = Array.isArray(node.components) ? node.components : [];
-    for (const child of children) {
-      stack.push(child);
-    }
-  }
-
-  return null;
-}
-
 function buildSearchComponents(query, tracks, ownerUserId) {
-  const container = new ContainerBuilder();
-
-  tracks.forEach((track, index) => {
-    const info = track.info || {};
-    const titleContent = `### ${index + 1}. ${info.title || 'Unknown title'}\n**Artist** - ${info.author || 'Unknown artist'}\n**Duration** - ${formatDuration(info.length)}`;
-    const thumbnailSection = new SectionBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(titleContent));
-
-    if (info.artworkUrl) {
-      thumbnailSection.setThumbnailAccessory(new ThumbnailBuilder().setURL(info.artworkUrl));
-    }
-
-    const infoContent = `**URL** ${info.uri || 'no url'}`;
-    const infoSection = new SectionBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(infoContent))
-      .setButtonAccessory(
-        new ButtonBuilder()
-          .setCustomId(`search_play:${ownerUserId}:${index}`)
-          .setLabel('Play')
-          .setStyle(ButtonStyle.Primary)
-          .setDisabled(!track.info?.uri),
-      );
-
-    container.addSectionComponents(thumbnailSection, infoSection);
-
-    if (index < tracks.length - 1) {
-      container.addSeparatorComponents(new SeparatorBuilder());
-    }
+  const container = buildTrackListContainer({
+    tracks,
+    startIndex: 0,
+    userId: ownerUserId,
+    customIdPrefix: 'search_play',
   });
 
   return [container];

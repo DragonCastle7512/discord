@@ -4,14 +4,9 @@ const {
   ButtonBuilder,
   ButtonStyle,
   StringSelectMenuBuilder,
-  ContainerBuilder,
-  SectionBuilder,
-  TextDisplayBuilder,
-  ThumbnailBuilder,
-  SeparatorBuilder,
   MessageFlags,
 } = require('discord.js');
-const { formatDuration } = require('../../music/recommand-service');
+const { buildTrackListContainer, formatTitle } = require('../../music/embeds/track-list-components');
 import { safeReply } from '../../common/reply-util';
 
 const PAGE_SIZE = 4;
@@ -23,12 +18,6 @@ function isUnknownMessageError(error) {
 
 function clamp(n, min, max) {
   return Math.max(min, Math.min(max, n));
-}
-
-function formatTitle(title, max = 80) {
-  if (!title) return 'Unknown title';
-  if (title.length <= max) return title;
-  return `${title.slice(0, max - 3)}...`;
 }
 
 function buildPlaylistComponents(tracks, userId, startIndex, selectedIndex) {
@@ -54,47 +43,19 @@ function buildPlaylistComponents(tracks, userId, startIndex, selectedIndex) {
 
   const containers = [];
 
-  const createTrackSections = (chunk) => {
-    const sections = [];
-    chunk.forEach(({ track, displayIdx }) => {
-      const info = track.info || {};
-      const titleContent = `### ${displayIdx + 1}. ${formatTitle(info.title)}\n**Artist** - ${info.author || 'Unknown artist'} \n**Duration** - ${formatDuration(info.length)}`;
-
-      const thumbnailSection = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(titleContent));
-
-      if (info.artworkUrl) {
-        thumbnailSection.setThumbnailAccessory(new ThumbnailBuilder().setURL(info.artworkUrl));
-      }
-
-      const infoContent = `**URL** ${info.uri || 'no url'}`;
-      const infoSection = new SectionBuilder()
-        .addTextDisplayComponents(new TextDisplayBuilder().setContent(infoContent))
-        .setButtonAccessory(
-          new ButtonBuilder()
-            .setCustomId(`playlist_play_item:${userId}:${displayIdx}`)
-            .setLabel('Play')
-            .setStyle(ButtonStyle.Primary),
-        );
-
-      sections.push({ thumbnailSection, infoSection });
-    });
-    return sections;
-  };
-
   const addContainerForChunk = (chunk, isSelected) => {
     if (chunk.length === 0) return;
-    const container = new ContainerBuilder();
-    if (isSelected) {
-      container.setAccentColor(0xcd2929);
-    }
-    const trackSections = createTrackSections(chunk);
-    trackSections.forEach((pair, i) => {
-      container.addSectionComponents(pair.thumbnailSection, pair.infoSection);
-      if (i < trackSections.length - 1) {
-        container.addSeparatorComponents(new SeparatorBuilder());
-      }
+    const chunkTracks = chunk.map(c => c.track);
+    const chunkStartIdx = chunk[0].displayIdx;
+
+    const container = buildTrackListContainer({
+      tracks: chunkTracks,
+      startIndex: chunkStartIdx,
+      userId,
+      customIdPrefix: 'playlist_play_item',
+      selectedIndex: isSelected ? selectedIndex : -1,
     });
+
     containers.push(container);
   };
 

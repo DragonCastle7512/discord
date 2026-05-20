@@ -1,21 +1,16 @@
 const {
   SlashCommandBuilder,
-  ContainerBuilder,
-  SectionBuilder,
-  TextDisplayBuilder,
-  ThumbnailBuilder,
-  SeparatorBuilder,
-  ButtonBuilder,
   ButtonStyle,
   MessageFlags,
   ActionRowBuilder,
+  ButtonBuilder,
 } = require('discord.js');
 const { handlers: musicSkillHandlers } = require('../../ai/skills/music-skill');
 const {
   clampRecommendationCount,
-  formatDuration,
   recommendFromHistory,
 } = require('../../music/recommand-service');
+const { buildTrackListContainer, findUriByButtonCustomId } = require('../../music/embeds/track-list-components');
 import { safeReply } from '../../common/reply-util';
 
 // 사용자별 추천 결과를 저장할 인메모리 캐시
@@ -34,93 +29,15 @@ async function fetchPopularByKeyword({ keyword, limit, region }) {
   return output.items;
 }
 
-function getCustomIdValue(value) {
-  return value?.customId || value?.custom_id || null;
-}
-
-function getTextValue(value) {
-  return value?.content || value?.text || '';
-}
-
-function collectTextFromNode(node) {
-  if (!node || typeof node !== 'object') return '';
-  const chunks = [];
-  const text = getTextValue(node);
-  if (text) chunks.push(String(text));
-
-  const children = Array.isArray(node.components) ? node.components : [];
-  for (const child of children) {
-    const plain = (child && typeof child.toJSON === 'function') ? child.toJSON() : child;
-    const childText = collectTextFromNode(plain);
-    if (childText) chunks.push(childText);
-  }
-  return chunks.join('\n');
-}
-
-function extractFirstUrl(text) {
-  const match = String(text || '').match(/https?:\/\/\S+/i);
-  return match ? match[0] : null;
-}
-
-function findUriByButtonCustomId(components, targetCustomId) {
-  const stack = Array.isArray(components) ? [...components] : [];
-
-  while (stack.length > 0) {
-    const current = stack.pop();
-    const node = (current && typeof current.toJSON === 'function') ? current.toJSON() : current;
-    if (!node || typeof node !== 'object') continue;
-
-    const accessory = node.accessory || node.accessoryComponent || node.accessory_component;
-    if (accessory) {
-      const accessoryCustomId = getCustomIdValue(accessory);
-      if (accessoryCustomId === targetCustomId) {
-        const text = collectTextFromNode(node);
-        const url = extractFirstUrl(text);
-        if (url) return url;
-      }
-      stack.push(accessory);
-    }
-
-    const children = Array.isArray(node.components) ? node.components : [];
-    for (const child of children) {
-      stack.push(child);
-    }
-  }
-
-  return null;
-}
-
 function buildRecommendationComponents(tracks, ownerUserId, startIndex = 0) {
   const chunkSize = 5;
   const currentChunk = tracks.slice(startIndex, startIndex + chunkSize);
-  const container = new ContainerBuilder();
 
-  currentChunk.forEach((track, chunkIdx) => {
-    const displayIdx = startIndex + chunkIdx;
-
-    const titleContent = `### ${displayIdx + 1}. ${track.title || 'Unknown title'}\n**Artist** - ${track.author || 'Unknown artist'}\n**Duration** - ${formatDuration(track.length)}`;
-    const thumbnailSection = new SectionBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(titleContent));
-
-    if (track.artworkUrl) {
-      thumbnailSection.setThumbnailAccessory(new ThumbnailBuilder().setURL(track.artworkUrl));
-    }
-
-    const infoContent = `**URL** ${track.uri || 'no url'}`;
-    const infoSection = new SectionBuilder()
-      .addTextDisplayComponents(new TextDisplayBuilder().setContent(infoContent))
-      .setButtonAccessory(
-        new ButtonBuilder()
-          .setCustomId(`recommand_play:${ownerUserId}:${displayIdx}`)
-          .setLabel('Play')
-          .setStyle(ButtonStyle.Primary),
-      );
-
-    container.addSectionComponents(thumbnailSection, infoSection);
-
-    if (chunkIdx < currentChunk.length - 1) {
-      container.addSeparatorComponents(new SeparatorBuilder());
-    }
+  const container = buildTrackListContainer({
+    tracks: currentChunk,
+    startIndex,
+    userId: ownerUserId,
+    customIdPrefix: 'recommand_play',
   });
 
   const row = new ActionRowBuilder()
