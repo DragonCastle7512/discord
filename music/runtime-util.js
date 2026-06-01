@@ -1,5 +1,6 @@
 const { buildNowPlayingEmbed } = require('./embeds/buildEmbed');
 const { insertHistory } = require('./repositorys/music-history.repository');
+const { generateSongBatchForMood } = require('./mood-service');
 
 function isUrl(input) {
     return /^https?:\/\//i.test(input);
@@ -133,6 +134,9 @@ function createRuntimeUtils({
                 voiceChannelId: null,
                 playing: false,
                 loop: false,
+                auto: false,
+                autoMood: null,
+                autoPool: [],
             });
         }
 
@@ -349,11 +353,97 @@ function createRuntimeUtils({
         state.history = [];
         state.current = null;
         state.playing = false;
+        state.auto = false;
+        state.autoMood = null;
+        state.autoPool = [];
         await shoukaku.leaveVoiceChannel(guildId);
         state.player = null;
         state.voiceChannelId = null;
         notifyMusicUpdate(guildId, 'music');
       }
+    }
+
+    async function triggerAutoPlay(guildId) {
+        const state = guildStates.get(guildId);
+        if (!state || !state.player || state.playing) return;
+
+        let recommendedUri = null;
+        let recommendedTitle = '';
+
+        const mood = state.autoMood || '잔잔한';
+
+        if (!state.autoPool || state.autoPool.length === 0) {
+            const excludedTitles = [];
+            if (state.current) {
+                excludedTitles.push(`${state.current.info.author} - ${state.current.info.title}`);
+            }
+            state.history.slice(-15).forEach((track) => {
+                if (track.info) {
+                    excludedTitles.push(`${track.info.author} - ${track.info.title}`);
+                }
+            });
+
+            try {
+                const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
+                state.autoPool = Array.isArray(batch) ? batch : [];
+                console.log(`[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`);
+            }
+            catch (err) {
+                console.error('generateSongBatchForMood failed in autoplay:', err);
+                throw new Error(`generateSongBatchForMood failed: ${err.message}`);
+            }
+        }
+
+        if (state.autoPool && state.autoPool.length > 0) {
+            const generatedQuery = state.autoPool.shift();
+            if (generatedQuery) {
+                console.log(`[AutoPlay Mood] Selected from pool: ${generatedQuery} (${state.autoPool.length} left)`);
+                recommendedTitle = generatedQuery;
+
+                try {
+                    const resolved = await resolveTracks(generatedQuery);
+                    if (resolved && resolved.tracks.length > 0) {
+                        recommendedUri = resolved.tracks[0].info.uri;
+                        recommendedTitle = resolved.tracks[0].info.title;
+                    }
+                }
+                catch (err) {
+                    console.error(`Resolve failed for autoplay mood query "${generatedQuery}":`, err);
+                }
+            }
+        }
+
+        if (!recommendedUri) {
+            const textChannel = getTextChannel(state.textChannelId);
+            if (textChannel) {
+                textChannel.send(`[오토모드] '${mood}' 분위기의 자동 재생 곡을 준비하는 데 실패했어요.`).catch(console.error);
+            }
+            throw new Error(`Failed to resolve auto-play song for mood "${mood}"`);
+        }
+
+        try {
+            const resolved = await resolveTracks(recommendedUri);
+            if (resolved && resolved.tracks.length > 0) {
+                const track = {
+                    ...resolved.tracks[0],
+                    requestedBy: client.user.id,
+                };
+
+                state.queue.push(track);
+                await playNext(guildId);
+            }
+            else {
+                throw new Error('Resolve returned empty tracks');
+            }
+        }
+        catch (err) {
+            console.error('Autoplay resolve/play failed:', err);
+            const textChannel = getTextChannel(state.textChannelId);
+            if (textChannel) {
+                textChannel.send(`자동 재생 곡 (**${recommendedTitle}**)을 준비하는 데 실패했어요.`).catch(console.error);
+            }
+            throw err;
+        }
     }
 
     async function playNext(guildId) {
@@ -363,6 +453,9 @@ function createRuntimeUtils({
         const next = state.queue.shift();
         if (!next) {
             state.current = null;
+            if (state.auto) {
+                triggerAutoPlay(guildId).catch((err) => console.error('autoplay failed:', err));
+            }
             return;
         }
 

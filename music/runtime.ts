@@ -331,6 +331,51 @@ export function createMusicRuntime({
     return { enabled: Boolean(state.loop) };
   }
 
+  async function auto(context: any, enable: boolean | null, mood: string | null = null): Promise<{ enabled: boolean; mood?: string | null; message?: string }> {
+    const guildId = typeof context === 'string' ? context : context.guildId || context.guild?.id;
+    const state = guildStates.get(guildId);
+    if (!state) return { enabled: false };
+    
+    if (enable !== null) {
+      state.auto = Boolean(enable);
+    } else {
+      state.auto = !state.auto;
+    }
+    
+    if (state.auto && mood !== null) {
+      if (state.autoMood !== mood) {
+        state.autoMood = mood;
+        state.autoPool = [];
+      }
+    } else if (!state.auto) {
+      state.autoMood = null;
+      state.autoPool = [];
+    }
+
+    let extraMessage = '';
+
+    if (state.auto && !state.current && state.queue.length === 0 && !state.playing) {
+      const member = context?.member || (context?.user ? await context.guild?.members.fetch(context.user.id).catch(() => null) : null);
+      const voiceChannel = member?.voice?.channel;
+      
+      if (voiceChannel) {
+        try {
+          const readyNode = await waitForReadyNode();
+          if (readyNode) {
+            await joinOrMovePlayer(context.guild, context.channelId || state.textChannelId, voiceChannel);
+            playNext(guildId).catch((err: Error) => console.error('Autoplay trigger on enable failed:', err));
+          }
+        } catch (err) {
+          console.error('Auto join failed:', err);
+        }
+      } else if (state.player) {
+        playNext(guildId).catch((err: Error) => console.error('Autoplay trigger on enable failed:', err));
+      }
+    }
+    
+    return { enabled: Boolean(state.auto), mood: state.autoMood };
+  }
+
   async function movePlaylistItem(userId: string, fromIndex: number | string, toIndex: number | string): Promise<RuntimeResponse> {
     const entries = await findPlaylist(userId);
     if (!entries.length) {
@@ -430,6 +475,7 @@ export function createMusicRuntime({
     stop,
     queue,
     loop,
+    auto,
     history,
     searchTracks,
     getPlaylist,

@@ -26,7 +26,7 @@ export interface Track {
   encoded: string;
   info: TrackInfo;
   requestedBy?: string | null;
-  createAt?: Date
+  createAt?: Date;
 }
 
 /**
@@ -41,6 +41,9 @@ export interface GuildState {
   voiceChannelId: string | null;
   playing: boolean;
   loop: boolean;
+  auto?: boolean;
+  autoMood?: string | null;
+  autoPool?: string[];
 }
 
 /**
@@ -84,6 +87,7 @@ export interface MusicRuntime {
   stop: (guildId: string) => Promise<RuntimeResponse>;
   queue: (guildId: string) => { message: string; count: number };
   loop: (guildId: string, enable: boolean | null) => Promise<{ enabled: boolean }>;
+  auto: (context: any, enable: boolean | null, mood?: string | null) => Promise<{ enabled: boolean; mood?: string | null; message?: string }>;
   history: (guildId: string, requestedBy?: string) => Promise<{ total: number; items: HistoryEntry[] }>;
   searchTracks: (query: string) => Promise<{ tracks: Track[]; playlistName: string | null }>;
   getPlaylist: (userId: string) => Promise<Track[]>;
