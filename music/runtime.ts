@@ -143,8 +143,8 @@ export function createMusicRuntime({
   }
 
   async function skip(guildId: string): Promise<RuntimeResponse> {
-    const state = guildStates.get(guildId);
-    if (!state || !state.player || !state.playing) {
+    const state = getOrCreateState(guildId);
+    if (!state.player || !state.playing) {
       return { ok: false, message: '아무것도 재생 중이지 않아요!' };
     }
 
@@ -153,8 +153,8 @@ export function createMusicRuntime({
   }
 
   async function stop(guildId: string): Promise<RuntimeResponse> {
-    const state = guildStates.get(guildId);
-    if (!state || !state.player) {
+    const state = getOrCreateState(guildId);
+    if (!state.player) {
       return { ok: false, message: '재생 중인 노래가 없어요!' };
     }
 
@@ -164,8 +164,8 @@ export function createMusicRuntime({
   }
 
   function queue(guildId: string) {
-    const state = guildStates.get(guildId);
-    if (!state || (!state.current && state.queue.length === 0)) {
+    const state = getOrCreateState(guildId);
+    if (!state.current && state.queue.length === 0) {
       return { message: 'Queue가 비어있어요!', count: 0 };
     }
 
@@ -242,16 +242,16 @@ export function createMusicRuntime({
   }
 
   function getQueueSnapshot(guildId: string) {
-    const state = guildStates.get(guildId);
+    const state = getOrCreateState(guildId);
     return {
-      current: state?.current || null,
-      queue: state?.queue.slice() || [],
+      current: state.current || null,
+      queue: state.queue.slice() || [],
     };
   }
 
   function moveQueueItem(guildId: string, fromIndex: number | string, toIndex: number | string): RuntimeResponse {
-    const state = guildStates.get(guildId);
-    if (!state) return { ok: false, message: '재생 중인 서버가 아니에요.' };
+    const state = getOrCreateState(guildId);
+    if (!state.player) return { ok: false, message: '재생 중인 서버가 아니에요.' };
     
     const length = state.queue.length;
     const from = Number(fromIndex);
@@ -273,8 +273,8 @@ export function createMusicRuntime({
   }
 
   function removeQueueItem(guildId: string, index: number | string): RuntimeResponse {
-    const state = guildStates.get(guildId);
-    if (!state) return { ok: false, message: '재생 중인 서버가 아니에요.' };
+    const state = getOrCreateState(guildId);
+    if (!state.player) return { ok: false, message: '재생 중인 서버가 아니에요.' };
     
     const length = state.queue.length;
     const target = Number(index);
@@ -290,8 +290,8 @@ export function createMusicRuntime({
   }
 
   function shuffleQueue(guildId: string): RuntimeResponse {
-    const state = guildStates.get(guildId);
-    if (!state || state.queue.length === 0) {
+    const state = getOrCreateState(guildId);
+    if (state.queue.length === 0) {
       return { ok: false, message: '대기열이 비어 있어요.' };
     }
     if (state.queue.length < 2) {
@@ -324,17 +324,36 @@ export function createMusicRuntime({
     return resolveTracks(trimmedQuery);
   }
 
+  function getOrCreateState(guildId: string): GuildState {
+    let state = guildStates.get(guildId);
+    if (!state) {
+      state = {
+        player: null,
+        queue: [],
+        history: [],
+        current: null,
+        textChannelId: null,
+        voiceChannelId: null,
+        playing: false,
+        loop: false,
+        auto: false,
+        autoMood: null,
+        autoPool: [],
+      };
+      guildStates.set(guildId, state);
+    }
+    return state;
+  }
+
   async function loop(guildId: string, enable: boolean | null): Promise<{ enabled: boolean }> {
-    const state = guildStates.get(guildId);
-    if (!state) return { enabled: false };
+    const state = getOrCreateState(guildId);
     state.loop = (enable !== null) ? Boolean(enable) : !state.loop;
     return { enabled: Boolean(state.loop) };
   }
 
   async function auto(context: any, enable: boolean | null, mood: string | null = null): Promise<{ enabled: boolean; mood?: string | null; message?: string }> {
     const guildId = typeof context === 'string' ? context : context.guildId || context.guild?.id;
-    const state = guildStates.get(guildId);
-    if (!state) return { enabled: false };
+    const state = getOrCreateState(guildId);
     
     if (enable !== null) {
       state.auto = Boolean(enable);
@@ -351,9 +370,7 @@ export function createMusicRuntime({
       state.autoMood = null;
       state.autoPool = [];
     }
-
-    let extraMessage = '';
-
+    
     if (state.auto && !state.current && state.queue.length === 0 && !state.playing) {
       const member = context?.member || (context?.user ? await context.guild?.members.fetch(context.user.id).catch(() => null) : null);
       const voiceChannel = member?.voice?.channel;
@@ -423,8 +440,8 @@ export function createMusicRuntime({
   }
 
   async function pause(guildId: string): Promise<RuntimeResponse> {
-    const state = guildStates.get(guildId);
-    if (!state || !state.player) {
+    const state = getOrCreateState(guildId);
+    if (!state.player) {
       return { ok: false, message: '재생 중인 노래가 없어요!' };
     }
 
@@ -438,8 +455,8 @@ export function createMusicRuntime({
   }
 
   async function previous(guildId: string): Promise<RuntimeResponse> {
-    const state = guildStates.get(guildId);
-    if (!state || !state.player) {
+    const state = getOrCreateState(guildId);
+    if (!state.player) {
       return { ok: false, message: '재생 중인 노래가 없어요!' };
     }
 
