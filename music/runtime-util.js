@@ -209,6 +209,9 @@ function createRuntimeUtils({
 
             if (endedTrack && event?.reason !== 'replaced') {
                 state.history.push(endedTrack);
+                if (state.history.length > 50) {
+                    state.history.shift();
+                }
             }
             if (state.loop && endedTrack && (!event?.reason || event.reason === 'finished' || event.reason === 'stopped')) {
                 state.queue.push({
@@ -377,7 +380,7 @@ function createRuntimeUtils({
             if (state.current) {
                 excludedTitles.push(`${state.current.info.author} - ${state.current.info.title}`);
             }
-            state.history.slice(-15).forEach((track) => {
+            state.history.slice(-30).forEach((track) => {
                 if (track.info) {
                     excludedTitles.push(`${track.info.author} - ${track.info.title}`);
                 }
