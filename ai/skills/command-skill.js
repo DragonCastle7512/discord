@@ -1,3 +1,5 @@
+import { MOOD_CHOICES } from './tool-names';
+
 function compactOptions(options) {
   const next = {};
   for (const [key, value] of Object.entries(options || {})) {
@@ -235,6 +237,24 @@ module.exports = {
         required: [],
       },
     },
+    {
+      name: 'slash_auto',
+      description: '자동 재생 모드를 활성화/비활성화 합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          mood: {
+            type: 'STRING',
+            description: `분위기(${MOOD_CHOICES.map(c => c.value).join(',')} 중 택1). 활성화 시 필수 입력`,
+          },
+          enable: {
+            type: 'BOOLEAN',
+            description: '활성화(true) 또는 비활성화(false) 여부',
+          },
+        },
+        required: ['enable'],
+      },
+    },
   ],
   handlers: {
     slash_play: async (args, obj) => executeSlash(obj, 'play', { query: args?.query }),
@@ -265,5 +285,6 @@ module.exports = {
     },
     slash_dashboard: async (args, obj) => executeSlash(obj, 'dashboard'),
     slash_pause: async (args, obj) => executeSlash(obj, 'pause'),
+    slash_auto: async (args, obj) => executeSlash(obj, 'auto', { mood: args?.mood, enable: args?.enable }),
   },
 };

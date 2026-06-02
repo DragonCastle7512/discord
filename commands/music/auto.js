@@ -1,3 +1,4 @@
+import { MOOD_CHOICES } from '../../ai/skills/tool-names';
 import { safeReply } from '../../common/reply-util';
 
 const { SlashCommandBuilder } = require('discord.js');
@@ -10,17 +11,7 @@ module.exports = {
       option.setName('mood')
         .setDescription('자동 재생할 음악의 분위기/무드를 선택하세요.')
         .setRequired(false)
-        .addChoices(
-          { name: '잔잔한(발라드)', value: '잔잔한' },
-          { name: '신나는(pop)', value: '신나는' },
-          { name: '랩/힙합(Hiphop)', value: '랩/힙합' },
-          { name: '재즈(Jazz)', value: '재즈' },
-          { name: '록/메탈(Metal)', value: '록/메탈' },
-          { name: 'Jpop', value: 'Jpop' },
-          { name: '비오는 날 어울리는', value: '비오는 날' },
-          { name: '카페 분위기 BGM', value: '카페' },
-          { name: '우울한', value: '우울한' },
-        ),
+        .addChoices(...MOOD_CHOICES),
     )
     .addBooleanOption(option =>
       option.setName('enable')
@@ -59,7 +50,7 @@ module.exports = {
       };
 
       const selectedLabel = moodLabelMap[activeMood] || activeMood;
-      await safeReply(interaction, `자동 재생 모드를 \`활성화\`했어요! 대기열이 비어있으면 **[${selectedLabel}]**`);
+      await safeReply(interaction, `자동 재생 모드를 \`활성화\`했어요! **[${selectedLabel}]**`);
     }
     else {
       await safeReply(interaction, '자동 재생 모드를 `비활성화`했어요!');
