@@ -47,6 +47,7 @@ module.exports = {
         '비오는 날': '비오는 날 어울리는 노래',
         '카페': ' 카페 분위기 BGM',
         '우울한': '우울할 때 듣는 위로송',
+        '추천 곡': '추천 곡 (최근 들은 곡 기반)',
       };
 
       const selectedLabel = moodLabelMap[activeMood] || activeMood;

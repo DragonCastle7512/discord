@@ -54,4 +54,55 @@ async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
   }
 }
 
-module.exports = { generateSongBatchForMood };
+async function selectAndCleanSongsFromSearch(videoTitles, tagsString, count = 20) {
+  const model = models[0];
+
+  const prompt = `
+유저의 음악 취향 키워드/태그: [${tagsString}]
+
+아래는 유튜브에서 위 태그와 관련해 실시간으로 검색된 실제 존재하는 영상들의 제목 리스트입니다:
+${videoTitles.map((title, idx) => `${idx + 1}. ${title}`).join('\n')}
+
+위 리스트 중에서 유저의 취향에 부합하는 곡을 최대 ${count}곡 선정해 주세요.
+반드시 아래 조건을 준수해야 합니다:
+1. 리스트에 실제로 기재된 영상만 골라야 하며, 절대 실존하지 않는 곡을 지어내거나(Hallucination) 리스트에 없는 곡을 마음대로 추가하지 마세요.
+2. 1시간 연속 재생, 모음집, 컴필레이션, 앨범 전곡(Full Album) 같은 여러 곡이 포함된 영상은 제외하고 단일 곡 영상만 선택해주세요.
+3. 선택한 영상의 제목을 분석하여, 불필요한 태그/괄호/화질 설명(예: [MV], Official Video, Lyrics, HD, 1080p 등)을 모두 제거하고 오직 '아티스트 - 곡 제목'의 아주 깔끔한 형태로만 한 줄에 하나씩 작성해주세요.
+   예: [MV] IU(아이유) _ 밤편지(Through the Night) -> 아이유 - 밤편지
+   예: (Lyrics) 볼빨간사춘기 - 우주를 줄게 -> 볼빨간사춘기 - 우주를 줄게
+   예: 임영웅 - 사랑은 늘 도망가 [신사와 아가씨 OST] -> 임영웅 - 사랑은 늘 도망가
+
+답변은 부연 설명, 번호 표시나 기호 없이 오직 '아티스트 - 곡 제목' 형식으로만 한 줄에 한 곡씩만 작성해주세요.`;
+
+  try {
+    const response = await ai.models.generateContent({
+      model,
+      contents: prompt,
+      config: {
+        temperature: 0.3,
+        thinkingConfig: { includeThoughts: false },
+      },
+    });
+
+    const text = response.text ? response.text.trim() : '';
+    if (!text) return [];
+
+    const lines = text.split('\n')
+      .map(line => {
+        const cleaned = line.replace(/^\d+[\.\-\s]*/, '')
+          .replace(/^[\-\*\+\•\s]*/, '')
+          .replace(/['"“”]/g, '')
+          .trim();
+        return cleaned;
+      })
+      .filter(line => line.includes('-') && line.length > 3);
+
+    return lines;
+  }
+  catch (err) {
+    console.error('[Gemini Mood Service] Error in selectAndCleanSongsFromSearch:', err);
+    return [];
+  }
+}
+
+module.exports = { generateSongBatchForMood, selectAndCleanSongsFromSearch };

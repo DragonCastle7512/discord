@@ -1,6 +1,7 @@
 const { buildNowPlayingEmbed } = require('./embeds/buildEmbed');
-const { insertHistory } = require('./repositorys/music-history.repository');
-const { generateSongBatchForMood } = require('./mood-service');
+const { insertHistory, findAllHistory } = require('./repositorys/music-history.repository');
+const { generateSongBatchForMood, selectAndCleanSongsFromSearch } = require('./mood-service');
+const { buildHistoryTagKeywords, dedupeSimilarKeywords } = require('./recommand-service');
 
 function isUrl(input) {
     return /^https?:\/\//i.test(input);
@@ -386,18 +387,106 @@ function createRuntimeUtils({
                 }
             });
 
-            try {
-                const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
-                state.autoPool = Array.isArray(batch) ? batch : [];
-                console.log(`[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`);
+            if (mood === '추천 곡') {
+                try {
+                    const historyItems = await findAllHistory(guildId);
+                    const tagKeywordsRaw = buildHistoryTagKeywords(historyItems, 10);
+                    const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw);
+
+                    if (tagKeywords.length > 0) {
+                        const shuffledKeywords = [...tagKeywords].sort(() => Math.random() - 0.5);
+                        const selectedKeywords = shuffledKeywords.slice(0, Math.min(3, shuffledKeywords.length));
+
+                        const searchResults = [];
+                        for (const keyword of selectedKeywords) {
+                            try {
+                                const resolved = await resolveTracks(`ytmsearch:${keyword}`);
+                                const tracks = resolved?.tracks || [];
+                                if (Array.isArray(tracks)) {
+                                    searchResults.push(...tracks);
+                                }
+                            }
+                            catch (searchErr) {
+                                console.error(`[AutoPlay Mood] Lavalink search failed for keyword "${keyword}":`, searchErr);
+                            }
+                        }
+
+                        const videoTitles = searchResults
+                            .map(track => {
+                                if (track.info) {
+                                    return `${track.info.author} - ${track.info.title}`;
+                                }
+                                return null;
+                            })
+                            .filter(Boolean);
+
+                        if (videoTitles.length > 0) {
+                            const tagsString = tagKeywords.map(k => `#${k}`).join(', ');
+                            const shuffledTitles = videoTitles.sort(() => Math.random() - 0.5);
+
+                            const batch = await selectAndCleanSongsFromSearch(shuffledTitles, tagsString, 20);
+                            const cleanBatch = Array.isArray(batch) ? batch : [];
+
+                            state.autoPool = cleanBatch.sort(() => Math.random() - 0.5);
+                        }
+                        else {
+                            const textChannel = getTextChannel(state.textChannelId);
+                            if (textChannel) {
+                                textChannel.send('[오토모드] 최근 히스토리가 부족하여, 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch(console.error);
+                            }
+                            state.auto = false;
+                            state.autoPool = [];
+                            notifyMusicUpdate(guildId, 'music');
+                            return;
+                        }
+                    }
+                    else {
+                        const textChannel = getTextChannel(state.textChannelId);
+                        if (textChannel) {
+                            textChannel.send('[오토모드] 최근 히스토리가 부족해 추천 곡을 자동 재생할 수 없어요! 더 많은 곡을 먼저 재생해 주세요.').catch(console.error);
+                        }
+                        state.auto = false;
+                        state.autoPool = [];
+                        notifyMusicUpdate(guildId, 'music');
+                        return;
+                    }
+                }
+                catch (err) {
+                    console.error('AI tag recommendation failed in autoplay:', err);
+                    const textChannel = getTextChannel(state.textChannelId);
+                    if (textChannel) {
+                        textChannel.send('[오토모드] 추천 곡을 준비하는 중 오류가 발생하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch(console.error);
+                    }
+                    state.auto = false;
+                    state.autoPool = [];
+                    notifyMusicUpdate(guildId, 'music');
+                    return;
+                }
             }
-            catch (err) {
-                console.error('generateSongBatchForMood failed in autoplay:', err);
-                throw new Error(`generateSongBatchForMood failed: ${err.message}`);
+            else {
+                try {
+                    const recentSongs = [];
+                    if (state.current) {
+                        recentSongs.push(`${state.current.info.author} - ${state.current.info.title}`);
+                    }
+                    state.history.slice(-10).forEach((track) => {
+                        if (track.info) {
+                            recentSongs.push(`${track.info.author} - ${track.info.title}`);
+                        }
+                    });
+
+                    const batch = await generateSongBatchForMood(mood, excludedTitles, 20, recentSongs);
+                    state.autoPool = Array.isArray(batch) ? batch : [];
+                    console.log(`[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`);
+                }
+                catch (err) {
+                    console.error('generateSongBatchForMood failed in autoplay:', err);
+                    throw new Error(`generateSongBatchForMood failed: ${err.message}`);
+                }
             }
         }
 
-        if (state.autoPool && state.autoPool.length > 0) {
+        while (state.autoPool && state.autoPool.length > 0 && !recommendedUri) {
             const generatedQuery = state.autoPool.shift();
             if (generatedQuery) {
                 console.log(`[AutoPlay Mood] Selected from pool: ${generatedQuery} (${state.autoPool.length} left)`);
@@ -409,6 +498,9 @@ function createRuntimeUtils({
                         recommendedUri = resolved.tracks[0].info.uri;
                         recommendedTitle = resolved.tracks[0].info.title;
                     }
+                    else {
+                        console.warn(`[AutoPlay Mood] Resolving returned empty tracks for query: "${generatedQuery}"`);
+                    }
                 }
                 catch (err) {
                     console.error(`Resolve failed for autoplay mood query "${generatedQuery}":`, err);
@@ -419,7 +511,18 @@ function createRuntimeUtils({
         if (!recommendedUri) {
             const textChannel = getTextChannel(state.textChannelId);
             if (textChannel) {
-                textChannel.send(`[오토모드] '${mood}' 분위기의 자동 재생 곡을 준비하는 데 실패했어요.`).catch(console.error);
+                if (mood === '추천 곡') {
+                    textChannel.send('[오토모드] 추천 곡 리스트의 모든 곡을 로드하는 데 실패하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 보세요!').catch(console.error);
+                }
+                else {
+                    textChannel.send(`[오토모드] '${mood}' 분위기의 자동 재생 곡을 준비하는 데 실패했어요.`).catch(console.error);
+                }
+            }
+            if (mood === '추천 곡') {
+                state.auto = false;
+                state.autoPool = [];
+                notifyMusicUpdate(guildId, 'music');
+                return;
             }
             throw new Error(`Failed to resolve auto-play song for mood "${mood}"`);
         }

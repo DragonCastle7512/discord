@@ -54,6 +54,10 @@ function keywordSimilarity(a, b) {
 function isValidTagKeyword(value) {
   const normalized = normalizeText(value);
   if (!normalized) return false;
+
+  const noise = ['official', 'lyrics', 'lyric', '가사', 'music', 'mv', 'audio', 'video'];
+  if (noise.some((word) => normalized.includes(word))) return false;
+
   return normalized.replace(/\s+/g, '').length >= MIN_TAG_KEYWORD_LENGTH;
 }
 
@@ -270,6 +274,12 @@ async function collectFromPopularItems({
       if (!first) continue;
 
       const track = getTrackInfo(first);
+      const titleLower = String(track.title || '').toLowerCase();
+      const noiseWords = ['official', 'lyrics', 'lyric', '가사'];
+      if (noiseWords.some(word => titleLower.includes(word))) {
+          continue;
+      }
+
       const key = getTrackKey(track);
       if (!key || globalSeenKeys.has(key)) continue;
       if (excludedTrackKeys.has(key)) continue;
@@ -300,6 +310,7 @@ async function recommendFromHistory({
   region = 'KR',
   historyLimit = HISTORY_LIMIT,
   popularLimit = POPULAR_LIMIT,
+  randomizeKeywordsCount = null,
 }) {
   const normalizedCount = clampRecommendationCount(count);
   const recentHistoryItems = (Array.isArray(historyItems) ? historyItems : []).slice(0, historyLimit);
@@ -331,7 +342,15 @@ async function recommendFromHistory({
   const keywordStats = [];
   const usedKeywords = [];
 
-  const keywordsToTry = tagKeywords.length > 0 ? tagKeywords.slice(0, 5) : ['music'];
+  let keywordsToTry = tagKeywords.length > 0 ? tagKeywords : ['music'];
+  if (randomizeKeywordsCount && tagKeywords.length > 0) {
+    keywordsToTry = [...tagKeywords]
+      .sort(() => Math.random() - 0.5)
+      .slice(0, randomizeKeywordsCount);
+  }
+  else {
+    keywordsToTry = keywordsToTry.slice(0, 5);
+  }
   const firstHalfTarget = Math.ceil(normalizedCount / 2);
 
   for (const keyword of keywordsToTry) {
@@ -352,9 +371,9 @@ async function recommendFromHistory({
     usedKeywords.push(keyword);
 
     const isFirstKeyword = usedKeywords.length === 1;
-    const maxToCollect = isFirstKeyword
-      ? Math.min(firstHalfTarget, normalizedCount - currentTotal)
-      : (normalizedCount - currentTotal);
+    const maxToCollect = randomizeKeywordsCount
+      ? Math.ceil(normalizedCount / keywordsToTry.length)
+      : (isFirstKeyword ? Math.min(firstHalfTarget, normalizedCount - currentTotal) : (normalizedCount - currentTotal));
 
     const collected = await collectFromPopularItems({
       popularItems,
@@ -370,7 +389,7 @@ async function recommendFromHistory({
       keyword,
       rawCount: popularItems.length,
       collectedCount: collected.length,
-      limitApplied: isFirstKeyword ? firstHalfTarget : null,
+      limitApplied: isFirstKeyword && !randomizeKeywordsCount ? firstHalfTarget : null,
     });
 
     recommendations.push(...collected);
@@ -410,4 +429,6 @@ module.exports = {
   formatDuration,
   parseUserIdFromArg,
   recommendFromHistory,
+  buildHistoryTagKeywords,
+  dedupeSimilarKeywords,
 };
