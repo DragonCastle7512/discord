@@ -1,8 +1,15 @@
-const { DataTypes, Model, Sequelize } = require('sequelize');
+import { Model, DataTypes, InferAttributes, InferCreationAttributes, CreationOptional } from 'sequelize';
+import type { Sequelize } from 'sequelize';
+import { Track } from '../types';
 
-class MusicHistory extends Model {}
+export class MusicHistory extends Model<InferAttributes<MusicHistory>, InferCreationAttributes<MusicHistory>> {
+  declare id: CreationOptional<number>;
+  declare guildId: string;
+  declare musicInfo: Track;
+  declare createdAt: CreationOptional<Date>;
+}
 
-function initMusicHistoryModel(sequelize) {
+export function initMusicHistoryModel(sequelize: Sequelize): typeof MusicHistory {
   MusicHistory.init(
     {
       id: {
@@ -23,7 +30,7 @@ function initMusicHistoryModel(sequelize) {
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
-        defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+        defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
         field: 'created_at',
       },
     },
@@ -38,8 +45,3 @@ function initMusicHistoryModel(sequelize) {
 
   return MusicHistory;
 }
-
-module.exports = {
-  MusicHistory,
-  initMusicHistoryModel,
-};

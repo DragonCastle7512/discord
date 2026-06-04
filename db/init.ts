@@ -1,9 +1,8 @@
-const { initMusicHistoryModel } = require('../music/models/music-history');
-const { initPlayListModel } = require('../music/models/playlist');
-const { sequelize } = require('./sequelize');
+import { initMusicHistoryModel } from '../music/models/music-history';
+import { initPlayListModel } from '../music/models/playlist';
+import { sequelize } from './sequelize';
 
-
-async function initDb() {
+export async function initDb(): Promise<void> {
     try {
         console.log('db 연결 중...');
         initPlayListModel(sequelize);
@@ -16,4 +15,3 @@ async function initDb() {
         console.error(err);
     }
 }
-module.exports = { initDb };

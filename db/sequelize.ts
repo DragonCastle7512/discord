@@ -1,7 +1,8 @@
-const { Sequelize } = require('sequelize');
-const oracledb = require('oracledb');
+import { Sequelize } from 'sequelize';
+// @ts-ignore
+import oracledb from 'oracledb';
 
-const sequelize = new Sequelize({
+export const sequelize = new Sequelize({
   dialect: 'oracle',
   dialectModule: oracledb,
   username: process.env.DB_USER,
@@ -18,7 +19,3 @@ const sequelize = new Sequelize({
     idle: 10000,
   },
 });
-
-module.exports = {
-  sequelize,
-};

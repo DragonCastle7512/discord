@@ -20,7 +20,7 @@ import { createRuntimeUtils } from './music/runtime-util';
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
 const { createTtsRuntime } = require('./tts/runtime');
-const { initDb } = require('./db/init');
+import { initDb } from './db/init';
 const { createTtsHttpStore } = require('./tts/http-store');
 const { loadCommandModules, deployCommands } = require('./commands/loader');
 const { createSlashCommandInvoker } = require('./commands/slash-command-invoker');
