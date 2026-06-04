@@ -2,7 +2,7 @@ const {
   clampRecommendationCount,
   parseUserIdFromArg,
   recommendFromHistory,
-} = require('../../music/recommand-service');
+} = require('../../music/services/recommand-service');
 
 const buildListResponse = (items, region, label, keyword, meta = {}) => {
   const displayLimit = Number.isInteger(meta.displayLimit)

@@ -27,6 +27,7 @@ export interface Track {
   info: TrackInfo;
   requestedBy?: string | null;
   createAt?: Date;
+  tags?: string[];
 }
 
 /**

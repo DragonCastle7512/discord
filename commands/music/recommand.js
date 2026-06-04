@@ -9,7 +9,7 @@ const { handlers: musicSkillHandlers } = require('../../ai/skills/music-skill');
 const {
   clampRecommendationCount,
   recommendFromHistory,
-} = require('../../music/recommand-service');
+} = require('../../music/services/recommand-service');
 const { buildTrackListContainer, findUriByButtonCustomId } = require('../../music/embeds/track-list-components');
 import { safeReply } from '../../common/reply-util';
 

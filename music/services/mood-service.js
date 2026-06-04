@@ -3,6 +3,9 @@ const { GoogleGenAI } = require('@google/genai');
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const models = ['gemini-3.1-flash-lite', 'gemma-4-26b-a4b-it', 'gemma-4-31b-it'];
 
+/**
+ * 일반 분위기별 자동 재생(AI 기반 분위기 노래 선정)
+ */
 async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
   const model = models[0];
   const excludedList = excludedTitles.slice(-30).join(', ');
@@ -54,6 +57,9 @@ async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
   }
 }
 
+/**
+ * 추천 노래 자동 재생(히스토리 태그 분석 -> 검색 후 재생 가능한 목록 조회)
+ */
 async function selectAndCleanSongsFromSearch(videoTitles, tagsString, count = 20) {
   const model = models[0];
 

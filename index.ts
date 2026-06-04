@@ -15,11 +15,11 @@ import { createSystemRouter } from './routes/system';
 import { createTtsRouter } from './routes/tts';
 import { createServer } from 'node:http';
 import { initSocket } from './common/socket';
+import { createRuntimeUtils } from './music/runtime-util';
 
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
 const { createTtsRuntime } = require('./tts/runtime');
-const { createRuntimeUtils } = require('./music/runtime-util');
 const { initDb } = require('./db/init');
 const { createTtsHttpStore } = require('./tts/http-store');
 const { loadCommandModules, deployCommands } = require('./commands/loader');
