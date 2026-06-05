@@ -158,7 +158,12 @@ function buildHistoryTagKeywords(historyItems, limit = TAG_KEYWORD_LIMIT) {
   const artistWeight = new Map();
   const tagWeight = new Map();
 
-  historyItems.forEach((entry) => {
+  const validHistoryItems = (historyItems || []).filter((entry) => {
+    const base = entry?.musicInfo || entry || {};
+    return !base.isSkipped;
+  });
+
+  validHistoryItems.forEach((entry) => {
     const track = getTrackInfo(entry);
 
     const author = normalizeText(track.author);
@@ -212,7 +217,13 @@ function buildHistoryTagKeywords(historyItems, limit = TAG_KEYWORD_LIMIT) {
 
 function buildHistoryTagFrequencies(historyItems) {
   const weight = new Map();
-  historyItems.forEach((entry) => {
+
+  const validHistoryItems = (historyItems || []).filter((entry) => {
+    const base = entry?.musicInfo || entry || {};
+    return !base.isSkipped;
+  });
+
+  validHistoryItems.forEach((entry) => {
     const track = getTrackInfo(entry);
     const unique = new Set(
       (track.tags || [])

@@ -24,3 +24,15 @@ export async function findHistoryByRequester(guildId: string, requestedBy?: stri
     return String(requesterId || '') === String(requestedBy);
   });
 }
+
+export async function updateHistorySkipped(id: number, skipped: boolean = true): Promise<any> {
+  const item = await MusicHistory.findByPk(id);
+  if (item) {
+    const info = item.musicInfo as any;
+    if (info) {
+      info.isSkipped = skipped;
+      item.changed('musicInfo', true);
+      await item.save();
+    }
+  }
+}

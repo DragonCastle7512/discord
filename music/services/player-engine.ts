@@ -3,7 +3,7 @@ import { Shoukaku, Player, Node } from 'shoukaku';
 import { GuildState, Track, RuntimeUtils } from '../types';
 import { isUrl, extractYoutubeVideoId, extractTagsFromTrackInfo, sleep } from '../utils/track-parser';
 import { buildNowPlayingEmbed } from '../embeds/buildEmbed';
-import { insertHistory } from '../repositorys/music-history.repository';
+import { insertHistory, updateHistorySkipped } from '../repositorys/music-history.repository';
 import { notifyMusicUpdate } from '../../common/socket';
 import { createAutoplayService } from './autoplay.service';
 
@@ -123,14 +123,22 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
 
       player.on('end', async (event) => {
         const endedTrack = state.current;
+        const endedHistoryId = state.currentHistoryId;
         state.playing = false;
         state.current = null;
+        state.currentHistoryId = null;
 
         if (endedTrack && event?.reason !== 'replaced') {
           state.history.push(endedTrack);
           if (state.history.length > 50) {
             state.history.shift();
           }
+        }
+
+        if (endedHistoryId && event?.reason !== 'finished') {
+          updateHistorySkipped(endedHistoryId, true).catch((err) =>
+            console.error('Failed to mark track as skipped in history db:', err)
+          );
         }
         if (
           state.loop &&
@@ -297,12 +305,18 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
 
     state.current = next;
 
-    await insertHistory(guildId, {
+    const historyItem = await insertHistory(guildId, {
       encoded: next.encoded,
       info: next.info || ({} as any),
       requestedBy: next.requestedBy || null,
       tags: extractTagsFromTrackInfo(next.info || {}),
-    });
+    }).catch((err) => console.error('Failed to insert history:', err));
+
+    if (historyItem) {
+      state.currentHistoryId = historyItem.id;
+    } else {
+      state.currentHistoryId = null;
+    }
 
     state.playing = true;
     notifyMusicUpdate(guildId, 'music');

@@ -28,6 +28,7 @@ export interface Track {
   requestedBy?: string | null;
   createAt?: Date;
   tags?: string[];
+  isSkipped?: boolean;
 }
 
 /**
@@ -45,6 +46,7 @@ export interface GuildState {
   auto?: boolean;
   autoMood?: string | null;
   autoPool?: string[];
+  currentHistoryId?: number | null;
 }
 
 /**
