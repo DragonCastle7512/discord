@@ -60,8 +60,9 @@ async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
 /**
  * 추천 노래 자동 재생(히스토리 태그 분석 -> 검색 후 재생 가능한 목록 조회)
  */
-async function selectAndCleanSongsFromSearch(videoTitles, tagsString, count = 20) {
+async function selectAndCleanSongsFromSearch(videoTitles, tagsString, excludedTitles = [], count = 20) {
   const model = models[0];
+  const excludedList = Array.isArray(excludedTitles) ? excludedTitles.slice(-30).join(', ') : '';
 
   const prompt = `
 유저의 음악 취향 키워드/태그: [${tagsString}]
@@ -77,6 +78,7 @@ ${videoTitles.map((title, idx) => `${idx + 1}. ${title}`).join('\n')}
    예: [MV] IU(아이유) _ 밤편지(Through the Night) -> 아이유 - 밤편지
    예: (Lyrics) 볼빨간사춘기 - 우주를 줄게 -> 볼빨간사춘기 - 우주를 줄게
    예: 임영웅 - 사랑은 늘 도망가 [신사와 아가씨 OST] -> 임영웅 - 사랑은 늘 도망가
+4. 중복 배제: 다음 곡들은 이미 최근에 감상한 곡들이므로, 검색 결과 리스트에 포함되어 있더라도 절대 선택하지 마세요: [${excludedList}]
 
 답변은 부연 설명, 번호 표시나 기호 없이 오직 '아티스트 - 곡 제목' 형식으로만 한 줄에 한 곡씩만 작성해주세요.`;
 

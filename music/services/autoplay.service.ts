@@ -35,16 +35,17 @@ export function createAutoplayService(deps: AutoplayDeps) {
 
     const mood = state.autoMood || '잔잔한';
 
-    if (!state.autoPool || state.autoPool.length === 0) {
-        const excludedTitles: string[] = [];
-        if (state.current) {
-            excludedTitles.push(`${state.current.info.author} - ${state.current.info.title}`);
+    const excludedTitles: string[] = [];
+    if (state.current) {
+        excludedTitles.push(`${state.current.info.author} - ${state.current.info.title}`);
+    }
+    state.history.slice(-30).forEach((track) => {
+        if (track.info) {
+            excludedTitles.push(`${track.info.author} - ${track.info.title}`);
         }
-        state.history.slice(-30).forEach((track) => {
-            if (track.info) {
-                excludedTitles.push(`${track.info.author} - ${track.info.title}`);
-            }
-        });
+    });
+
+    if (!state.autoPool || state.autoPool.length === 0) {
 
         if (mood === '추천 곡') {
             try {
@@ -54,7 +55,9 @@ export function createAutoplayService(deps: AutoplayDeps) {
 
                 if (tagKeywords.length > 0) {
                     const shuffledKeywords = [...tagKeywords].sort(() => Math.random() - 0.5);
-                    const selectedKeywords = shuffledKeywords.slice(0, Math.min(3, shuffledKeywords.length));
+                    console.log(shuffledKeywords)
+                    const selectedKeywords = shuffledKeywords.slice(0, Math.min(5, shuffledKeywords.length));
+                    console.log(selectedKeywords)
 
                     const searchResults: Track[] = [];
                     for (const keyword of selectedKeywords) {
@@ -83,7 +86,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         const tagsString = tagKeywords.map(k => `#${k}`).join(', ');
                         const shuffledTitles = videoTitles.sort(() => Math.random() - 0.5);
 
-                        const batch = await selectAndCleanSongsFromSearch(shuffledTitles, tagsString, 20);
+                        const batch = await selectAndCleanSongsFromSearch(shuffledTitles, tagsString, excludedTitles, 20);
                         const cleanBatch = Array.isArray(batch) ? batch : [];
 
                         state.autoPool = cleanBatch.sort(() => Math.random() - 0.5);
@@ -138,6 +141,14 @@ export function createAutoplayService(deps: AutoplayDeps) {
     while (state.autoPool && state.autoPool.length > 0 && !recommendedUri) {
         const generatedQuery = state.autoPool.shift();
         if (generatedQuery) {
+            const isExcluded = excludedTitles.some(excluded => 
+                excluded.toLowerCase().replace(/\s+/g, '') === generatedQuery.toLowerCase().replace(/\s+/g, '')
+            );
+            if (isExcluded) {
+                console.log(`[AutoPlay Mood] Skipping duplicate song from history: ${generatedQuery}`);
+                continue;
+            }
+
             console.log(`[AutoPlay Mood] Selected from pool: ${generatedQuery} (${state.autoPool.length} left)`);
             recommendedTitle = generatedQuery;
 
