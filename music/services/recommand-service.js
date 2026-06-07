@@ -356,9 +356,10 @@ async function recommendFromHistory({
   const blacklistSet = await getBlacklistForGuild(resolvedGuildId);
 
   const tagFrequencies = buildHistoryTagFrequencies(recentHistoryItems);
-  const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 6);
+  const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 26);
   const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
-    .filter(k => !blacklistSet.has(k.toLowerCase().trim()));
+    .filter(k => !blacklistSet.has(k))
+    .slice(0, TAG_KEYWORD_LIMIT + 6);
 
   const excludedTrackKeys = new Set();
   recentHistoryItems.forEach((entry) => {
@@ -460,4 +461,7 @@ module.exports = {
   recommendFromHistory,
   buildHistoryTagKeywords,
   dedupeSimilarKeywords,
+  getBlacklistForGuild,
+  isValidTagKeyword,
+  normalizeText,
 };

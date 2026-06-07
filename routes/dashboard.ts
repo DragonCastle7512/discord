@@ -277,30 +277,33 @@ export function createDashboardRouter(
     try {
       const session = (req as any).session;
       const histories = await MusicHistory.findAll({ where: { guildId: session.guildId } });
-      const rawKeywordsList: string[] = [];
       const keywordMap = new Map<string, number>();
 
+      const { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText } = require('../music/services/recommand-service');
+
       histories.forEach(h => {
+        if ((h.musicInfo as any)?.isSkipped) return;
+
         const tags = (h.musicInfo as any)?.tags || [];
         tags.forEach((tag: string) => {
-          const normalized = tag.toLowerCase().trim();
-          if (normalized.length >= 2) {
-            rawKeywordsList.push(normalized);
+          const normalized = normalizeText(tag);
+          if (isValidTagKeyword(normalized)) {
             keywordMap.set(normalized, (keywordMap.get(normalized) || 0) + 1);
           }
         });
       });
 
-      const { dedupeSimilarKeywords } = require('../music/services/recommand-service');
-      const dedupedKeywordsList: string[] = dedupeSimilarKeywords(rawKeywordsList);
+      const plainHistories = histories.map(h => h.get({ plain: true }));
+      const tagKeywordsRaw = buildHistoryTagKeywords(plainHistories, 9999);
+      const dedupedKeywordsList: string[] = dedupeSimilarKeywords(tagKeywordsRaw);
 
       const blacklistRecords = await KeywordBlacklist.findAll({ where: { guildId: session.guildId } });
       const blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
 
       const keywords = dedupedKeywordsList
+        .filter(tag => !blacklistSet.has(tag))
         .map(tag => ({ tag, freq: keywordMap.get(tag) || 0 }))
-        .filter(item => !blacklistSet.has(item.tag) && item.freq > 0)
-        .sort((a, b) => b.freq - a.freq);
+        .filter(item => item.freq > 0);
 
       res.json({
         ok: true,

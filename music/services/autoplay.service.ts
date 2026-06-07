@@ -2,7 +2,7 @@ import { Client } from 'discord.js';
 import { GuildState, Track } from '../types';
 import { findAllHistory } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
-import { buildHistoryTagKeywords, dedupeSimilarKeywords } from './recommand-service';
+import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild } from './recommand-service';
 
 export interface AutoplayDeps {
   client: Client;
@@ -50,19 +50,20 @@ export function createAutoplayService(deps: AutoplayDeps) {
         if (mood === '추천 곡') {
             try {
                 const historyItems = await findAllHistory(guildId);
-                const tagKeywordsRaw = buildHistoryTagKeywords(historyItems, 10);
-                const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw);
+                const tagKeywordsRaw = buildHistoryTagKeywords(historyItems, 9999);
+                const blacklistSet = await getBlacklistForGuild(guildId);
+                const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
+                    .filter(k => !blacklistSet.has(k))
+                    .slice(0, 10);
 
                 if (tagKeywords.length > 0) {
                     const shuffledKeywords = [...tagKeywords].sort(() => Math.random() - 0.5);
-                    console.log(shuffledKeywords)
                     const selectedKeywords = shuffledKeywords.slice(0, Math.min(5, shuffledKeywords.length));
-                    console.log(selectedKeywords)
 
                     const searchResults: Track[] = [];
                     for (const keyword of selectedKeywords) {
                         try {
-                            const resolved = await resolveTracks(`ytmsearch:${keyword}`);
+                            const resolved = await resolveTracks(keyword);
                             const tracks = resolved?.tracks || [];
                             if (Array.isArray(tracks)) {
                                 searchResults.push(...tracks);
