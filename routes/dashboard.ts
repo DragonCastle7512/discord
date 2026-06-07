@@ -1,12 +1,15 @@
 // @ts-ignore
 import { Router, Request, Response } from 'express';
 import { Client } from 'discord.js';
-import { MusicRuntime, GuildState, PlaylistEntry, TrackInfo, HistoryEntry } from '../music/types';
+import { MusicRuntime, GuildState, PlaylistEntry, TrackInfo, HistoryEntry, Track } from '../music/types';
 import { findAllHistory } from '../music/repositorys/music-history.repository';
 import { findPlaylist } from '../music/repositorys/playlist.repository';
 import { DashboardResponse, MusicItem } from './types';
 import { verifyDashboardToken } from '../common/auth';
 import { notifyMusicUpdate } from '../common/socket';
+import { KeywordBlacklist } from '../music/models/keyword-blacklist';
+import { MusicHistory } from '../music/models/music-history';
+
 
 export function createDashboardRouter(
   client: Client,
@@ -256,6 +259,126 @@ export function createDashboardRouter(
       res.json(result);
     } catch (e: any) {
       res.status(500).json({ ok: false, message: e.message });
+    }
+  });
+
+  async function verifyToken(req: Request, res: Response, next: any) {
+    const token = (req.query.token as string) || (req.body.token as string);
+    const session = verifyDashboardToken(token);
+    if (!session) {
+      res.status(401).json({ error: '인증 실패' });
+      return;
+    }
+    (req as any).session = session;
+    next();
+  }
+
+  router.get('/admin/keywords', verifyToken, async (req: Request, res: Response) => {
+    try {
+      const session = (req as any).session;
+      const histories = await MusicHistory.findAll({ where: { guildId: session.guildId } });
+      const rawKeywordsList: string[] = [];
+      const keywordMap = new Map<string, number>();
+
+      histories.forEach(h => {
+        const tags = (h.musicInfo as any)?.tags || [];
+        tags.forEach((tag: string) => {
+          const normalized = tag.toLowerCase().trim();
+          if (normalized.length >= 2) {
+            rawKeywordsList.push(normalized);
+            keywordMap.set(normalized, (keywordMap.get(normalized) || 0) + 1);
+          }
+        });
+      });
+
+      const { dedupeSimilarKeywords } = require('../music/services/recommand-service');
+      const dedupedKeywordsList: string[] = dedupeSimilarKeywords(rawKeywordsList);
+
+      const blacklistRecords = await KeywordBlacklist.findAll({ where: { guildId: session.guildId } });
+      const blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
+
+      const keywords = dedupedKeywordsList
+        .map(tag => ({ tag, freq: keywordMap.get(tag) || 0 }))
+        .filter(item => !blacklistSet.has(item.tag) && item.freq > 0)
+        .sort((a, b) => b.freq - a.freq);
+
+      res.json({
+        ok: true,
+        totalKeywordsCount: dedupedKeywordsList.length,
+        blacklistCount: blacklistSet.size,
+        keywords,
+        blacklist: Array.from(blacklistSet)
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/admin/blacklist', verifyToken, async (req: Request, res: Response) => {
+    const { keyword } = req.body;
+    if (!keyword || typeof keyword !== 'string') {
+      res.status(400).json({ error: '올바른 키워드를 입력해주세요.' });
+      return;
+    }
+    try {
+      const session = (req as any).session;
+      const normalized = keyword.toLowerCase().trim();
+      await KeywordBlacklist.findOrCreate({ 
+        where: { 
+          guildId: session.guildId, 
+          keyword: normalized 
+        } 
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/admin/blacklist', verifyToken, async (req: Request, res: Response) => {
+    const { keyword } = req.body;
+    if (!keyword || typeof keyword !== 'string') {
+      res.status(400).json({ error: '올바른 키워드를 입력해주세요.' });
+      return;
+    }
+    try {
+      const session = (req as any).session;
+      const normalized = keyword.toLowerCase().trim();
+      await KeywordBlacklist.destroy({ 
+        where: { 
+          guildId: session.guildId, 
+          keyword: normalized 
+        } 
+      });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/admin/search-preview', verifyToken, async (req: Request, res: Response) => {
+    const keyword = req.query.keyword as string;
+    if (!keyword) {
+      res.status(400).json({ error: '검색어를 입력해주세요.' });
+      return;
+    }
+
+    try {
+      const searchResult = await music.searchTracks(keyword);
+      const tracks = searchResult.tracks || [];
+
+      const items = tracks.slice(0, 10).map((t: Track) => ({
+        id: t.info.identifier,
+        title: t.info.title,
+        artist: t.info.author || '알 수 없음',
+        url: t.info.uri || (t.info.identifier ? `https://www.youtube.com/watch?v=${t.info.identifier}` : ''),
+        thumbnail: t.info.artworkUrl || (t.info.identifier ? `https://i.ytimg.com/vi/${t.info.identifier}/mqdefault.jpg` : null)
+      }));
+
+      res.json({ ok: true, items });
+    } catch (err: any) {
+      console.error(`[DEBUG] search-preview error:`, err);
+      res.status(500).json({ error: err.message });
     }
   });
 

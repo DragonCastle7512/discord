@@ -1,3 +1,16 @@
+const { KeywordBlacklist } = require('../models/keyword-blacklist');
+
+async function getBlacklistForGuild(guildId) {
+  if (!guildId) return new Set();
+  try {
+    const records = await KeywordBlacklist.findAll({ where: { guildId } });
+    return new Set(records.map(r => normalizeText(r.keyword)));
+  } catch (err) {
+    console.error(`[Recommend Service] Failed to load blacklist for guild ${guildId}:`, err);
+    return new Set();
+  }
+}
+
 const DEFAULT_COUNT = 5;
 const MAX_COUNT = 20;
 const HISTORY_LIMIT = 100;
@@ -322,6 +335,7 @@ async function recommendFromHistory({
   historyLimit = HISTORY_LIMIT,
   popularLimit = POPULAR_LIMIT,
   randomizeKeywordsCount = null,
+  guildId = null,
 }) {
   const normalizedCount = clampRecommendationCount(count);
   const recentHistoryItems = (Array.isArray(historyItems) ? historyItems : []).slice(0, historyLimit);
@@ -338,9 +352,13 @@ async function recommendFromHistory({
     };
   }
 
+  const resolvedGuildId = guildId || recentHistoryItems[0]?.guildId;
+  const blacklistSet = await getBlacklistForGuild(resolvedGuildId);
+
   const tagFrequencies = buildHistoryTagFrequencies(recentHistoryItems);
   const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 6);
-  const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw);
+  const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
+    .filter(k => !blacklistSet.has(k.toLowerCase().trim()));
 
   const excludedTrackKeys = new Set();
   recentHistoryItems.forEach((entry) => {

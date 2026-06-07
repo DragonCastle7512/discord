@@ -224,9 +224,13 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
         identifiers.push(`ytmsearch:${ytId}`);
       }
     } else {
-      identifiers.push(`ytmsearch:${query}`, `ytsearch:${query}`);
-      if (allowSoundCloudFallback) {
-        identifiers.push(`scsearch:${query}`);
+      if (/^(ytmsearch|ytsearch|scsearch):/.test(query)) {
+        identifiers.push(query);
+      } else {
+        identifiers.push(`ytmsearch:${query}`, `ytsearch:${query}`);
+        if (allowSoundCloudFallback) {
+          identifiers.push(`scsearch:${query}`);
+        }
       }
     }
 
