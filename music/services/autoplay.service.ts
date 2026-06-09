@@ -50,11 +50,11 @@ export function createAutoplayService(deps: AutoplayDeps) {
         if (mood === '추천 곡') {
             try {
                 const historyItems = await findAllHistory(guildId);
-                const tagKeywordsRaw = buildHistoryTagKeywords(historyItems, 9999);
+                const tagKeywordsRaw = buildHistoryTagKeywords(historyItems, 100);
                 const blacklistSet = await getBlacklistForGuild(guildId);
                 const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
                     .filter(k => !blacklistSet.has(k))
-                    .slice(0, 10);
+                    .slice(0, 7);
 
                 if (tagKeywords.length > 0) {
                     const shuffledKeywords = [...tagKeywords].sort(() => Math.random() - 0.5);
