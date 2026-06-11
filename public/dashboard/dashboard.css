@@ -11,6 +11,36 @@ body{background:var(--bg);color:var(--text);font-family:var(--body);min-height:1
 .topbar{position:sticky;top:0;z-index:100;grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:70px;background:#111;border-bottom:1px solid var(--border);}
 .logo{font-family:var(--head);font-size:20px;color:var(--red);letter-spacing:1px;display:flex;align-items:center;gap:8px;}
 .logo svg{width:22px;height:22px;}
+.menu-toggle-btn {
+  display: none;
+  background: none;
+  border: none;
+  color: var(--text);
+  cursor: pointer;
+  padding: 4px;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s;
+}
+.menu-toggle-btn:hover {
+  color: var(--red);
+}
+.sidebar-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 1000;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+}
+.sidebar-overlay.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
 .server-info{display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted); height: 100%;}
 .server-dot{width:8px;height:8px;border-radius:50%;background:#3ba55c;}
 .server-name{color:var(--text);font-weight:500;}
@@ -124,8 +154,26 @@ body.is-dragging .pl-card * {
     grid-template-columns: 1fr;
   }
 
+  .logo-desktop {
+    display: none;
+  }
+
+  .menu-toggle-btn {
+    display: flex;
+  }
+
   .sidebar {
-    display: none; 
+    position: fixed;
+    top: 0;
+    left: -240px;
+    width: 240px;
+    height: 100vh;
+    z-index: 1001;
+    transition: transform 0.3s ease;
+  }
+
+  .sidebar.open {
+    transform: translateX(240px);
   }
 
   .main {

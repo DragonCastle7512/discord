@@ -97,3 +97,20 @@ window.addBlacklistFromInput = addBlacklistFromInput;
 window.filterKeywordsTable = filterKeywordsTable;
 window.searchPreviewKeywords = searchPreviewKeywords;
 window.sendControl = sendControl;
+
+// Mobile menu toggle logic
+const menuToggleBtn = document.getElementById('menu-toggle-btn');
+const sidebarOverlay = document.getElementById('sidebar-overlay');
+const sidebar = document.querySelector('.sidebar');
+
+if (menuToggleBtn && sidebarOverlay && sidebar) {
+  menuToggleBtn.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    sidebarOverlay.classList.toggle('visible');
+  });
+
+  sidebarOverlay.addEventListener('click', () => {
+    sidebar.classList.remove('open');
+    sidebarOverlay.classList.remove('visible');
+  });
+}

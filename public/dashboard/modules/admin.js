@@ -23,6 +23,13 @@ export function switchTab(tab) {
     adminView.style.display = 'block';
     loadAdminKeywords();
   }
+
+  const sidebar = document.querySelector('.sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  if (sidebar && overlay) {
+    sidebar.classList.remove('open');
+    overlay.classList.remove('visible');
+  }
 }
 
 export async function loadAdminKeywords() {
