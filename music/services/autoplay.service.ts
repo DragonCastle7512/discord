@@ -59,6 +59,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 if (tagKeywords.length > 0) {
                     const shuffledKeywords = [...tagKeywords].sort(() => Math.random() - 0.5);
                     const selectedKeywords = shuffledKeywords.slice(0, Math.min(5, shuffledKeywords.length));
+                    // console.log(tagKeywords+"\n"+selectedKeywords);
 
                     const searchResults: Track[] = [];
                     for (const keyword of selectedKeywords) {
@@ -88,9 +89,10 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         const shuffledTitles = videoTitles.sort(() => Math.random() - 0.5);
 
                         const batch = await selectAndCleanSongsFromSearch(shuffledTitles, tagsString, excludedTitles, 20);
+                        console.log(batch)
                         const cleanBatch = Array.isArray(batch) ? batch : [];
 
-                        state.autoPool = cleanBatch.sort(() => Math.random() - 0.5);
+                        state.autoPool = cleanBatch;
                     }
                     else {
                         const textChannel = getTextChannel(state.textChannelId);
