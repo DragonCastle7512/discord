@@ -303,6 +303,23 @@ body.is-dragging .pl-card * {
 .blacklist-add-form button:hover {
   background: var(--red-dim);
 }
+.keyword-search-form {
+  margin-left: auto;
+}
+.keyword-search-form input {
+  padding: 4px 8px; 
+  border-radius: 4px; 
+  border: 1px solid var(--border); 
+  background: var(--black); 
+  color: var(--text-main); 
+  font-size: 11px;
+  transition: border-color 0.2s;
+}
+
+.keyword-search-form input:focus {
+  outline: none;
+  border-color: var(--red);
+}
 
 .blacklist-chips {
   display: flex;
