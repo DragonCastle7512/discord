@@ -303,7 +303,8 @@ export function createDashboardRouter(
       const keywords = dedupedKeywordsList
         .filter(tag => !blacklistSet.has(tag))
         .map(tag => ({ tag, freq: keywordMap.get(tag) || 0 }))
-        .filter(item => item.freq > 0);
+        .filter(item => item.freq > 0)
+        .sort((a, b) => b.freq - a.freq || a.tag.localeCompare(b.tag));
 
       res.json({
         ok: true,

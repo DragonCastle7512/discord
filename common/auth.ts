@@ -20,7 +20,10 @@ export function generateDashboardToken(guildId: string, userId: string): string 
     expiresAt: Date.now() + SESSION_DURATION
   });
   
-  setTimeout(() => sessions.delete(token), SESSION_DURATION);
+  const timer = setTimeout(() => sessions.delete(token), SESSION_DURATION);
+  if (timer && typeof timer.unref === 'function') {
+    timer.unref();
+  }
   
   return token;
 }
