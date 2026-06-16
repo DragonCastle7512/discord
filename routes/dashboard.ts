@@ -319,14 +319,46 @@ export function createDashboardRouter(
         .filter(item => item.freq > 0)
         .sort((a, b) => b.freq - a.freq || a.tag.localeCompare(b.tag));
 
-      let recommendation = { keyword: null as string | null, items: [] as any[] };
+      let recommendation = { keywords: [] as string[], items: [] as any[] };
       if (keywords.length > 0) {
-        const topKeyword = keywords[0].tag;
-        recommendation.keyword = topKeyword;
+        const topKeywords = keywords.slice(0, 3).map(k => k.tag);
+        recommendation.keywords = topKeywords;
+
         try {
-          const searchResult = await music.searchTracks(topKeyword);
-          const tracks = searchResult.tracks || [];
-          recommendation.items = tracks.slice(0, 10).map((t: Track) => ({
+          const searchPromises = topKeywords.map(async (kw) => {
+            try {
+              const res = await music.searchTracks(kw);
+              const rawTracks = res.tracks || [];
+              // 1m 30s (90,000ms) ~ 6m (360,000ms) duration filter
+              return rawTracks.filter((t: Track) => t.info.length >= 90000 && t.info.length <= 360000);
+            } catch (err) {
+              console.error(`[GET /admin/keywords] search for "${kw}" failed:`, err);
+              return [];
+            }
+          });
+          const searchResults = await Promise.all(searchPromises);
+
+          // Mix (interleave) tracks from search results
+          const mixedTracks: Track[] = [];
+          const maxTracks = Math.max(...searchResults.map(r => r.length));
+          for (let i = 0; i < maxTracks; i++) {
+            for (let j = 0; j < searchResults.length; j++) {
+              if (searchResults[j][i]) {
+                mixedTracks.push(searchResults[j][i]);
+              }
+            }
+          }
+
+          // Deduplicate tracks
+          const seenIds = new Set<string>();
+          const dedupedTracks = mixedTracks.filter(t => {
+            const id = t.info.uri || t.info.identifier;
+            if (!id || seenIds.has(id)) return false;
+            seenIds.add(id);
+            return true;
+          });
+
+          recommendation.items = dedupedTracks.slice(0, 10).map((t: Track) => ({
             id: t.info.identifier,
             title: t.info.title,
             artist: t.info.author || '알 수 없음',
@@ -334,7 +366,7 @@ export function createDashboardRouter(
             thumbnail: t.info.artworkUrl || (t.info.identifier ? `https://i.ytimg.com/vi/${t.info.identifier}/mqdefault.jpg` : null)
           }));
         } catch (searchErr) {
-          console.error(`[GET /admin/keywords] Lavalink search failed for keyword "${topKeyword}":`, searchErr);
+          console.error('[GET /admin/keywords] Mixing recommendation failed:', searchErr);
         }
       }
 

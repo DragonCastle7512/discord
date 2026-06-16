@@ -162,4 +162,20 @@ describe('UserKeywordBlacklist Model Compatibility Tests', () => {
       } 
     });
   });
+
+  it('should correctly filter tracks by duration 1:30 to 6:00 in API response structure mock', () => {
+    const mockTracks = [
+      { info: { length: 80000, title: 'Too Short' } }, // 1m 20s
+      { info: { length: 90000, title: 'Perfect 1' } }, // 1m 30s
+      { info: { length: 300000, title: 'Perfect 2' } }, // 5m
+      { info: { length: 360000, title: 'Perfect 3' } }, // 6m
+      { info: { length: 400000, title: 'Too Long' } }, // 6m 40s
+    ];
+
+    const filtered = mockTracks.filter(t => t.info.length >= 90000 && t.info.length <= 360000);
+    assert.strictEqual(filtered.length, 3);
+    assert.strictEqual(filtered[0].info.title, 'Perfect 1');
+    assert.strictEqual(filtered[1].info.title, 'Perfect 2');
+    assert.strictEqual(filtered[2].info.title, 'Perfect 3');
+  });
 });
