@@ -324,6 +324,8 @@ module.exports = {
         fetchPopularByKeyword: fetchPopularByKeywordViaSkill,
         searchTracks: (query) => obj?.context?.music?.searchTracks(query),
         region,
+        guildId,
+        userId: obj?.message?.author?.id || null,
       });
 
       if (!result.ok) {

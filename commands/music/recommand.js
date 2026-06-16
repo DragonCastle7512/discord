@@ -91,6 +91,8 @@ module.exports = {
       fetchPopularByKeyword,
       searchTracks: (query) => context.music.searchTracks(query),
       region: 'KR',
+      guildId: interaction.guildId,
+      userId: interaction.user.id,
     });
 
     if (!result || !result.ok || !Array.isArray(result.items) || result.items.length === 0) {
