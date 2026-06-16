@@ -2,15 +2,17 @@ import test, { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import { sequelize } from '../db/sequelize';
 import { initUserKeywordBlacklistModel, UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
+import { initKeywordBlacklistModel } from '../music/models/keyword-blacklist';
 
 describe('UserKeywordBlacklist Model Compatibility Tests', () => {
   before(async () => {
     await sequelize.authenticate();
     initUserKeywordBlacklistModel(sequelize);
+    initKeywordBlacklistModel(sequelize);
     await UserKeywordBlacklist.sync();
     await UserKeywordBlacklist.destroy({ 
       where: { 
-        userId: 'test-user-xyz',
+        userId: ['test-user-xyz', 'test-user-A'],
       } 
     });
   });
@@ -102,6 +104,62 @@ describe('UserKeywordBlacklist Model Compatibility Tests', () => {
         userId: 'test-user-xyz',
         keyword: 'personal-blacklist'
       }
+    });
+  });
+
+  it('should filter out user-specific blacklisted keywords in recommendFromHistory', async () => {
+    await UserKeywordBlacklist.create({ 
+      userId: 'test-user-A', 
+      keyword: 'personal-blacklist-tag' 
+    });
+
+    const { recommendFromHistory } = require('../music/services/recommand-service');
+
+    const dummyHistory = [
+      {
+        guildId: 'test-guild-A',
+        musicInfo: {
+          requestedBy: 'test-user-A',
+          tags: ['normal-tag', 'personal-blacklist-tag']
+        }
+      }
+    ];
+
+    const fetchPopularMock = async () => [];
+    const searchTracksMock = async () => ({ tracks: [] });
+
+    // 1. userId가 'test-user-A' 인 경우 - 필터링 되어야 함
+    const resultUserA = await recommendFromHistory({
+      historyItems: dummyHistory,
+      count: 5,
+      fetchPopularByKeyword: fetchPopularMock,
+      searchTracks: searchTracksMock,
+      randomizeKeywordsCount: null,
+      guildId: 'test-guild-A',
+      userId: 'test-user-A'
+    });
+
+    assert.ok(resultUserA.keywords.includes('normal tag'), 'normal tag should be present');
+    assert.ok(!resultUserA.keywords.includes('personal blacklist tag'), 'personal blacklist tag should be filtered out for User A');
+
+    // 2. 다른 userId 'test-user-B' 인 경우 - 필터링되지 않아야 함
+    const resultUserB = await recommendFromHistory({
+      historyItems: dummyHistory,
+      count: 5,
+      fetchPopularByKeyword: fetchPopularMock,
+      searchTracks: searchTracksMock,
+      randomizeKeywordsCount: null,
+      guildId: 'test-guild-A',
+      userId: 'test-user-B'
+    });
+
+    assert.ok(resultUserB.keywords.includes('personal blacklist tag'), 'personal blacklist tag should NOT be filtered out for User B');
+
+    await UserKeywordBlacklist.destroy({ 
+      where: { 
+        userId: 'test-user-A', 
+        keyword: 'personal-blacklist-tag' 
+      } 
     });
   });
 });

@@ -336,6 +336,7 @@ async function recommendFromHistory({
   popularLimit = POPULAR_LIMIT,
   randomizeKeywordsCount = null,
   guildId = null,
+  userId = null,
 }) {
   const normalizedCount = clampRecommendationCount(count);
   const recentHistoryItems = (Array.isArray(historyItems) ? historyItems : []).slice(0, historyLimit);
@@ -354,6 +355,16 @@ async function recommendFromHistory({
 
   const resolvedGuildId = guildId || recentHistoryItems[0]?.guildId;
   const blacklistSet = await getBlacklistForGuild(resolvedGuildId);
+
+  if (userId) {
+    try {
+      const { UserKeywordBlacklist } = require('../models/user-keyword-blacklist');
+      const userRecords = await UserKeywordBlacklist.findAll({ where: { userId } });
+      userRecords.forEach(r => blacklistSet.add(normalizeText(r.keyword)));
+    } catch (err) {
+      console.error(`[Recommend Service] Failed to load blacklist for user ${userId}:`, err);
+    }
+  }
 
   const tagFrequencies = buildHistoryTagFrequencies(recentHistoryItems);
   const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 26);
