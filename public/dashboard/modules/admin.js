@@ -282,7 +282,7 @@ export function renderRecommendationResult(recommendation) {
   const modeLabel = currentKeywordMode === 'personal' ? '나를 위한' : '서버';
   if (!recommendation || !recommendation.keyword) {
     titleEl.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ${modeLabel} 추천 곡 미리보기`;
-    container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">충분한 키워드 데이터가 쌓이면 추천 곡이 나타납니다.</div>';
+    container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; width: 100%;">충분한 키워드 데이터가 쌓이면 추천 곡이 나타납니다.</div>';
     return;
   }
 
@@ -290,55 +290,60 @@ export function renderRecommendationResult(recommendation) {
 
   const items = recommendation.items || [];
   if (items.length === 0) {
-    container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">추천 검색 결과가 없습니다.</div>';
+    container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; width: 100%;">추천 검색 결과가 없습니다.</div>';
     return;
   }
 
-  items.forEach((item, index) => {
-    const row = document.createElement('div');
-    row.className = 'queue-item';
+  const displayItems = items.slice(0, 5);
 
-    const num = document.createElement('div');
-    num.className = 'queue-num';
-    num.textContent = String(index + 1);
+  displayItems.forEach((item) => {
+    const card = document.createElement('div');
+    card.className = 'recommend_item_card';
 
-    const thumb = document.createElement('div');
-    thumb.className = 'queue-thumb';
-    thumb.appendChild(createThumbnail(item.thumbnail, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+    const thumbContainer = document.createElement('div');
+    thumbContainer.className = 'card-thumb';
 
-    const info = document.createElement('div');
-    info.className = 'queue-info';
+    const img = document.createElement('img');
+    img.src = item.thumbnail || 'https://images.unsplash.com/photo-1614680376593-902f74fa0d41?q=80&w=300';
+    img.alt = item.title;
+
+    const overlay = document.createElement('div');
+    overlay.className = 'card-play-overlay';
+    overlay.onclick = () => playMusic(item.url);
+
+    const playCircle = document.createElement('div');
+    playCircle.className = 'card-play-btn-circle';
+    playCircle.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    overlay.appendChild(playCircle);
+
+    thumbContainer.append(img, overlay);
+
+    const infoContainer = document.createElement('div');
+    infoContainer.className = 'card-info';
 
     const title = document.createElement('div');
-    title.className = 'queue-title';
+    title.className = 'card-title';
     title.textContent = item.title;
+    title.title = item.title;
 
     const artist = document.createElement('div');
-    artist.className = 'queue-artist';
+    artist.className = 'card-artist';
     artist.textContent = item.artist;
+    artist.title = item.artist;
 
-    info.append(title, artist);
+    infoContainer.append(title, artist);
 
-    const actions = document.createElement('div');
-    actions.className = 'queue-actions';
-    actions.style.display = 'flex';
-    actions.style.gap = '6px';
+    const actionsContainer = document.createElement('div');
+    actionsContainer.className = 'card-actions';
 
-    const playBtn = document.createElement('button');
-    playBtn.className = 'qa-btn';
-    playBtn.style.color = 'var(--red)';
-    playBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
-    playBtn.title = '대시보드에서 재생';
-    playBtn.onclick = () => playMusic(item.url);
+    const viewBtn = document.createElement('button');
+    viewBtn.className = 'card-action-btn';
+    viewBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg> 유튜브에서 열기';
+    viewBtn.onclick = () => window.open(item.url, '_blank');
 
-    const linkBtn = document.createElement('button');
-    linkBtn.className = 'qa-btn';
-    linkBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
-    linkBtn.title = '유튜브에서 열기';
-    linkBtn.onclick = () => window.open(item.url, '_blank');
+    actionsContainer.appendChild(viewBtn);
 
-    actions.append(playBtn, linkBtn);
-    row.append(num, thumb, info, actions);
-    container.appendChild(row);
+    card.append(thumbContainer, infoContainer, actionsContainer);
+    container.appendChild(card);
   });
 }
