@@ -9,6 +9,7 @@ import { verifyDashboardToken } from '../common/auth';
 import { notifyMusicUpdate } from '../common/socket';
 import { KeywordBlacklist } from '../music/models/keyword-blacklist';
 import { MusicHistory } from '../music/models/music-history';
+import { UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
 
 
 export function createDashboardRouter(
@@ -276,12 +277,18 @@ export function createDashboardRouter(
   router.get('/admin/keywords', verifyToken, async (req: Request, res: Response) => {
     try {
       const session = (req as any).session;
+      const mode = (req.query.mode as string) || 'server';
+
       const histories = await MusicHistory.findAll({ where: { guildId: session.guildId } });
       const keywordMap = new Map<string, number>();
 
       const { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText } = require('../music/services/recommand-service');
 
-      histories.forEach(h => {
+      const filteredHistories = mode === 'personal'
+        ? histories.filter(h => String((h.musicInfo as any)?.requestedBy || '') === String(session.userId))
+        : histories;
+
+      filteredHistories.forEach(h => {
         if ((h.musicInfo as any)?.isSkipped) return;
 
         const tags = (h.musicInfo as any)?.tags || [];
@@ -293,12 +300,18 @@ export function createDashboardRouter(
         });
       });
 
-      const plainHistories = histories.map(h => h.get({ plain: true }));
+      const plainHistories = filteredHistories.map(h => h.get({ plain: true }));
       const tagKeywordsRaw = buildHistoryTagKeywords(plainHistories, 9999);
       const dedupedKeywordsList: string[] = dedupeSimilarKeywords(tagKeywordsRaw);
 
-      const blacklistRecords = await KeywordBlacklist.findAll({ where: { guildId: session.guildId } });
-      const blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
+      let blacklistSet = new Set<string>();
+      if (mode === 'personal') {
+        const blacklistRecords = await UserKeywordBlacklist.findAll({ where: { userId: session.userId } });
+        blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
+      } else {
+        const blacklistRecords = await KeywordBlacklist.findAll({ where: { guildId: session.guildId } });
+        blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
+      }
 
       const keywords = dedupedKeywordsList
         .filter(tag => !blacklistSet.has(tag))
@@ -306,12 +319,33 @@ export function createDashboardRouter(
         .filter(item => item.freq > 0)
         .sort((a, b) => b.freq - a.freq || a.tag.localeCompare(b.tag));
 
+      let recommendation = { keyword: null as string | null, items: [] as any[] };
+      if (keywords.length > 0) {
+        const topKeyword = keywords[0].tag;
+        recommendation.keyword = topKeyword;
+        try {
+          const searchResult = await music.searchTracks(topKeyword);
+          const tracks = searchResult.tracks || [];
+          recommendation.items = tracks.slice(0, 10).map((t: Track) => ({
+            id: t.info.identifier,
+            title: t.info.title,
+            artist: t.info.author || '알 수 없음',
+            url: t.info.uri || (t.info.identifier ? `https://www.youtube.com/watch?v=${t.info.identifier}` : ''),
+            thumbnail: t.info.artworkUrl || (t.info.identifier ? `https://i.ytimg.com/vi/${t.info.identifier}/mqdefault.jpg` : null)
+          }));
+        } catch (searchErr) {
+          console.error(`[GET /admin/keywords] Lavalink search failed for keyword "${topKeyword}":`, searchErr);
+        }
+      }
+
       res.json({
         ok: true,
+        mode,
         totalKeywordsCount: dedupedKeywordsList.length,
         blacklistCount: blacklistSet.size,
         keywords,
-        blacklist: Array.from(blacklistSet)
+        blacklist: Array.from(blacklistSet),
+        recommendation
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -319,7 +353,7 @@ export function createDashboardRouter(
   });
 
   router.post('/admin/blacklist', verifyToken, async (req: Request, res: Response) => {
-    const { keyword } = req.body;
+    const { keyword, mode } = req.body;
     if (!keyword || typeof keyword !== 'string') {
       res.status(400).json({ error: '올바른 키워드를 입력해주세요.' });
       return;
@@ -327,12 +361,23 @@ export function createDashboardRouter(
     try {
       const session = (req as any).session;
       const normalized = keyword.toLowerCase().trim();
-      await KeywordBlacklist.findOrCreate({ 
-        where: { 
-          guildId: session.guildId, 
-          keyword: normalized 
-        } 
-      });
+      const currentMode = mode || 'server';
+
+      if (currentMode === 'personal') {
+        await UserKeywordBlacklist.findOrCreate({ 
+          where: { 
+            userId: session.userId, 
+            keyword: normalized 
+          } 
+        });
+      } else {
+        await KeywordBlacklist.findOrCreate({ 
+          where: { 
+            guildId: session.guildId, 
+            keyword: normalized 
+          } 
+        });
+      }
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -340,7 +385,7 @@ export function createDashboardRouter(
   });
 
   router.delete('/admin/blacklist', verifyToken, async (req: Request, res: Response) => {
-    const { keyword } = req.body;
+    const { keyword, mode } = req.body;
     if (!keyword || typeof keyword !== 'string') {
       res.status(400).json({ error: '올바른 키워드를 입력해주세요.' });
       return;
@@ -348,12 +393,23 @@ export function createDashboardRouter(
     try {
       const session = (req as any).session;
       const normalized = keyword.toLowerCase().trim();
-      await KeywordBlacklist.destroy({ 
-        where: { 
-          guildId: session.guildId, 
-          keyword: normalized 
-        } 
-      });
+      const currentMode = mode || 'server';
+
+      if (currentMode === 'personal') {
+        await UserKeywordBlacklist.destroy({ 
+          where: { 
+            userId: session.userId, 
+            keyword: normalized 
+          } 
+        });
+      } else {
+        await KeywordBlacklist.destroy({ 
+          where: { 
+            guildId: session.guildId, 
+            keyword: normalized 
+          } 
+        });
+      }
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

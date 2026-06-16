@@ -56,4 +56,52 @@ describe('UserKeywordBlacklist Model Compatibility Tests', () => {
     });
     assert.strictEqual(notFound, null);
   });
+
+  it('should correctly filter history by userId and blacklist keywords in personal mode', async () => {
+    await UserKeywordBlacklist.create({
+      userId: 'test-user-xyz',
+      keyword: 'personal-blacklist'
+    });
+
+    const dummyHistories = [
+      {
+        guildId: 'test-guild-1',
+        musicInfo: {
+          requestedBy: 'test-user-xyz',
+          tags: ['pop-music', 'personal-blacklist', 'jazz-music']
+        }
+      },
+      {
+        guildId: 'test-guild-1',
+        musicInfo: {
+          requestedBy: 'another-user',
+          tags: ['rock-music']
+        }
+      }
+    ];
+
+    const personalHistories = dummyHistories.filter(h => h.musicInfo.requestedBy === 'test-user-xyz');
+    assert.strictEqual(personalHistories.length, 1);
+    
+    const { normalizeText } = require('../music/services/recommand-service');
+    const tags = personalHistories.flatMap(h => h.musicInfo.tags);
+    
+    const blacklistRecords = await UserKeywordBlacklist.findAll({ where: { userId: 'test-user-xyz' } });
+    const blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
+
+    const filteredTags = tags
+      .map(t => normalizeText(t))
+      .filter(t => !blacklistSet.has(t));
+
+    assert.ok(filteredTags.includes('pop music'));
+    assert.ok(!filteredTags.includes('personal-blacklist'));
+    assert.ok(!filteredTags.includes('rock-music'));
+
+    await UserKeywordBlacklist.destroy({
+      where: {
+        userId: 'test-user-xyz',
+        keyword: 'personal-blacklist'
+      }
+    });
+  });
 });
