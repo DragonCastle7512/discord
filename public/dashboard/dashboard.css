@@ -472,13 +472,28 @@ body.is-dragging .pl-card * {
   box-shadow: 0 2px 8px rgba(192, 57, 43, 0.4);
 }
 
-/* ─── 추천 곡 가로 카드 그리드 레이아웃 ─── */
 .recommendation-cards {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  display: flex;
+  flex-wrap: nowrap;
   gap: 16px;
   margin-top: 16px;
   width: 100%;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  padding-bottom: 10px;
+}
+.recommendation-cards::-webkit-scrollbar {
+  height: 6px;
+}
+.recommendation-cards::-webkit-scrollbar-track {
+  background: transparent;
+}
+.recommendation-cards::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 3px;
+}
+.recommendation-cards::-webkit-scrollbar-thumb:hover {
+  background: var(--muted);
 }
 
 .recommend_item_card {
@@ -492,6 +507,8 @@ body.is-dragging .pl-card * {
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   position: relative;
   overflow: hidden;
+  flex-shrink: 0;
+  width: 200px;
 }
 
 .recommend_item_card:hover {
@@ -532,7 +549,8 @@ body.is-dragging .pl-card * {
   cursor: pointer;
 }
 
-.card-thumb:hover .card-play-overlay {
+.card-thumb:hover .card-play-overlay,
+.recommend_item_card.touched .card-play-overlay {
   opacity: 1;
 }
 

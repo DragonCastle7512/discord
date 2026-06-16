@@ -322,7 +322,6 @@ export function createDashboardRouter(
       let recommendation = { keywords: [] as string[], items: [] as any[] };
       if (keywords.length > 0) {
         const topKeywords = keywords.slice(0, 3).map(k => k.tag);
-        recommendation.keywords = topKeywords;
 
         try {
           const searchPromises = topKeywords.map(async (kw) => {
@@ -459,7 +458,10 @@ export function createDashboardRouter(
       const searchResult = await music.searchTracks(keyword);
       const tracks = searchResult.tracks || [];
 
-      const items = tracks.slice(0, 10).map((t: Track) => ({
+      // 1m 30s (90,000ms) ~ 6m (360,000ms) duration filter
+      const filteredTracks = tracks.filter((t: Track) => t.info.length >= 90000 && t.info.length <= 360000);
+
+      const items = filteredTracks.slice(0, 10).map((t: Track) => ({
         id: t.info.identifier,
         title: t.info.title,
         artist: t.info.author || '알 수 없음',
@@ -467,7 +469,7 @@ export function createDashboardRouter(
         thumbnail: t.info.artworkUrl || (t.info.identifier ? `https://i.ytimg.com/vi/${t.info.identifier}/mqdefault.jpg` : null)
       }));
 
-      res.json({ ok: true, items });
+      res.json({ ok: true, items: items });
     } catch (err: any) {
       console.error(`[DEBUG] search-preview error:`, err);
       res.status(500).json({ error: err.message });

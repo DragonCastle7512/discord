@@ -280,13 +280,13 @@ export function renderRecommendationResult(recommendation) {
   container.innerHTML = '';
 
   const modeLabel = currentKeywordMode === 'personal' ? '나를 위한' : '서버';
-  if (!recommendation || !recommendation.keyword) {
-    titleEl.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ${modeLabel} 추천 곡 미리보기`;
+
+  titleEl.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ${modeLabel} 추천 곡 미리보기`;
+  if (!recommendation) {
     container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; width: 100%;">충분한 키워드 데이터가 쌓이면 추천 곡이 나타납니다.</div>';
     return;
   }
 
-  titleEl.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ${modeLabel} 추천 곡 미리보기 (키워드: #${recommendation.keyword})`;
 
   const items = recommendation.items || [];
   if (items.length === 0) {
@@ -294,7 +294,8 @@ export function renderRecommendationResult(recommendation) {
     return;
   }
 
-  const displayItems = items.slice(0, 5);
+  const displayItems = items.slice(0, 10);
+  const isTouch = window.matchMedia('(pointer: coarse)').matches;
 
   displayItems.forEach((item) => {
     const card = document.createElement('div');
@@ -309,7 +310,25 @@ export function renderRecommendationResult(recommendation) {
 
     const overlay = document.createElement('div');
     overlay.className = 'card-play-overlay';
-    overlay.onclick = () => playMusic(item.url);
+
+    overlay.onclick = (e) => {
+      if (isTouch) {
+        e.stopPropagation();
+        if (!card.classList.contains('touched')) {
+          document.querySelectorAll('.recommend_item_card').forEach(c => c.classList.remove('touched'));
+          card.classList.add('touched');
+        }
+        else if (e.target.closest('.card-play-btn-circle')) {
+          playMusic(item.url);
+        }
+        else {
+            card.classList.remove('touched');
+        }
+      }
+      else {
+        playMusic(item.url);
+      }
+    };
 
     const playCircle = document.createElement('div');
     playCircle.className = 'card-play-btn-circle';
@@ -346,4 +365,10 @@ export function renderRecommendationResult(recommendation) {
     card.append(thumbContainer, infoContainer, actionsContainer);
     container.appendChild(card);
   });
+}
+
+if (window.matchMedia('(pointer: coarse)').matches) {
+  document.addEventListener('click', () => {
+    document.querySelectorAll('.recommend_item_card').forEach(c => c.classList.remove('touched'));
+  }, { passive: true });
 }
