@@ -436,3 +436,39 @@ body.is-dragging .pl-card * {
   color: #fff;
   background: var(--red-glow);
 }
+
+/* ─── 키워드 모드 셀렉터 탭 ─── */
+.keyword-mode-selector {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 24px;
+  background: var(--card);
+  padding: 6px;
+  border-radius: 30px;
+  width: fit-content;
+  border: 1px solid var(--border);
+}
+
+.mode-btn {
+  background: transparent;
+  border: none;
+  color: var(--muted);
+  padding: 8px 20px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.mode-btn:hover {
+  color: var(--text);
+  background: rgba(255, 255, 255, 0.03);
+}
+
+.mode-btn.active {
+  color: #fff;
+  background: var(--red);
+  box-shadow: 0 2px 8px rgba(192, 57, 43, 0.4);
+}
+
