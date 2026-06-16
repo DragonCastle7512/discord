@@ -154,6 +154,17 @@
         <button id="btn-mode-personal" class="mode-btn" onclick="setKeywordMode('personal')">개인 키워드</button>
       </div>
 
+      <!-- RECOMMENDATION PREVIEW CARD (추천 곡 미리보기) -->
+      <div class="card" style="margin-bottom: 24px;">
+        <div class="section-title" id="recommendationCardTitle">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+          서버 추천 곡 미리보기
+        </div>
+        <div class="recommendation-cards" id="recommendationResultContainer">
+          <div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; width: 100%;">충분한 키워드 데이터가 쌓이면 추천 곡이 나타납니다.</div>
+        </div>
+      </div>
+
       <div class="grid2">
         <!-- BLACKLIST MANAGEMENT -->
         <div class="card">
@@ -200,31 +211,18 @@
         </div>
       </div>
 
-      <div class="grid2" style="margin-top: 24px;">
-        <!-- SEARCH PREVIEW CARD (유튜브 검색 미리보기) -->
-        <div class="card">
-          <div class="section-title">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            검색 결과 확인 (유튜브 검색 미리보기)
-          </div>
-          <div class="blacklist-add-form">
-            <input type="text" id="preview-search-input" placeholder="유튜브 검색어 입력 (예: 버즈)..." onkeydown="if(event.key === 'Enter') searchPreviewKeywords()" />
-            <button onclick="searchPreviewKeywords()">검색</button>
-          </div>
-          <div class="queue-list scrollable" style="max-height: 450px; height: 388px; margin-top: 12px;" id="previewResultContainer">
-            <div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
-          </div>
+      <!-- SEARCH PREVIEW CARD (유튜브 검색 미리보기) -->
+      <div class="card" style="margin-top: 24px;">
+        <div class="section-title">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          검색 결과 확인 (유튜브 검색 미리보기)
         </div>
-
-        <!-- RECOMMENDATION PREVIEW CARD (추천 곡 미리보기) -->
-        <div class="card">
-          <div class="section-title" id="recommendationCardTitle">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-            서버 추천 곡 미리보기
-          </div>
-          <div class="queue-list scrollable" style="max-height: 450px; height: 388px; margin-top: 12px;" id="recommendationResultContainer">
-            <div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">충분한 키워드 데이터가 쌓이면 추천 곡이 나타납니다.</div>
-          </div>
+        <div class="blacklist-add-form">
+          <input type="text" id="preview-search-input" placeholder="유튜브 검색어 입력 (예: 버즈)..." onkeydown="if(event.key === 'Enter') searchPreviewKeywords()" />
+          <button onclick="searchPreviewKeywords()">검색</button>
+        </div>
+        <div class="queue-list scrollable" style="max-height: 450px; margin-top: 12px;" id="previewResultContainer">
+          <div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">검색어를 입력하고 검색 버튼을 눌러주세요.</div>
         </div>
       </div>
     </div>
