@@ -5,7 +5,8 @@ import {
   switchTab,
   addBlacklistFromInput,
   filterKeywordsTable,
-  searchPreviewKeywords
+  searchPreviewKeywords,
+  setKeywordMode
 } from './modules/admin.js';
 
 let socket = null;
@@ -97,6 +98,7 @@ window.addBlacklistFromInput = addBlacklistFromInput;
 window.filterKeywordsTable = filterKeywordsTable;
 window.searchPreviewKeywords = searchPreviewKeywords;
 window.sendControl = sendControl;
+window.setKeywordMode = setKeywordMode;
 
 // Mobile menu toggle logic
 const menuToggleBtn = document.getElementById('menu-toggle-btn');

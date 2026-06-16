@@ -3,6 +3,7 @@ import { createThumbnail } from './ui.js';
 import { playMusic } from './player.js';
 
 let allKeywordsData = [];
+let currentKeywordMode = 'server';
 
 export function switchTab(tab) {
   const menuDashboard = document.getElementById('menu-dashboard');
@@ -32,10 +33,26 @@ export function switchTab(tab) {
   }
 }
 
+export function setKeywordMode(mode) {
+  currentKeywordMode = mode;
+  const btnServer = document.getElementById('btn-mode-server');
+  const btnPersonal = document.getElementById('btn-mode-personal');
+  if (btnServer && btnPersonal) {
+    if (mode === 'server') {
+      btnServer.classList.add('active');
+      btnPersonal.classList.remove('active');
+    } else {
+      btnServer.classList.remove('active');
+      btnPersonal.classList.add('active');
+    }
+  }
+  loadAdminKeywords();
+}
+
 export async function loadAdminKeywords() {
   if (!token) return;
   try {
-    const res = await fetch(`/api/admin/keywords?token=${token}`);
+    const res = await fetch(`/api/admin/keywords?token=${token}&mode=${currentKeywordMode}`);
     if (res.status === 401) {
       alert('토큰이 만료되었습니다. Discord에서 /dashboard 명령어를 다시 입력해주세요.');
       return;
@@ -46,6 +63,7 @@ export async function loadAdminKeywords() {
 
       renderBlacklistChips(data.blacklist || []);
       renderKeywordsTable(allKeywordsData);
+      renderRecommendationResult(data.recommendation || null);
     }
   }
   catch (err) {
@@ -119,7 +137,7 @@ export async function addBlacklist(keyword) {
     const res = await fetch('/api/admin/blacklist', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, keyword }),
+      body: JSON.stringify({ token, keyword, mode: currentKeywordMode }),
     });
     const data = await res.json();
     if (data.ok) {
@@ -140,7 +158,7 @@ export async function removeBlacklist(keyword) {
     const res = await fetch('/api/admin/blacklist', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, keyword }),
+      body: JSON.stringify({ token, keyword, mode: currentKeywordMode }),
     });
     const data = await res.json();
     if (data.ok) {
@@ -203,6 +221,76 @@ export function renderPreviewResult(items) {
 
   if (items.length === 0) {
     container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">검색 결과가 없습니다.</div>';
+    return;
+  }
+
+  items.forEach((item, index) => {
+    const row = document.createElement('div');
+    row.className = 'queue-item';
+
+    const num = document.createElement('div');
+    num.className = 'queue-num';
+    num.textContent = String(index + 1);
+
+    const thumb = document.createElement('div');
+    thumb.className = 'queue-thumb';
+    thumb.appendChild(createThumbnail(item.thumbnail, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+
+    const info = document.createElement('div');
+    info.className = 'queue-info';
+
+    const title = document.createElement('div');
+    title.className = 'queue-title';
+    title.textContent = item.title;
+
+    const artist = document.createElement('div');
+    artist.className = 'queue-artist';
+    artist.textContent = item.artist;
+
+    info.append(title, artist);
+
+    const actions = document.createElement('div');
+    actions.className = 'queue-actions';
+    actions.style.display = 'flex';
+    actions.style.gap = '6px';
+
+    const playBtn = document.createElement('button');
+    playBtn.className = 'qa-btn';
+    playBtn.style.color = 'var(--red)';
+    playBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    playBtn.title = '대시보드에서 재생';
+    playBtn.onclick = () => playMusic(item.url);
+
+    const linkBtn = document.createElement('button');
+    linkBtn.className = 'qa-btn';
+    linkBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    linkBtn.title = '유튜브에서 열기';
+    linkBtn.onclick = () => window.open(item.url, '_blank');
+
+    actions.append(playBtn, linkBtn);
+    row.append(num, thumb, info, actions);
+    container.appendChild(row);
+  });
+}
+
+export function renderRecommendationResult(recommendation) {
+  const titleEl = document.getElementById('recommendationCardTitle');
+  const container = document.getElementById('recommendationResultContainer');
+  if (!titleEl || !container) return;
+  container.innerHTML = '';
+
+  const modeLabel = currentKeywordMode === 'personal' ? '나를 위한' : '서버';
+  if (!recommendation || !recommendation.keyword) {
+    titleEl.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ${modeLabel} 추천 곡 미리보기`;
+    container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">충분한 키워드 데이터가 쌓이면 추천 곡이 나타납니다.</div>';
+    return;
+  }
+
+  titleEl.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ${modeLabel} 추천 곡 미리보기 (키워드: #${recommendation.keyword})`;
+
+  const items = recommendation.items || [];
+  if (items.length === 0) {
+    container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">추천 검색 결과가 없습니다.</div>';
     return;
   }
 
