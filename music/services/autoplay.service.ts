@@ -3,6 +3,8 @@ import { GuildState, Track } from '../types';
 import { findAllHistory } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
 import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild } from './recommand-service';
+import { isDurationInRange } from '../utils/track-parser';
+
 
 export interface AutoplayDeps {
   client: Client;
@@ -67,7 +69,9 @@ export function createAutoplayService(deps: AutoplayDeps) {
                             const resolved = await resolveTracks(keyword);
                             const tracks = resolved?.tracks || [];
                             if (Array.isArray(tracks)) {
-                                searchResults.push(...tracks);
+                                // 1m 30s ~ 6m duration filtering
+                                const filtered = tracks.filter(t => isDurationInRange(t.info.length));
+                                searchResults.push(...filtered);
                             }
                         }
                         catch (searchErr) {
@@ -158,8 +162,13 @@ export function createAutoplayService(deps: AutoplayDeps) {
             try {
                 const resolved = await resolveTracks(generatedQuery);
                 if (resolved && resolved.tracks.length > 0) {
-                    recommendedUri = resolved.tracks[0].info.uri;
-                    recommendedTitle = resolved.tracks[0].info.title;
+                    const firstTrack = resolved.tracks[0];
+                    if (isDurationInRange(firstTrack.info.length)) {
+                        recommendedUri = firstTrack.info.uri;
+                        recommendedTitle = firstTrack.info.title;
+                    } else {
+                        console.log(`[AutoPlay Mood] Skipping song due to duration filter mismatch: ${generatedQuery} (${firstTrack.info.length}ms)`);
+                    }
                 }
                 else {
                     console.warn(`[AutoPlay Mood] Resolving returned empty tracks for query: "${generatedQuery}"`);
