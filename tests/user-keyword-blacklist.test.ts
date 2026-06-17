@@ -3,6 +3,8 @@ import assert from 'node:assert';
 import { sequelize } from '../db/sequelize';
 import { initUserKeywordBlacklistModel, UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
 import { initKeywordBlacklistModel } from '../music/models/keyword-blacklist';
+import { isDurationInRange } from '../music/utils/track-parser';
+
 
 describe('UserKeywordBlacklist Model Compatibility Tests', () => {
   before(async () => {
@@ -172,7 +174,7 @@ describe('UserKeywordBlacklist Model Compatibility Tests', () => {
       { info: { length: 400000, title: 'Too Long' } }, // 6m 40s
     ];
 
-    const filtered = mockTracks.filter(t => t.info.length >= 90000 && t.info.length <= 360000);
+    const filtered = mockTracks.filter(t => isDurationInRange(t.info.length));
     assert.strictEqual(filtered.length, 3);
     assert.strictEqual(filtered[0].info.title, 'Perfect 1');
     assert.strictEqual(filtered[1].info.title, 'Perfect 2');
