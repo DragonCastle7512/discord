@@ -7,6 +7,8 @@ import { findPlaylist } from '../music/repositorys/playlist.repository';
 import { DashboardResponse, MusicItem } from './types';
 import { verifyDashboardToken } from '../common/auth';
 import { notifyMusicUpdate } from '../common/socket';
+import { isDurationInRange } from '../music/utils/track-parser';
+
 import { KeywordBlacklist } from '../music/models/keyword-blacklist';
 import { MusicHistory } from '../music/models/music-history';
 import { UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
@@ -328,8 +330,8 @@ export function createDashboardRouter(
             try {
               const res = await music.searchTracks(kw);
               const rawTracks = res.tracks || [];
-              // 1m 30s (90,000ms) ~ 6m (360,000ms) duration filter
-              return rawTracks.filter((t: Track) => t.info.length >= 90000 && t.info.length <= 360000);
+              // 1m 30s ~ 6m duration filter
+              return rawTracks.filter((t: Track) => isDurationInRange(t.info.length));
             } catch (err) {
               console.error(`[GET /admin/keywords] search for "${kw}" failed:`, err);
               return [];
@@ -458,8 +460,8 @@ export function createDashboardRouter(
       const searchResult = await music.searchTracks(keyword);
       const tracks = searchResult.tracks || [];
 
-      // 1m 30s (90,000ms) ~ 6m (360,000ms) duration filter
-      const filteredTracks = tracks.filter((t: Track) => t.info.length >= 90000 && t.info.length <= 360000);
+      // 1m 30s ~ 6m duration filter
+      const filteredTracks = tracks.filter((t: Track) => isDurationInRange(t.info.length));
 
       const items = filteredTracks.slice(0, 10).map((t: Track) => ({
         id: t.info.identifier,
