@@ -51,6 +51,22 @@ export function setKeywordMode(mode) {
 
 export async function loadAdminKeywords() {
   if (!token) return;
+
+  const chipsContainer = document.getElementById('blacklistChips');
+  const tableBody = document.getElementById('keywordTableBody');
+  const recommendationContainer = document.getElementById('recommendationResultContainer');
+
+  // API 요청 전 로딩 상태 표시
+  if (chipsContainer) {
+    chipsContainer.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div></div>';
+  }
+  if (tableBody) {
+    tableBody.innerHTML = '<tr><td colspan="4"><div class="loading-container"><div class="loading-spinner"></div></div></td></tr>';
+  }
+  if (recommendationContainer) {
+    recommendationContainer.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div></div>';
+  }
+
   try {
     const res = await fetch(`/api/admin/keywords?token=${token}&mode=${currentKeywordMode}`);
     if (res.status === 401) {
@@ -68,6 +84,15 @@ export async function loadAdminKeywords() {
   }
   catch (err) {
     console.error('키워드 데이터 로드 실패:', err);
+    if (chipsContainer) {
+      chipsContainer.innerHTML = '<div style="color: var(--red); font-size: 13px; padding: 10px 0;">로딩 실패</div>';
+    }
+    if (tableBody) {
+      tableBody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--red); padding: 20px;">로딩 실패</td></tr>';
+    }
+    if (recommendationContainer) {
+      recommendationContainer.innerHTML = '<div style="color: var(--red); font-size: 13px; text-align: center; padding: 40px 0;">로딩 실패</div>';
+    }
   }
 }
 
