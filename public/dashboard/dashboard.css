@@ -630,4 +630,34 @@ body.is-dragging .pl-card * {
   background: rgba(255, 255, 255, 0.05);
 }
 
+/* 로딩 스피너 컨테이너 */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 40px 0;
+  width: 100%;
+  min-height: 100px;
+}
+
+/* 테이블 바디 영역 정렬용 */
+.keyword-table tbody .loading-container {
+  min-height: 200px;
+}
+
+/* 세련된 회전 스피너 링 */
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid var(--border);
+  border-top-color: var(--red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+
 
