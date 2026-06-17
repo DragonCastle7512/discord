@@ -3,6 +3,8 @@ const {
   parseUserIdFromArg,
   recommendFromHistory,
 } = require('../../music/services/recommand-service');
+const { isDurationInRange } = require('../../music/utils/track-parser');
+
 
 const buildListResponse = (items, region, label, keyword, meta = {}) => {
   const displayLimit = Number.isInteger(meta.displayLimit)
@@ -118,7 +120,7 @@ async function getYoutubePopularMusic(args) {
             if (!duration) {
               return true;
             }
-            return !isShortOrLongDuration(duration);
+            return isDurationInRange(duration);
           });
         }
       }
@@ -164,28 +166,6 @@ const searchYoutube = async (url) => {
   catch (err) {
     return `YouTube API 요청 중 오류: ${err?.message || err}`;
   }
-};
-
-const parseIsoDurationToSeconds = (duration) => {
-  if (!duration) {
-    return null;
-  }
-  const match = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(duration);
-  if (!match) {
-    return null;
-  }
-  const hours = Number(match[1] || 0);
-  const minutes = Number(match[2] || 0);
-  const seconds = Number(match[3] || 0);
-  return (hours * 3600) + (minutes * 60) + seconds;
-};
-
-const isShortOrLongDuration = (duration) => {
-  const seconds = parseIsoDurationToSeconds(duration);
-  if (seconds === null) {
-    return false;
-  }
-  return seconds <= 90 || seconds > 360;
 };
 
 module.exports = {
