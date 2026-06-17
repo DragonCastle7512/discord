@@ -1,4 +1,5 @@
 const { KeywordBlacklist } = require('../models/keyword-blacklist');
+const { isDurationInRange } = require('../utils/track-parser');
 
 async function getBlacklistForGuild(guildId) {
   if (!guildId) return new Set();
@@ -18,8 +19,7 @@ const POPULAR_LIMIT = 50;
 const TAG_KEYWORD_LIMIT = 4;
 const KEYWORD_SIMILARITY_THRESHOLD = 0.6;
 const MIN_TAG_KEYWORD_LENGTH = 4;
-const MIN_DURATION_MS = 90 * 1000;
-const MAX_DURATION_MS = 6 * 60 * 1000;
+
 
 function normalizeText(value) {
   return String(value || '')
@@ -110,10 +110,6 @@ function clampRecommendationCount(input) {
   const parsed = Number.parseInt(String(input || DEFAULT_COUNT), 10);
   if (!Number.isInteger(parsed) || parsed <= 0) return DEFAULT_COUNT;
   return Math.min(parsed, MAX_COUNT);
-}
-
-function isDurationInRange(durationMs) {
-  return Number.isFinite(durationMs) && durationMs >= MIN_DURATION_MS && durationMs <= MAX_DURATION_MS;
 }
 
 function formatDuration(durationMs) {

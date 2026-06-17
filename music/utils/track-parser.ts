@@ -110,3 +110,42 @@ export function extractYoutubeVideoId(input: string): string | null {
 
     return null;
 }
+
+export const MIN_DURATION_MS = 90 * 1000; // 1m 30s
+export const MAX_DURATION_MS = 6 * 60 * 1000; // 6m
+
+export function parseIsoDurationToSeconds(duration: string | null | undefined): number | null {
+    if (!duration) return null;
+    const match = /PT(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?/.exec(duration);
+    if (!match) return null;
+    const hours = Number(match[1] || 0);
+    const minutes = Number(match[2] || 0);
+    const seconds = Number(match[3] || 0);
+    return (hours * 3600) + (minutes * 60) + seconds;
+}
+
+/**
+ * 곡의 길이가 1분 30초 ~ 6분 범위에 속하는지 검사합니다.
+ * @param duration 밀리초 단위 숫자(number) 또는 ISO 8601 duration 문자열(string)
+ */
+export function isDurationInRange(duration: number | string | null | undefined): boolean {
+    if (duration === null || duration === undefined) return false;
+
+    let durationMs: number;
+    if (typeof duration === 'number') {
+        durationMs = duration;
+    } else if (typeof duration === 'string') {
+        if (/^\d+$/.test(duration)) {
+            durationMs = Number.parseInt(duration, 10);
+        } else {
+            const seconds = parseIsoDurationToSeconds(duration);
+            if (seconds === null) return false;
+            durationMs = seconds * 1000;
+        }
+    } else {
+        return false;
+    }
+
+    return Number.isFinite(durationMs) && durationMs >= MIN_DURATION_MS && durationMs <= MAX_DURATION_MS;
+}
+
