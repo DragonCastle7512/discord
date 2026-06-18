@@ -1,4 +1,5 @@
 import { token } from './state.js';
+import { showCustomConfirm } from './ui.js';
 
 let draggedItem = null;
 let draggedType = null;
@@ -62,7 +63,7 @@ export async function handleDrop(e, type, toIndex) {
 }
 
 export async function deleteItem(type, index) {
-  if (!confirm('정말 삭제하시겠습니까?')) return;
+  if (!await showCustomConfirm('정말 삭제하시겠습니까?')) return;
   try {
     const res = await fetch('/api/delete-item', {
       method: 'POST',
