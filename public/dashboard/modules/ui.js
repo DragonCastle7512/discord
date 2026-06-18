@@ -218,3 +218,103 @@ export function updateUI() {
   document.getElementById('trendList').replaceChildren(...mi.trending.map(createTrendItem));
   document.getElementById('playlistGrid').replaceChildren(...mi.playlists.map(createPlaylistCard));
 }
+
+// Toast Notification System
+export function showToast(message) {
+  let container = document.getElementById('toast-container');
+  if (!container) {
+    container = document.createElement('div');
+    container.id = 'toast-container';
+    document.body.appendChild(container);
+  }
+
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+
+  container.appendChild(toast);
+
+  // Force reflow for transition
+  toast.offsetHeight;
+  toast.classList.add('show');
+
+  // Fade out and remove
+  setTimeout(() => {
+    toast.classList.remove('show');
+    toast.addEventListener('transitionend', () => {
+      toast.remove();
+      if (container.childNodes.length === 0) {
+        container.remove();
+      }
+    });
+  }, 3000);
+}
+
+// Custom Alert Dialog System
+export function initCustomAlert() {
+  window.alert = function (message) {
+    // Prevent duplicated modals
+    if (document.querySelector('.custom-modal-overlay')) return;
+
+    // Body scroll lock
+    document.body.style.overflow = 'hidden';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-modal-overlay';
+
+    const card = document.createElement('div');
+    card.className = 'custom-modal-card';
+
+    const header = document.createElement('div');
+    header.className = 'custom-modal-header';
+    header.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
+        <line x1="12" y1="9" x2="12" y2="13"></line>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      <span>알림</span>
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'custom-modal-body';
+    body.textContent = message;
+
+    const footer = document.createElement('div');
+    footer.className = 'custom-modal-footer';
+
+    const btn = document.createElement('button');
+    btn.className = 'custom-modal-btn';
+    btn.textContent = '확인';
+
+    const closeModal = () => {
+      overlay.classList.remove('show');
+      overlay.addEventListener('transitionend', () => {
+        overlay.remove();
+        document.body.style.overflow = '';
+      });
+    };
+
+    btn.onclick = closeModal;
+    overlay.onclick = (e) => {
+      if (e.target === overlay) closeModal();
+    };
+
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        closeModal();
+        document.removeEventListener('keydown', handleEsc);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+
+    footer.appendChild(btn);
+    card.append(header, body, footer);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    // Force reflow
+    overlay.offsetHeight;
+    overlay.classList.add('show');
+  };
+}
