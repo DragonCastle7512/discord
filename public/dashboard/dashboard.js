@@ -1,6 +1,6 @@
 import { token, dashboardData, progressState } from './modules/state.js';
 import { startProgressTimer, sendControl, togglePlay } from './modules/player.js';
-import { updateUI } from './modules/ui.js';
+import { updateUI, initCustomAlert } from './modules/ui.js';
 import {
   switchTab,
   addBlacklistFromInput,
@@ -8,6 +8,9 @@ import {
   searchPreviewKeywords,
   setKeywordMode
 } from './modules/admin.js';
+
+// Initialize custom alert override
+initCustomAlert();
 
 let socket = null;
 
