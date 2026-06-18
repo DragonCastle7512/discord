@@ -318,3 +318,82 @@ export function initCustomAlert() {
     overlay.classList.add('show');
   };
 }
+
+// Custom Confirm Dialog System
+export function showCustomConfirm(message) {
+  return new Promise((resolve) => {
+    // Prevent duplicated modals
+    if (document.querySelector('.custom-modal-overlay')) {
+      resolve(false);
+      return;
+    }
+
+    // Body scroll lock
+    document.body.style.overflow = 'hidden';
+
+    const overlay = document.createElement('div');
+    overlay.className = 'custom-modal-overlay';
+
+    const card = document.createElement('div');
+    card.className = 'custom-modal-card';
+
+    const header = document.createElement('div');
+    header.className = 'custom-modal-header';
+    header.innerHTML = `
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="10"></circle>
+        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
+        <line x1="12" y1="17" x2="12.01" y2="17"></line>
+      </svg>
+      <span>확인 필요</span>
+    `;
+
+    const body = document.createElement('div');
+    body.className = 'custom-modal-body';
+    body.textContent = message;
+
+    const footer = document.createElement('div');
+    footer.className = 'custom-modal-footer';
+
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'custom-modal-btn cancel';
+    cancelBtn.textContent = '취소';
+
+    const confirmBtn = document.createElement('button');
+    confirmBtn.className = 'custom-modal-btn';
+    confirmBtn.textContent = '확인';
+
+    const closeWithResult = (result) => {
+      overlay.classList.remove('show');
+      overlay.addEventListener('transitionend', () => {
+        overlay.remove();
+        document.body.style.overflow = '';
+        resolve(result);
+      });
+    };
+
+    confirmBtn.onclick = () => closeWithResult(true);
+    cancelBtn.onclick = () => closeWithResult(false);
+    
+    overlay.onclick = (e) => {
+      if (e.target === overlay) closeWithResult(false);
+    };
+
+    const handleEsc = (e) => {
+      if (e.key === 'Escape') {
+        closeWithResult(false);
+        document.removeEventListener('keydown', handleEsc);
+      }
+    };
+    document.addEventListener('keydown', handleEsc);
+
+    footer.append(cancelBtn, confirmBtn);
+    card.append(header, body, footer);
+    overlay.appendChild(card);
+    document.body.appendChild(overlay);
+
+    // Force reflow
+    overlay.offsetHeight;
+    overlay.classList.add('show');
+  });
+}
