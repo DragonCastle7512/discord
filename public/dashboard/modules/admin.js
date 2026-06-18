@@ -1,5 +1,5 @@
 import { token } from './state.js';
-import { createThumbnail } from './ui.js';
+import { createThumbnail, showToast } from './ui.js';
 import { playMusic } from './player.js';
 
 let allKeywordsData = [];
@@ -166,6 +166,7 @@ export async function addBlacklist(keyword) {
     });
     const data = await res.json();
     if (data.ok) {
+      showToast(`키워드 '${keyword}'(을)를 차단했습니다.`);
       loadAdminKeywords();
     }
     else {
@@ -187,6 +188,7 @@ export async function removeBlacklist(keyword) {
     });
     const data = await res.json();
     if (data.ok) {
+      showToast(`키워드 '${keyword}' 차단을 해제했습니다.`);
       loadAdminKeywords();
     }
     else {
