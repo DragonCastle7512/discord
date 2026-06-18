@@ -212,7 +212,7 @@ export function createMusicRuntime({
     notifyMusicUpdate(userId, 'playlist');
 
     const title = track.info?.title || 'Unknown title';
-    return { ok: true, message: `Playlist에 노래를 추가했어요!\n **${title}**${note}` };
+    return { ok: true, message: `Playlist에 노래를 추가했어요!\n ${title}${note}` };
   }
 
   async function clearToPlaylist(userId: string): Promise<RuntimeResponse> {

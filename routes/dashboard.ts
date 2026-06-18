@@ -244,9 +244,11 @@ export function createDashboardRouter(
         case 'previous':
           result = await music.previous(session.guildId);
           break;
-        case 'loop':
-          result = await music.loop(session.guildId, null);
+        case 'loop': {
+          const loopRes = await music.loop(session.guildId, null);
+          result = { ok: true, enabled: loopRes.enabled };
           break;
+        }
         case 'pause':
           result = await music.pause(session.guildId);
           break;
