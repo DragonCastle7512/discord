@@ -56,14 +56,21 @@ export async function sendControl(action) {
         shuffle: '대기열을 무작위로 섞었습니다.',
         skip: '다음 곡으로 넘어갑니다.',
         previous: '이전 곡으로 돌아갑니다.',
-        loop: '반복 재생 모드가 변경되었습니다.',
         pause: '재생 상태를 변경했습니다.'
       };
-      if (messages[action]) {
+      if (action === 'loop') {
+        const loopMsg = result.enabled ? '반복 재생 모드를 활성화했습니다. 🔁' : '반복 재생 모드를 비활성화했습니다.';
+        showToast(loopMsg);
+      } else if (action === 'addPlaylist') {
+        showToast(result.message || '플레이리스트에 곡을 추가했습니다. 🎵');
+      } else if (messages[action]) {
         showToast(messages[action]);
       }
     } else {
       console.error(`${action} 실패:`, result.message);
+      if (action === 'addPlaylist') {
+        alert(result.message || '플레이리스트 추가에 실패했습니다.');
+      }
     }
   }
   catch (err) {
