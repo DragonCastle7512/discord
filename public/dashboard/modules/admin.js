@@ -210,6 +210,16 @@ export async function addBlacklist(keyword) {
 
 export async function removeBlacklist(keyword) {
   if (!keyword || !token) return;
+
+  // 1. 실패 시 복구를 위한 상태 백업
+  const backupBlacklist = [...allBlacklistData];
+
+  // 2. 상태 변경 (낙관적 업데이트: 칩 목록에서 즉시 제거)
+  allBlacklistData = allBlacklistData.filter(item => item !== keyword);
+
+  // 3. UI 즉시 반영
+  renderBlacklistChips(allBlacklistData);
+
   try {
     const res = await fetch('/api/admin/blacklist', {
       method: 'DELETE',
@@ -219,14 +229,21 @@ export async function removeBlacklist(keyword) {
     const data = await res.json();
     if (data.ok) {
       showToast(`키워드 '${keyword}' 차단을 해제했습니다.`);
-      loadAdminKeywords();
+      // 백그라운드 갱신 (스피너 없이 테이블 복구)
+      loadAdminKeywords(false);
     }
     else {
+      // 실패 시 롤백 및 에러 알림
+      allBlacklistData = backupBlacklist;
+      renderBlacklistChips(allBlacklistData);
       alert(data.error || '차단 해제 실패');
     }
   }
   catch (err) {
     console.error('차단 해제 요청 실패:', err);
+    // 실패 시 롤백
+    allBlacklistData = backupBlacklist;
+    renderBlacklistChips(allBlacklistData);
   }
 }
 
