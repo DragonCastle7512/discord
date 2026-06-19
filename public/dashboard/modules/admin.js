@@ -162,6 +162,21 @@ export function renderKeywordsTable(keywords) {
 
 export async function addBlacklist(keyword) {
   if (!keyword || !token) return;
+
+  // 1. 실패 시 복구를 위한 상태 백업
+  const backupKeywords = [...allKeywordsData];
+  const backupBlacklist = [...allBlacklistData];
+
+  // 2. 상태 변경 (낙관적 업데이트)
+  allKeywordsData = allKeywordsData.filter(item => item.tag !== keyword);
+  if (!allBlacklistData.includes(keyword)) {
+    allBlacklistData.push(keyword);
+  }
+
+  // 3. UI 즉시 반영
+  renderBlacklistChips(allBlacklistData);
+  renderKeywordsTable(allKeywordsData);
+
   try {
     const res = await fetch('/api/admin/blacklist', {
       method: 'POST',
@@ -171,14 +186,25 @@ export async function addBlacklist(keyword) {
     const data = await res.json();
     if (data.ok) {
       showToast(`키워드 '${keyword}'(을)를 차단했습니다.`);
-      loadAdminKeywords();
+      // 백그라운드 갱신 (스피너 비활성화)
+      loadAdminKeywords(false);
     }
     else {
+      // 실패 시 롤백 및 에러 알림
+      allKeywordsData = backupKeywords;
+      allBlacklistData = backupBlacklist;
+      renderBlacklistChips(allBlacklistData);
+      renderKeywordsTable(allKeywordsData);
       alert(data.error || '차단 실패');
     }
   }
   catch (err) {
     console.error('차단 요청 실패:', err);
+    // 실패 시 롤백
+    allKeywordsData = backupKeywords;
+    allBlacklistData = backupBlacklist;
+    renderBlacklistChips(allBlacklistData);
+    renderKeywordsTable(allKeywordsData);
   }
 }
 
