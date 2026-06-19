@@ -6,7 +6,7 @@ import {
   addBlacklistFromInput,
   filterKeywordsTable,
   searchPreviewKeywords,
-  setKeywordMode
+  setKeywordMode,
 } from './modules/admin.js';
 
 // Initialize custom alert override

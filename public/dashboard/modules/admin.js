@@ -42,7 +42,8 @@ export function setKeywordMode(mode) {
     if (mode === 'server') {
       btnServer.classList.add('active');
       btnPersonal.classList.remove('active');
-    } else {
+    }
+    else {
       btnServer.classList.remove('active');
       btnPersonal.classList.add('active');
     }
@@ -80,6 +81,7 @@ export async function loadAdminKeywords(showLoading = true) {
     if (data.ok) {
       allKeywordsData = data.keywords || [];
       allBlacklistData = data.blacklist || [];
+      allBlacklistData.sort();
 
       renderBlacklistChips(allBlacklistData);
       renderKeywordsTable(allKeywordsData);
