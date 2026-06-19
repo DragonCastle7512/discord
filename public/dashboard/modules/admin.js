@@ -3,6 +3,7 @@ import { createThumbnail, showToast } from './ui.js';
 import { playMusic } from './player.js';
 
 let allKeywordsData = [];
+let allBlacklistData = [];
 let currentKeywordMode = 'server';
 
 export function switchTab(tab) {
@@ -49,22 +50,24 @@ export function setKeywordMode(mode) {
   loadAdminKeywords();
 }
 
-export async function loadAdminKeywords() {
+export async function loadAdminKeywords(showLoading = true) {
   if (!token) return;
 
   const chipsContainer = document.getElementById('blacklistChips');
   const tableBody = document.getElementById('keywordTableBody');
   const recommendationContainer = document.getElementById('recommendationResultContainer');
 
-  // API 요청 전 로딩 상태 표시
-  if (chipsContainer) {
-    chipsContainer.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div></div>';
-  }
-  if (tableBody) {
-    tableBody.innerHTML = '<tr><td colspan="4"><div class="loading-container"><div class="loading-spinner"></div></div></td></tr>';
-  }
-  if (recommendationContainer) {
-    recommendationContainer.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div></div>';
+  // API 요청 전 로딩 상태 표시 (showLoading이 true일 때만 노출)
+  if (showLoading) {
+    if (chipsContainer) {
+      chipsContainer.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div></div>';
+    }
+    if (tableBody) {
+      tableBody.innerHTML = '<tr><td colspan="4"><div class="loading-container"><div class="loading-spinner"></div></div></td></tr>';
+    }
+    if (recommendationContainer) {
+      recommendationContainer.innerHTML = '<div class="loading-container"><div class="loading-spinner"></div></div>';
+    }
   }
 
   try {
@@ -76,8 +79,9 @@ export async function loadAdminKeywords() {
     const data = await res.json();
     if (data.ok) {
       allKeywordsData = data.keywords || [];
+      allBlacklistData = data.blacklist || [];
 
-      renderBlacklistChips(data.blacklist || []);
+      renderBlacklistChips(allBlacklistData);
       renderKeywordsTable(allKeywordsData);
       renderRecommendationResult(data.recommendation || null);
     }
