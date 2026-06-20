@@ -4,6 +4,9 @@ import { showCustomConfirm } from './ui.js';
 let draggedItem = null;
 let draggedType = null;
 let lastTouchTarget = null;
+let activeGhost = null;
+let touchOffsetX = 0;
+let touchOffsetY = 0;
 
 function setDraggingState(active) {
   if (active) document.body.classList.add('is-dragging');
@@ -78,11 +81,23 @@ export async function deleteItem(type, index) {
 }
 
 export function setupTouchEvents(el, type, index) {
-  el.addEventListener('touchstart', () => {
+  el.addEventListener('touchstart', (e) => {
     draggedItem = index;
     draggedType = type;
     el.style.opacity = '0.4';
     setDraggingState(true);
+
+    const touch = e.touches[0];
+    const rect = el.getBoundingClientRect();
+    touchOffsetX = touch.clientX - rect.left;
+    touchOffsetY = touch.clientY - rect.top;
+
+    activeGhost = el.cloneNode(true);
+    activeGhost.classList.add('touch-ghost');
+    activeGhost.style.width = `${rect.width}px`;
+    activeGhost.style.height = `${rect.height}px`;
+    activeGhost.style.transform = `translate3d(${touch.clientX - touchOffsetX}px, ${touch.clientY - touchOffsetY}px, 0) scale(1.05)`;
+    document.body.appendChild(activeGhost);
   }, { passive: true });
 
   el.addEventListener('touchmove', (e) => {
@@ -91,6 +106,10 @@ export function setupTouchEvents(el, type, index) {
     if (e.cancelable) e.preventDefault();
 
     const touch = e.touches[0];
+    if (activeGhost) {
+      activeGhost.style.transform = `translate3d(${touch.clientX - touchOffsetX}px, ${touch.clientY - touchOffsetY}px, 0) scale(1.05)`;
+    }
+
     const target = document.elementFromPoint(touch.clientX, touch.clientY);
     const item = target?.closest('.queue-item, .pl-card');
 
@@ -104,12 +123,28 @@ export function setupTouchEvents(el, type, index) {
   el.addEventListener('touchend', async (e) => {
     el.style.opacity = '1';
     setDraggingState(false);
+    if (activeGhost) {
+      activeGhost.remove();
+      activeGhost = null;
+    }
     if (lastTouchTarget) {
       const parent = lastTouchTarget.parentNode;
       const toIndex = Array.from(parent.children).indexOf(lastTouchTarget);
       lastTouchTarget.classList.remove('drag-over');
       await handleDrop(e, type, toIndex);
     }
+    draggedItem = null;
+    lastTouchTarget = null;
+  }, { passive: true });
+
+  el.addEventListener('touchcancel', () => {
+    el.style.opacity = '1';
+    setDraggingState(false);
+    if (activeGhost) {
+      activeGhost.remove();
+      activeGhost = null;
+    }
+    document.querySelectorAll('.queue-item, .pl-card').forEach(i => i.classList.remove('drag-over'));
     draggedItem = null;
     lastTouchTarget = null;
   }, { passive: true });
