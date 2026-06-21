@@ -122,6 +122,9 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       }
 
       player.on('end', async (event) => {
+        if (event?.reason === 'replaced') {
+          return;
+        }
         const endedTrack = state.current;
         const endedHistoryId = state.currentHistoryId;
         state.playing = false;

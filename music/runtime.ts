@@ -130,7 +130,7 @@ export function createMusicRuntime({
       }
     }
 
-    if (!state.playing) {
+    if (!state.current) {
       await playNext(guild.id);
     }
 
