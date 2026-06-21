@@ -1,5 +1,5 @@
-import { token } from './state.js';
 import { showCustomConfirm } from './ui.js';
+import { api } from './api.js';
 
 let draggedItem = null;
 let draggedType = null;
@@ -53,11 +53,7 @@ export async function handleDrop(e, type, toIndex) {
   draggedItem = null;
 
   try {
-    const res = await fetch('/api/move-item', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, type, from: fromIndex, to: toIndex }),
-    });
+    const res = await api.moveItem(type, fromIndex, toIndex);
     if (!res.ok) console.error('이동 실패');
   }
   catch (err) {
@@ -68,11 +64,7 @@ export async function handleDrop(e, type, toIndex) {
 export async function deleteItem(type, index) {
   if (!await showCustomConfirm('정말 삭제하시겠습니까?')) return;
   try {
-    const res = await fetch('/api/delete-item', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, type, index }),
-    });
+    const res = await api.deleteItem(type, index);
     if (!res.ok) console.error('삭제 실패');
   }
   catch (err) {

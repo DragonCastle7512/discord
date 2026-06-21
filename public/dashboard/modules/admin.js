@@ -1,4 +1,4 @@
-import { token } from './state.js';
+import { api } from './api.js';
 import { createThumbnail, showToast } from './ui.js';
 import { playMusic } from './player.js';
 
@@ -72,12 +72,7 @@ export async function loadAdminKeywords(showLoading = true) {
   }
 
   try {
-    const res = await fetch(`/api/admin/keywords?token=${token}&mode=${currentKeywordMode}`);
-    if (res.status === 401) {
-      alert('토큰이 만료되었습니다. Discord에서 /dashboard 명령어를 다시 입력해주세요.');
-      return;
-    }
-    const data = await res.json();
+    const data = await api.fetchKeywords(currentKeywordMode);
     if (data.ok) {
       allKeywordsData = data.keywords || [];
       allBlacklistData = data.blacklist || [];
@@ -180,12 +175,7 @@ export async function addBlacklist(keyword) {
   renderKeywordsTable(allKeywordsData);
 
   try {
-    const res = await fetch('/api/admin/blacklist', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, keyword, mode: currentKeywordMode }),
-    });
-    const data = await res.json();
+    const data = await api.addBlacklist(keyword, currentKeywordMode);
     if (data.ok) {
       showToast(`키워드 '${keyword}'(을)를 차단했습니다.`);
       // 백그라운드 갱신 (스피너 비활성화)
@@ -223,12 +213,7 @@ export async function removeBlacklist(keyword) {
   renderBlacklistChips(allBlacklistData);
 
   try {
-    const res = await fetch('/api/admin/blacklist', {
-      method: 'DELETE',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, keyword, mode: currentKeywordMode }),
-    });
-    const data = await res.json();
+    const data = await api.removeBlacklist(keyword, currentKeywordMode);
     if (data.ok) {
       showToast(`키워드 '${keyword}' 차단을 해제했습니다.`);
       // 백그라운드 갱신 (스피너 없이 테이블 복구)
@@ -276,8 +261,7 @@ export async function searchPreviewKeywords() {
   container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0;">유튜브 검색 결과를 가져오는 중...</div>';
 
   try {
-    const res = await fetch(`/api/admin/search-preview?token=${token}&keyword=${encodeURIComponent(keyword)}`);
-    const data = await res.json();
+    const data = await api.searchPreview(keyword);
     if (data.ok) {
       renderPreviewResult(data.items || []);
     }

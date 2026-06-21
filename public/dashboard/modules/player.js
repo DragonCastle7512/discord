@@ -1,5 +1,6 @@
-import { token, dashboardData, progressState } from './state.js';
+import { dashboardData, progressState } from './state.js';
 import { showToast } from './ui.js';
+import { api } from './api.js';
 
 export function startProgressTimer() {
   if (progressState.progressInterval) clearInterval(progressState.progressInterval);
@@ -26,12 +27,7 @@ export function updateProgressBarUI() {
 
 export async function playMusic(url) {
   try {
-    const res = await fetch('/api/play-music', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, url }),
-    });
-    const result = await res.json();
+    const result = await api.playMusic(url);
     if (result.ok) {
       showToast('성공적으로 재생을 요청했습니다.');
     }
@@ -46,12 +42,7 @@ export async function playMusic(url) {
 
 export async function sendControl(action) {
   try {
-    const res = await fetch('/api/control', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, action }),
-    });
-    const result = await res.json();
+    const result = await api.sendControl(action);
     if (result.ok) {
       const messages = {
         shuffle: '대기열을 무작위로 섞었습니다.',
