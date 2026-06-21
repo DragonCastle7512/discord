@@ -8,6 +8,8 @@ import {
   searchPreviewKeywords,
   setKeywordMode,
 } from './modules/admin.js';
+import { renderIcons } from './modules/icons.js';
+import { api } from './modules/api.js';
 
 // Initialize custom alert override
 initCustomAlert();
@@ -65,13 +67,7 @@ function mergeDashboardData(newData, type) {
 export async function fetchDashboardData(type = 'all') {
   if (!token) return;
   try {
-    const res = await fetch(`/api/dashboard-data?token=${token}&type=${type}`);
-    if (res.status === 401) {
-      alert('토큰이 만료되었습니다. Discord에서 /dashboard 명령어를 다시 입력해주세요.');
-      return;
-    }
-    const response = await res.json();
-
+    const response = await api.fetchDashboardData(type);
     mergeDashboardData(response, type);
 
     if (dashboardData.server.guildId || dashboardData.server.userId) {
@@ -87,21 +83,64 @@ export async function fetchDashboardData(type = 'all') {
   }
 }
 
+function setupDOMEvents() {
+  // 1. Sidebar Tabs
+  const menuDashboard = document.getElementById('menu-dashboard');
+  const menuAdmin = document.getElementById('menu-admin');
+  if (menuDashboard) menuDashboard.addEventListener('click', () => switchTab('dashboard'));
+  if (menuAdmin) menuAdmin.addEventListener('click', () => switchTab('admin'));
+
+  // 2. Player Controls
+  const addPlaylistBtn = document.getElementById('addPlaylistBtn');
+  const prevBtn = document.getElementById('prevBtn');
+  const playBtn = document.getElementById('playBtn');
+  const skipBtn = document.getElementById('skipBtn');
+  const loopBtn = document.getElementById('loopBtn');
+  const shuffleBtn = document.getElementById('shuffleBtn');
+
+  if (addPlaylistBtn) addPlaylistBtn.addEventListener('click', () => sendControl('addPlaylist'));
+  if (prevBtn) prevBtn.addEventListener('click', () => sendControl('previous'));
+  if (playBtn) playBtn.addEventListener('click', () => togglePlay());
+  if (skipBtn) skipBtn.addEventListener('click', () => sendControl('skip'));
+  if (loopBtn) loopBtn.addEventListener('click', () => sendControl('loop'));
+  if (shuffleBtn) shuffleBtn.addEventListener('click', () => sendControl('shuffle'));
+
+  // 3. Admin View Controls
+  const btnModeServer = document.getElementById('btn-mode-server');
+  const btnModePersonal = document.getElementById('btn-mode-personal');
+  const blacklistAddBtn = document.getElementById('blacklistAddBtn');
+  const blacklistInput = document.getElementById('blacklist-input');
+  const keywordSearchInput = document.getElementById('keyword-search-input');
+  const previewSearchInput = document.getElementById('preview-search-input');
+  const previewSearchBtn = document.getElementById('previewSearchBtn');
+
+  if (btnModeServer) btnModeServer.addEventListener('click', () => setKeywordMode('server'));
+  if (btnModePersonal) btnModePersonal.addEventListener('click', () => setKeywordMode('personal'));
+  if (blacklistAddBtn) blacklistAddBtn.addEventListener('click', () => addBlacklistFromInput());
+  if (blacklistInput) {
+    blacklistInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') addBlacklistFromInput();
+    });
+  }
+  if (keywordSearchInput) {
+    keywordSearchInput.addEventListener('input', () => filterKeywordsTable());
+  }
+  if (previewSearchInput) {
+    previewSearchInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') searchPreviewKeywords();
+    });
+  }
+  if (previewSearchBtn) previewSearchBtn.addEventListener('click', () => searchPreviewKeywords());
+}
+
 if (token) {
+  setupDOMEvents();
   fetchDashboardData();
+  renderIcons();
 }
 else {
   alert('인증 토큰이 없습니다. Discord에서 /dashboard 명령어를 입력해 주세요.');
 }
-
-// Bind to window to allow HTML onclick events to work
-window.togglePlay = togglePlay;
-window.switchTab = switchTab;
-window.addBlacklistFromInput = addBlacklistFromInput;
-window.filterKeywordsTable = filterKeywordsTable;
-window.searchPreviewKeywords = searchPreviewKeywords;
-window.sendControl = sendControl;
-window.setKeywordMode = setKeywordMode;
 
 // Mobile menu toggle logic
 const menuToggleBtn = document.getElementById('menu-toggle-btn');
