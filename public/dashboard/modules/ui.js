@@ -2,6 +2,7 @@ import { dashboardData, progressState } from './state.js';
 import { formatTime, updateProgressBarUI } from './player.js';
 import { handleDragStart, handleDragEnd, handleDragOver, handleDragLeave, handleDrop, setupTouchEvents, deleteItem } from './dragdrop.js';
 import { playMusic } from './player.js';
+import { getIcon } from './icons.js';
 
 export function createThumbnail(src, fallbackSvgHtml, className = '') {
   if (src) {
@@ -36,7 +37,7 @@ export function createQueueItem(s, i) {
 
   const thumb = document.createElement('div');
   thumb.className = 'queue-thumb';
-  thumb.appendChild(createThumbnail(s.artwork, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+  thumb.appendChild(createThumbnail(s.artwork, getIcon('music')));
 
   const info = document.createElement('div');
   info.className = 'queue-info';
@@ -56,7 +57,7 @@ export function createQueueItem(s, i) {
   actions.className = 'queue-actions';
   const delBtn = document.createElement('button');
   delBtn.className = 'qa-btn';
-  delBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+  delBtn.innerHTML = getIcon('trash');
   delBtn.onclick = (e) => {
     e.stopPropagation();
     deleteItem('queue', i);
@@ -80,7 +81,7 @@ export function createTrendItem(s, i) {
   thumb.style.width = '38px';
   thumb.style.height = '38px';
   thumb.style.marginRight = '8px';
-  thumb.appendChild(createThumbnail(s.artwork, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+  thumb.appendChild(createThumbnail(s.artwork, getIcon('music')));
 
   const barWrap = document.createElement('div');
   barWrap.className = 'trend-bar-wrap';
@@ -121,7 +122,7 @@ export function createPlaylistCard(p, i) {
 
   const icon = document.createElement('div');
   icon.className = 'pl-icon';
-  icon.appendChild(createThumbnail(p.artwork, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>', 'border-radius:7px'));
+  icon.appendChild(createThumbnail(p.artwork, getIcon('music'), 'border-radius:7px'));
 
   const name = document.createElement('div');
   name.className = 'pl-name';
@@ -140,7 +141,7 @@ export function createPlaylistCard(p, i) {
 
   const delBtn = document.createElement('button');
   delBtn.className = 'pl-btn del';
-  delBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg>';
+  delBtn.innerHTML = getIcon('trash');
   delBtn.onclick = (e) => {
     e.stopPropagation();
     deleteItem('playlist', i);
@@ -182,7 +183,7 @@ export function updateUI() {
 
     updateProgressBarUI();
 
-    thumbEl.replaceChildren(createThumbnail(cm.artwork, '<svg viewBox="0 0 24 24" fill="currentColor" style="width:28px;height:28px;color:var(--red);"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>', 'np-thumb-img'));
+    thumbEl.replaceChildren(createThumbnail(cm.artwork, getIcon('musicRed'), 'np-thumb-img'));
 
     const reqAvWrap = document.querySelector('.now-playing div:last-child div:nth-child(2) div');
     if (cm.avatar) {
@@ -201,7 +202,7 @@ export function updateUI() {
     document.querySelector('.progress-dot').style.left = '0%';
     document.querySelector('.progress-times span:first-child').textContent = '0:00';
     document.querySelector('.progress-times span:last-child').textContent = '0:00';
-    thumbEl.replaceChildren(createThumbnail(null, '<svg viewBox="0 0 24 24" fill="currentColor" style="width:28px;height:28px;color:var(--muted);"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+    thumbEl.replaceChildren(createThumbnail(null, getIcon('musicMuted')));
   }
 
   const statVals = document.querySelectorAll('.stat-val');
@@ -268,11 +269,7 @@ export function initCustomAlert() {
     const header = document.createElement('div');
     header.className = 'custom-modal-header';
     header.innerHTML = `
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path>
-        <line x1="12" y1="9" x2="12" y2="13"></line>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-      </svg>
+      ${getIcon('alert')}
       <span>알림</span>
     `;
 
@@ -340,11 +337,7 @@ export function showCustomConfirm(message) {
     const header = document.createElement('div');
     header.className = 'custom-modal-header';
     header.innerHTML = `
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="12" r="10"></circle>
-        <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path>
-        <line x1="12" y1="17" x2="12.01" y2="17"></line>
-      </svg>
+      ${getIcon('confirm')}
       <span>확인 필요</span>
     `;
 

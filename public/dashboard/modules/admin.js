@@ -1,6 +1,7 @@
 import { api } from './api.js';
 import { createThumbnail, showToast } from './ui.js';
 import { playMusic } from './player.js';
+import { getIcon } from './icons.js';
 
 let allKeywordsData = [];
 let allBlacklistData = [];
@@ -294,7 +295,7 @@ export function renderPreviewResult(items) {
 
     const thumb = document.createElement('div');
     thumb.className = 'queue-thumb';
-    thumb.appendChild(createThumbnail(item.thumbnail, '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3v10.55c-.59-.34-1.27-.55-2-.55-2.21 0-4 1.79-4 4s1.79 4 4 4 4-1.79 4-4V7h4V3h-6z"/></svg>'));
+    thumb.appendChild(createThumbnail(item.thumbnail, getIcon('music')));
 
     const info = document.createElement('div');
     info.className = 'queue-info';
@@ -317,13 +318,13 @@ export function renderPreviewResult(items) {
     const playBtn = document.createElement('button');
     playBtn.className = 'qa-btn';
     playBtn.style.color = 'var(--red)';
-    playBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    playBtn.innerHTML = getIcon('play');
     playBtn.title = '대시보드에서 재생';
     playBtn.onclick = () => playMusic(item.url);
 
     const linkBtn = document.createElement('button');
     linkBtn.className = 'qa-btn';
-    linkBtn.innerHTML = '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>';
+    linkBtn.innerHTML = getIcon('link');
     linkBtn.title = '유튜브에서 열기';
     linkBtn.onclick = () => window.open(item.url, '_blank');
 
@@ -341,7 +342,7 @@ export function renderRecommendationResult(recommendation) {
 
   const modeLabel = currentKeywordMode === 'personal' ? '나를 위한' : '서버';
 
-  titleEl.innerHTML = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="var(--red)" stroke-width="2"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg> ${modeLabel} 추천 곡 미리보기`;
+  titleEl.innerHTML = `${getIcon('recommend')} ${modeLabel} 추천 곡 미리보기`;
   if (!recommendation) {
     container.innerHTML = '<div style="color: var(--muted); font-size: 13px; text-align: center; padding: 40px 0; width: 100%;">충분한 키워드 데이터가 쌓이면 추천 곡이 나타납니다.</div>';
     return;
@@ -392,7 +393,7 @@ export function renderRecommendationResult(recommendation) {
 
     const playCircle = document.createElement('div');
     playCircle.className = 'card-play-btn-circle';
-    playCircle.innerHTML = '<svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><polygon points="5 3 19 12 5 21 5 3"/></svg>';
+    playCircle.innerHTML = getIcon('play');
     overlay.appendChild(playCircle);
 
     thumbContainer.append(img, overlay);
@@ -417,7 +418,7 @@ export function renderRecommendationResult(recommendation) {
 
     const viewBtn = document.createElement('button');
     viewBtn.className = 'card-action-btn';
-    viewBtn.innerHTML = '<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg> 유튜브에서 열기';
+    viewBtn.innerHTML = `${getIcon('link')} 유튜브에서 열기`;
     viewBtn.onclick = () => window.open(item.url, '_blank');
 
     actionsContainer.appendChild(viewBtn);
