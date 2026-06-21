@@ -1,6 +1,7 @@
 import { dashboardData, progressState } from './state.js';
 import { showToast } from './ui.js';
 import { api } from './api.js';
+import { getIcon } from './icons.js';
 
 export function startProgressTimer() {
   if (progressState.progressInterval) clearInterval(progressState.progressInterval);
@@ -88,25 +89,14 @@ export function togglePlay() {
 
   sendControl('pause');
   if (playIcon) {
-    const isPlayingIcon = playIcon.innerHTML.includes('rect');
-    playIcon.replaceChildren();
-    if (isPlayingIcon) {
-      const poly = document.createElementNS('http://www.w3.org/2000/svg', 'polygon');
-      poly.setAttribute('points', '5 3 19 12 5 21 5 3');
-      playIcon.appendChild(poly);
+    const isPauseIcon = playIcon.getAttribute('data-icon') === 'pause';
+    if (isPauseIcon) {
+      playIcon.setAttribute('data-icon', 'play');
+      playIcon.innerHTML = getIcon('play');
     }
     else {
-      const r1 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      r1.setAttribute('x', '6');
-      r1.setAttribute('y', '4');
-      r1.setAttribute('width', '4');
-      r1.setAttribute('height', '16');
-      const r2 = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-      r2.setAttribute('x', '14');
-      r2.setAttribute('y', '4');
-      r2.setAttribute('width', '4');
-      r2.setAttribute('height', '16');
-      playIcon.append(r1, r2);
+      playIcon.setAttribute('data-icon', 'pause');
+      playIcon.innerHTML = getIcon('pause');
     }
   }
 }

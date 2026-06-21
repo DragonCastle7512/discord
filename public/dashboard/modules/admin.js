@@ -1,4 +1,5 @@
 import { api } from './api.js';
+import { token } from './state.js';
 import { createThumbnail, showToast } from './ui.js';
 import { playMusic } from './player.js';
 import { getIcon } from './icons.js';

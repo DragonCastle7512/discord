@@ -13,7 +13,8 @@ async function request(url, options = {}) {
     }
     const data = await res.json();
     return data;
-  } catch (err) {
+  }
+  catch (err) {
     console.error(`API Error (${url}):`, err);
     throw err;
   }
@@ -21,12 +22,12 @@ async function request(url, options = {}) {
 
 export const api = {
   fetchDashboardData: (type) => request(`/api/dashboard-data?type=${type}`),
-  sendControl: (action) => request('/api/control', { method: 'POST', body: JSON.stringify({ action }) }),
-  playMusic: (url) => request('/api/play-music', { method: 'POST', body: JSON.stringify({ url }) }),
-  moveItem: (type, from, to) => request('/api/move-item', { method: 'POST', body: JSON.stringify({ type, from, to }) }),
-  deleteItem: (type, index) => request('/api/delete-item', { method: 'POST', body: JSON.stringify({ type, index }) }),
+  sendControl: (action) => request('/api/control', { method: 'POST', body: JSON.stringify({ token, action }) }),
+  playMusic: (url) => request('/api/play-music', { method: 'POST', body: JSON.stringify({ token, url }) }),
+  moveItem: (type, from, to) => request('/api/move-item', { method: 'POST', body: JSON.stringify({ token, type, from, to }) }),
+  deleteItem: (type, index) => request('/api/delete-item', { method: 'POST', body: JSON.stringify({ token, type, index }) }),
   fetchKeywords: (mode) => request(`/api/admin/keywords?mode=${mode}`),
-  addBlacklist: (keyword, mode) => request('/api/admin/blacklist', { method: 'POST', body: JSON.stringify({ keyword, mode }) }),
-  removeBlacklist: (keyword, mode) => request('/api/admin/blacklist', { method: 'DELETE', body: JSON.stringify({ keyword, mode }) }),
+  addBlacklist: (keyword, mode) => request('/api/admin/blacklist', { method: 'POST', body: JSON.stringify({ token, keyword, mode }) }),
+  removeBlacklist: (keyword, mode) => request('/api/admin/blacklist', { method: 'DELETE', body: JSON.stringify({ token, keyword, mode }) }),
   searchPreview: (keyword) => request(`/api/admin/search-preview?keyword=${encodeURIComponent(keyword)}`),
 };
