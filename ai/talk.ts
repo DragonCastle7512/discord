@@ -4,6 +4,7 @@ import { AppContext, RuntimeResponse } from "../types";
 import { ContentListUnion, GenerateContentResponse, GoogleGenAI, Part } from "@google/genai";
 import { ToolName } from "./skills/tool-names";
 import { safeReply } from "../common/reply-util";
+import { logger } from "../common/logger";
 
 const fs = require('fs');
 const axios = require('axios');
@@ -130,9 +131,9 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
             replyMsg = await safeReply(message, statusText, replyMsg);
 
             const toolParts = await Promise.all(response.functionCalls.map(async (fc) => {
-                console.log(`[Tool Call] ${fc.name}:`, fc.args);
+                logger.info('ai', `Tool called: ${fc.name}`, { args: fc.args });
                 if (!fc.name) {
-                    console.error("[Tool Call] 함수 이름이 누락되었습니다.", fc);
+                    logger.error('ai', 'Tool name missing in functionCalls', { fc });
                     return { 
                         functionResponse: { 
                             name: "unknown_function",

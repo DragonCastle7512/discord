@@ -4,6 +4,7 @@ const {
   recommendFromHistory,
 } = require('../../music/services/recommand-service');
 const { isDurationInRange } = require('../../music/utils/track-parser');
+const { logger } = require('../../common/logger');
 
 
 const buildListResponse = (items, region, label, keyword, meta = {}) => {
@@ -125,7 +126,7 @@ async function getYoutubePopularMusic(args) {
         }
       }
       catch (err) {
-        console.error(err);
+        logger.error('ai', 'Failed to fetch YouTube popular music in music-skill', { error: err.stack });
       }
   }
   const nextToken = String(items?.nextPageToken || '');
@@ -136,7 +137,7 @@ async function getYoutubePopularMusic(args) {
     filteredCount: filteredItems.length,
     filterApplied: true,
   });
-  console.log(response?.text);
+  logger.info('ai', 'YouTube popular music skill output generated', { responseText: response?.text });
   return response;
 }
 

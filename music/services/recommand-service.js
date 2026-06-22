@@ -1,5 +1,6 @@
 const { KeywordBlacklist } = require('../models/keyword-blacklist');
 const { isDurationInRange } = require('../utils/track-parser');
+const { logger } = require('../../common/logger');
 
 async function getBlacklistForGuild(guildId) {
   if (!guildId) return new Set();
@@ -7,7 +8,7 @@ async function getBlacklistForGuild(guildId) {
     const records = await KeywordBlacklist.findAll({ where: { guildId } });
     return new Set(records.map(r => normalizeText(r.keyword)));
   } catch (err) {
-    console.error(`[Recommend Service] Failed to load blacklist for guild ${guildId}:`, err);
+    logger.error('system', `[Recommend Service] Failed to load blacklist for guild ${guildId}`, { error: err.stack });
     return new Set();
   }
 }
@@ -358,7 +359,7 @@ async function recommendFromHistory({
       const userRecords = await UserKeywordBlacklist.findAll({ where: { userId } });
       userRecords.forEach(r => blacklistSet.add(normalizeText(r.keyword)));
     } catch (err) {
-      console.error(`[Recommend Service] Failed to load blacklist for user ${userId}:`, err);
+      logger.error('system', `[Recommend Service] Failed to load blacklist for user ${userId}`, { error: err.stack });
     }
   }
 

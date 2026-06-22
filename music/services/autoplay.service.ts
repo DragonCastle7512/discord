@@ -4,6 +4,7 @@ import { findAllHistory } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
 import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild } from './recommand-service';
 import { isDurationInRange } from '../utils/track-parser';
+import { logger } from '../../common/logger';
 
 
 export interface AutoplayDeps {
@@ -121,7 +122,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 }
             }
             catch (err: any) {
-                console.error('AI tag recommendation failed in autoplay:', err);
+                logger.error('ai', 'AI tag recommendation failed in autoplay', { error: err.stack });
                 const textChannel = getTextChannel(state.textChannelId);
                 if (textChannel) {
                     textChannel.send('[오토모드] 추천 곡을 준비하는 중 오류가 발생하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch(console.error);
@@ -136,10 +137,10 @@ export function createAutoplayService(deps: AutoplayDeps) {
             try {
                 const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
                 state.autoPool = Array.isArray(batch) ? batch : [];
-                console.log(`[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`);
+                logger.info('ai', `[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`);
             }
             catch (err: any) {
-                console.error('generateSongBatchForMood failed in autoplay:', err);
+                logger.error('ai', 'generateSongBatchForMood failed in autoplay', { error: err.stack, mood });
                 throw new Error(`generateSongBatchForMood failed: ${err.message}`);
             }
         }
@@ -152,11 +153,11 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 excluded.toLowerCase().replace(/\s+/g, '') === generatedQuery.toLowerCase().replace(/\s+/g, '')
             );
             if (isExcluded) {
-                console.log(`[AutoPlay Mood] Skipping duplicate song from history: ${generatedQuery}`);
+                logger.info('ai', `[AutoPlay Mood] Skipping duplicate song from history: ${generatedQuery}`);
                 continue;
             }
 
-            console.log(`[AutoPlay Mood] Selected from pool: ${generatedQuery} (${state.autoPool.length} left)`);
+            logger.info('ai', `[AutoPlay Mood] Selected from pool: ${generatedQuery} (${state.autoPool.length} left)`);
             recommendedTitle = generatedQuery;
 
             try {
@@ -167,15 +168,15 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         recommendedUri = firstTrack.info.uri;
                         recommendedTitle = firstTrack.info.title;
                     } else {
-                        console.log(`[AutoPlay Mood] Skipping song due to duration filter mismatch: ${generatedQuery} (${firstTrack.info.length}ms)`);
+                        logger.info('ai', `[AutoPlay Mood] Skipping song due to duration filter mismatch: ${generatedQuery} (${firstTrack.info.length}ms)`);
                     }
                 }
                 else {
-                    console.warn(`[AutoPlay Mood] Resolving returned empty tracks for query: "${generatedQuery}"`);
+                    logger.warn('ai', `[AutoPlay Mood] Resolving returned empty tracks for query: "${generatedQuery}"`);
                 }
             }
             catch (err) {
-                console.error(`Resolve failed for autoplay mood query "${generatedQuery}":`, err);
+                logger.error('ai', `Resolve failed for autoplay mood query "${generatedQuery}"`, { error: (err as any)?.stack });
             }
         }
     }
