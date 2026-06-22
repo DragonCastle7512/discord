@@ -1,0 +1,47 @@
+import test, { describe, it, before, after } from 'node:test';
+import assert from 'node:assert';
+import fs from 'node:fs';
+import path from 'node:path';
+import { Logger } from '../common/logger';
+
+describe('Logger Tests', () => {
+  const logDir = path.join(__dirname, '../logs-test');
+  const logFile = path.join(logDir, 'app.log');
+
+  before(() => {
+    if (fs.existsSync(logDir)) {
+      fs.rmSync(logDir, { recursive: true, force: true });
+    }
+  });
+
+  after(() => {
+    if (fs.existsSync(logDir)) {
+      fs.rmSync(logDir, { recursive: true, force: true });
+    }
+  });
+
+  it('should create log directory and log JSON objects', () => {
+    const logger = new Logger(logFile, 1024 * 10); // 10KB limit for testing
+    logger.info('command', 'Test message', { userId: '123' });
+
+    assert.ok(fs.existsSync(logFile));
+    const content = fs.readFileSync(logFile, 'utf8').trim();
+    const parsed = JSON.parse(content);
+
+    assert.strictEqual(parsed.level, 'INFO');
+    assert.strictEqual(parsed.category, 'command');
+    assert.strictEqual(parsed.message, 'Test message');
+    assert.strictEqual(parsed.metadata.userId, '123');
+  });
+
+  it('should rotate log file when limit is exceeded', () => {
+    const logger = new Logger(logFile, 100); // Very low limit for testing
+    
+    // Write enough data to exceed 100 bytes
+    logger.info('system', 'First long message to trigger rotation test');
+    logger.info('system', 'Second message');
+
+    assert.ok(fs.existsSync(logFile));
+    assert.ok(fs.existsSync(logFile + '.old'));
+  });
+});
