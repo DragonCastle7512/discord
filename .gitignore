@@ -6,3 +6,5 @@ test.wav
 scripts
 .agent
 docs
+*.log
+*.old
