@@ -94,10 +94,13 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         const shuffledTitles = videoTitles.sort(() => Math.random() - 0.5);
 
                         const batch = await selectAndCleanSongsFromSearch(shuffledTitles, tagsString, excludedTitles, 20);
-                        console.log(batch)
                         const cleanBatch = Array.isArray(batch) ? batch : [];
-
                         state.autoPool = cleanBatch;
+                        logger.info('ai', `[AutoPlay Recommend] Auto pool replenished with ${cleanBatch.length} songs`, {
+                            selectedKeywords,
+                            tagKeywords,
+                            songs: cleanBatch,
+                        });
                     }
                     else {
                         const textChannel = getTextChannel(state.textChannelId);
@@ -137,7 +140,10 @@ export function createAutoplayService(deps: AutoplayDeps) {
             try {
                 const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
                 state.autoPool = Array.isArray(batch) ? batch : [];
-                logger.info('ai', `[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`);
+                logger.info('ai', `[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`, {
+                    mood,
+                    songs: state.autoPool,
+                });
             }
             catch (err: any) {
                 logger.error('ai', 'generateSongBatchForMood failed in autoplay', { error: err.stack, mood });
