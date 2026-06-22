@@ -16,6 +16,8 @@ import { createTtsRouter } from './routes/tts';
 import { createServer } from 'node:http';
 import { initSocket } from './common/socket';
 import { createRuntimeUtils } from './music/runtime-util';
+import { logger } from './common/logger';
+import { commandRateLimiter, aiRateLimiter } from './common/rate-limiter';
 
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
@@ -187,10 +189,38 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (!interaction.isChatInputCommand()) return;
     const command = (interaction.client as MyClient).commands.get(interaction.commandName);
     if (!command) return;
+
+    // 1. 레이트 리미터 체크
+    const rateCheck = commandRateLimiter.checkLimit(interaction.user.id);
+    if (rateCheck.blocked) {
+      logger.warn('security', `Command rate limited: ${interaction.commandName}`, {
+        userId: interaction.user.id,
+        guildId: interaction.guildId,
+        retryAfterMs: rateCheck.retryAfterMs,
+      });
+      await interaction.reply({
+        content: `명령어 호출이 너무 빠릅니다! 잠시 후 다시 시도해 주세요. (${Math.ceil(rateCheck.retryAfterMs / 1000)}초 후 가능)`,
+        ephemeral: true
+      }).catch(console.error);
+      return;
+    }
+
+    const startTime = Date.now();
     await command.execute(interaction, context);
+    const latencyMs = Date.now() - startTime;
+
+    logger.info('command', `Executed command: ${interaction.commandName}`, {
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      latencyMs,
+    });
   }
   catch (error: any) {
-    console.error('Command error:', error);
+    logger.error('command', `Command error in ${interaction.isChatInputCommand() ? (interaction as any).commandName : 'unknown'}`, {
+      userId: interaction.user.id,
+      guildId: interaction.guildId,
+      error: error.stack,
+    });
     if (interaction.isRepliable()) {
       const text = '오류가 발생했어요.';
       if (interaction.deferred || interaction.replied) {
@@ -242,10 +272,44 @@ client.on('messageCreate', async (message: Message) => {
   const msg: string = message.content;
   if (!msg.includes('치사야') && !msg.includes('치사,')) return;
 
+  // 1. AI 레이트 리미터 체크
+  const rateCheck = aiRateLimiter.checkLimit(message.author.id);
+  if (rateCheck.blocked) {
+    logger.warn('security', 'AI conversation rate limited', {
+      userId: message.author.id,
+      guildId: message.guildId,
+      retryAfterMs: rateCheck.retryAfterMs,
+    });
+    await safeReply(message, `대화 속도가 너무 빠릅니다! ${Math.ceil(rateCheck.retryAfterMs / 1000)}초 후에 다시 말을 걸어주세요.`);
+    return;
+  }
+
   if (message.channel instanceof BaseGuildTextChannel) {
     await message.channel.sendTyping();
   }
 
-	const response: RuntimeResponse = await talk(message, context);
-  await safeReply(message, `${response.message}`);
+  const startTime = Date.now();
+  try {
+    const response: RuntimeResponse = await talk(message, context);
+    const latencyMs = Date.now() - startTime;
+    
+    logger.info('ai', 'AI conversation succeeded', {
+      userId: message.author.id,
+      guildId: message.guildId,
+      promptLength: msg.length,
+      responseLength: response.message.length,
+      latencyMs,
+    });
+
+    await safeReply(message, `${response.message}`);
+  } catch (error: any) {
+    const latencyMs = Date.now() - startTime;
+    logger.error('ai', 'AI conversation failed', {
+      userId: message.author.id,
+      guildId: message.guildId,
+      latencyMs,
+      error: error.stack,
+    });
+    await safeReply(message, '대화 중 에러가 발생했습니다.');
+  }
 });

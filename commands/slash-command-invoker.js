@@ -1,3 +1,5 @@
+const { logger } = require('../common/logger');
+
 function normalizeReplyPayload(payload) {
   if (typeof payload === 'string') {
     return { content: payload };
@@ -155,11 +157,29 @@ function createSlashCommandInvoker({ commands, context }) {
       }
 
       const interaction = createSyntheticInteraction(message, options);
-      await command.execute(interaction, context);
-      return {
-        ok: true,
-        message: summarizeReply(interaction._replyMessage),
-      };
+      const startTime = Date.now();
+      try {
+        await command.execute(interaction, context);
+        const latencyMs = Date.now() - startTime;
+        logger.info('command', `Executed command (synthetic): ${normalizedName}`, {
+          userId: message.author.id,
+          guildId: message.guildId,
+          latencyMs,
+        });
+        return {
+          ok: true,
+          message: summarizeReply(interaction._replyMessage),
+        };
+      } catch (err) {
+        const latencyMs = Date.now() - startTime;
+        logger.error('command', `Failed command (synthetic): ${normalizedName}`, {
+          userId: message.author.id,
+          guildId: message.guildId,
+          latencyMs,
+          error: err.stack,
+        });
+        throw err;
+      }
     },
     listCommands() {
       return [...commands.keys()];
