@@ -45,4 +45,22 @@ describe('Logger Tests', () => {
     assert.ok(fs.existsSync(logFile));
     assert.ok(fs.existsSync(logFile + '.old'));
   });
+
+  it('should log music category messages successfully', () => {
+    const logger = new Logger(logFile, 1024 * 10);
+    logger.info('music', 'Started playing track: IU - LILAC', {
+      guildId: '123456789',
+      trackTitle: 'IU - LILAC',
+      trackUri: 'https://youtube.com/watch?v=mock',
+      requestedBy: 'user-1',
+      durationMs: 200000
+    });
+
+    const content = fs.readFileSync(logFile, 'utf8').trim();
+    const lines = content.split('\n');
+    const parsed = JSON.parse(lines[lines.length - 1]);
+
+    assert.strictEqual(parsed.category, 'music');
+    assert.strictEqual(parsed.metadata.trackTitle, 'IU - LILAC');
+  });
 });

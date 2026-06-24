@@ -6,6 +6,7 @@ import { buildNowPlayingEmbed } from '../embeds/buildEmbed';
 import { insertHistory, updateHistorySkipped } from '../repositorys/music-history.repository';
 import { notifyMusicUpdate } from '../../common/socket';
 import { createAutoplayService } from './autoplay.service';
+import { logger } from '../../common/logger';
 
 export interface PlayerEngineDeps {
   client: Client;
@@ -122,7 +123,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       }
 
       player.on('end', async (event) => {
-        if (event?.reason === 'replaced') {
+        if ((event?.reason as any) === 'replaced') {
           return;
         }
         const endedTrack = state.current;
@@ -131,7 +132,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
         state.current = null;
         state.currentHistoryId = null;
 
-        if (endedTrack && event?.reason !== 'replaced') {
+        if (endedTrack && (event?.reason as any) !== 'replaced') {
           state.history.push(endedTrack);
           if (state.history.length > 50) {
             state.history.shift();
@@ -329,12 +330,22 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
     notifyMusicUpdate(guildId, 'music');
     try {
       await state.player.playTrack({ track: { encoded: next.encoded } });
+      
+      const info = next.info || {};
+      const title = info.title || 'Unknown title';
+      const uri = info.uri || '';
+      const requesterId = next.requestedBy || null;
+
+      logger.info('music', `Started playing track: ${title}`, {
+        guildId,
+        trackTitle: title,
+        trackUri: uri,
+        requestedBy: requesterId,
+        durationMs: info.length,
+      });
+
       const textChannel = getTextChannel(state.textChannelId);
       if (textChannel) {
-        const info = next.info || {};
-        const title = info.title || 'Unknown title';
-        const uri = info.uri || '';
-        const requesterId = next.requestedBy || null;
         const thumbnailUrl = info.artworkUrl || null;
         const embed = buildNowPlayingEmbed({
           title,
