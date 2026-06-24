@@ -159,7 +159,13 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       });
 
       player.on('exception', async (event) => {
-        console.error('Player exception:', event);
+        logger.error('music', `Player exception occurred while playing track: ${state.current?.info?.title || 'Unknown'}`, {
+          guildId: guild.id,
+          trackTitle: state.current?.info?.title || 'Unknown',
+          trackUri: state.current?.info?.uri || '',
+          exceptionMessage: event.exception?.message || 'No exception message',
+          exceptionSeverity: event.exception?.severity || 'unknown',
+        });
         state.playing = false;
         state.current = null;
         notifyMusicUpdate(guild.id, 'music');
@@ -169,7 +175,13 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
         }
       });
 
-      player.on('stuck', async () => {
+      player.on('stuck', async (event) => {
+        logger.warn('music', `Track got stuck: ${state.current?.info?.title || 'Unknown'}`, {
+          guildId: guild.id,
+          trackTitle: state.current?.info?.title || 'Unknown',
+          trackUri: state.current?.info?.uri || '',
+          thresholdMs: event?.thresholdMs || null,
+        });
         state.playing = false;
         state.current = null;
         notifyMusicUpdate(guild.id, 'music');
