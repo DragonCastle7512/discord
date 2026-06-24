@@ -22,16 +22,17 @@ describe('Logger Tests', () => {
 
   it('should create log directory and log JSON objects', () => {
     const logger = new Logger(logFile, 1024 * 10); // 10KB limit for testing
-    logger.info('command', 'Test message', { userId: '123' });
+    logger.info('music', 'Song start test', { title: 'Test Song' });
 
     assert.ok(fs.existsSync(logFile));
     const content = fs.readFileSync(logFile, 'utf8').trim();
-    const parsed = JSON.parse(content);
+    const lines = content.split('\n');
+    const parsed = JSON.parse(lines[lines.length - 1]);
 
     assert.strictEqual(parsed.level, 'INFO');
-    assert.strictEqual(parsed.category, 'command');
-    assert.strictEqual(parsed.message, 'Test message');
-    assert.strictEqual(parsed.metadata.userId, '123');
+    assert.strictEqual(parsed.category, 'music');
+    assert.strictEqual(parsed.message, 'Song start test');
+    assert.strictEqual(parsed.metadata.title, 'Test Song');
   });
 
   it('should rotate log file when limit is exceeded', () => {

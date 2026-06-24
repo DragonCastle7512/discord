@@ -4,7 +4,7 @@ import path from 'node:path';
 export interface LogEntry {
   timestamp: string;
   level: 'INFO' | 'WARN' | 'ERROR';
-  category: 'command' | 'ai' | 'system' | 'security';
+  category: 'command' | 'ai' | 'system' | 'security' | 'music';
   message: string;
   metadata?: Record<string, any>;
 }
