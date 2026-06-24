@@ -96,7 +96,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         const batch = await selectAndCleanSongsFromSearch(shuffledTitles, tagsString, excludedTitles, 20);
                         const cleanBatch = Array.isArray(batch) ? batch : [];
                         state.autoPool = cleanBatch;
-                        logger.info('ai', `[AutoPlay Recommend] Auto pool replenished with ${cleanBatch.length} songs`, {
+                        logger.info('music', `[AutoPlay Recommend] Auto pool replenished with ${cleanBatch.length} songs`, {
                             selectedKeywords,
                             tagKeywords,
                             songs: cleanBatch,
@@ -125,7 +125,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 }
             }
             catch (err: any) {
-                logger.error('ai', 'AI tag recommendation failed in autoplay', { error: err.stack });
+                logger.error('music', 'AI tag recommendation failed in autoplay', { error: err.stack });
                 const textChannel = getTextChannel(state.textChannelId);
                 if (textChannel) {
                     textChannel.send('[오토모드] 추천 곡을 준비하는 중 오류가 발생하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch(console.error);
@@ -140,13 +140,13 @@ export function createAutoplayService(deps: AutoplayDeps) {
             try {
                 const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
                 state.autoPool = Array.isArray(batch) ? batch : [];
-                logger.info('ai', `[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`, {
+                logger.info('music', `[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`, {
                     mood,
                     songs: state.autoPool,
                 });
             }
             catch (err: any) {
-                logger.error('ai', 'generateSongBatchForMood failed in autoplay', { error: err.stack, mood });
+                logger.error('music', 'generateSongBatchForMood failed in autoplay', { error: err.stack, mood });
                 throw new Error(`generateSongBatchForMood failed: ${err.message}`);
             }
         }
@@ -159,11 +159,11 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 excluded.toLowerCase().replace(/\s+/g, '') === generatedQuery.toLowerCase().replace(/\s+/g, '')
             );
             if (isExcluded) {
-                logger.info('ai', `[AutoPlay Mood] Skipping duplicate song from history: ${generatedQuery}`);
+                logger.info('music', `[AutoPlay Mood] Skipping duplicate song from history: ${generatedQuery}`);
                 continue;
             }
 
-            logger.info('ai', `[AutoPlay Mood] Selected from pool: ${generatedQuery} (${state.autoPool.length} left)`);
+            logger.info('music', `[AutoPlay Mood] Selected from pool: ${generatedQuery} (${state.autoPool.length} left)`);
             recommendedTitle = generatedQuery;
 
             try {
@@ -174,15 +174,15 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         recommendedUri = firstTrack.info.uri;
                         recommendedTitle = firstTrack.info.title;
                     } else {
-                        logger.info('ai', `[AutoPlay Mood] Skipping song due to duration filter mismatch: ${generatedQuery} (${firstTrack.info.length}ms)`);
+                        logger.info('music', `[AutoPlay Mood] Skipping song due to duration filter mismatch: ${generatedQuery} (${firstTrack.info.length}ms)`);
                     }
                 }
                 else {
-                    logger.warn('ai', `[AutoPlay Mood] Resolving returned empty tracks for query: "${generatedQuery}"`);
+                    logger.warn('music', `[AutoPlay Mood] Resolving returned empty tracks for query: "${generatedQuery}"`);
                 }
             }
             catch (err) {
-                logger.error('ai', `Resolve failed for autoplay mood query "${generatedQuery}"`, { error: (err as any)?.stack });
+                logger.error('music', `Resolve failed for autoplay mood query "${generatedQuery}"`, { error: (err as any)?.stack });
             }
         }
     }
