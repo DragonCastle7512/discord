@@ -63,4 +63,23 @@ describe('Logger Tests', () => {
     assert.strictEqual(parsed.category, 'music');
     assert.strictEqual(parsed.metadata.trackTitle, 'IU - LILAC');
   });
+
+  it('should log recommend info successfully', () => {
+    const logger = new Logger(logFile, 1024 * 10);
+    logger.info('music', 'Generated recommendations for guild 123456789', {
+      guildId: '123456789',
+      userId: 'user-123',
+      requestedCount: 5,
+      recommendedCount: 3,
+      usedKeywords: ['k-pop', 'indie'],
+    });
+
+    const content = fs.readFileSync(logFile, 'utf8').trim();
+    const lines = content.split('\n');
+    const parsed = JSON.parse(lines[lines.length - 1]);
+
+    assert.strictEqual(parsed.category, 'music');
+    assert.strictEqual(parsed.metadata.userId, 'user-123');
+    assert.strictEqual(parsed.metadata.recommendedCount, 3);
+  });
 });

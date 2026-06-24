@@ -434,6 +434,13 @@ async function recommendFromHistory({
   }
 
   if (!recommendations.length) {
+    logger.warn('music', `Failed to generate recommendations for guild ${resolvedGuildId}`, {
+      guildId: resolvedGuildId,
+      userId,
+      reason: 'No suitable recommendation results found',
+      keywordsTried: keywordsToTry,
+      keywordStats,
+    });
     return {
       ok: false,
       reason: '적절한 추천 결과가 없어요!',
@@ -449,6 +456,15 @@ async function recommendFromHistory({
   const finalItems = recommendations.slice(0, normalizedCount);
 
   const displayOrder = interleaveBySource(finalItems, finalItems.length);
+
+  logger.info('music', `Generated recommendations for guild ${resolvedGuildId}`, {
+    guildId: resolvedGuildId,
+    userId,
+    requestedCount: count,
+    recommendedCount: displayOrder.length,
+    usedKeywords,
+    keywordStats,
+  });
 
   return {
     ok: true,
