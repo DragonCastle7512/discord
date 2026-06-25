@@ -490,8 +490,21 @@ export function createDashboardRouter(
     }
 
     const logPath = path.join(__dirname, '../logs/app.log');
+
+    let avatarUrl: string | null = null;
+    let displayName = 'Admin';
+    try {
+      const user = await client.users.fetch(session.userId).catch(() => null);
+      if (user) {
+        avatarUrl = user.displayAvatarURL() || null;
+        displayName = user.globalName || user.username;
+      }
+    } catch (userErr) {
+      console.error('Failed to fetch user profile for logs page:', userErr);
+    }
+
     if (!fs.existsSync(logPath)) {
-      res.json([]);
+      res.json({ logs: [], user: { avatarUrl, displayName } });
       return;
     }
 
@@ -507,7 +520,13 @@ export function createDashboardRouter(
       }).filter(entry => entry !== null);
 
       entries.reverse();
-      res.json(entries);
+      res.json({
+        logs: entries,
+        user: {
+          avatarUrl,
+          displayName
+        }
+      });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
     }

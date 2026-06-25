@@ -71,7 +71,19 @@ async function fetchLogs() {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
     
-    rawLogs = await response.json();
+    const data = await response.json();
+    rawLogs = data.logs;
+    
+    // 유저 아바타 업데이트
+    const userAv = document.querySelector('.user-av');
+    if (userAv && data.user) {
+      if (data.user.avatarUrl) {
+        userAv.innerHTML = `<img src="${data.user.avatarUrl}" alt="${escapeHtml(data.user.displayName)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;" />`;
+      } else if (data.user.displayName) {
+        userAv.textContent = data.user.displayName.charAt(0).toUpperCase();
+      }
+    }
+
     renderLogs();
   } catch (err) {
     console.error('Failed to fetch logs:', err);

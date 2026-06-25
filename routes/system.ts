@@ -2,6 +2,7 @@
 import { Router, Request, Response } from 'express';
 import path from 'node:path';
 import { HealthResponse } from './types';
+import { verifyDashboardToken } from '../common/auth';
 
 export function createSystemRouter(): Router {
   const router = Router();
@@ -23,6 +24,12 @@ export function createSystemRouter(): Router {
   });
 
   router.get('/admin/:token', (req: Request, res: Response) => {
+    const token = req.params.token;
+    const session = verifyDashboardToken(token);
+    if (!session || session.userId !== process.env.OWNER_ID) {
+      res.status(404).sendFile(path.join(__dirname, '../public/error/404.html'));
+      return;
+    }
     res.sendFile(path.join(__dirname, '../public/logs/logs.html'));
   });
 

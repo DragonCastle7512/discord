@@ -11,6 +11,18 @@ describe('Logs API Tests', () => {
   const logFile = path.join(logDir, 'app.log');
   let originalOwnerId: string | undefined;
 
+  const mockClient: any = {
+    users: {
+      async fetch() {
+        return {
+          displayAvatarURL: () => 'mock-avatar-url',
+          globalName: 'Mock Owner',
+          username: 'owner'
+        };
+      }
+    }
+  };
+
   before(() => {
     originalOwnerId = process.env.OWNER_ID;
     process.env.OWNER_ID = 'owner-123';
@@ -28,13 +40,10 @@ describe('Logs API Tests', () => {
 
   after(() => {
     process.env.OWNER_ID = originalOwnerId;
-    // We keep app.log or clean it up? Better clean up or restore.
-    // For unit tests, cleaning up is good, but we don't want to destroy active system logs if run in local development.
-    // Since logFile path is in ../logs/app.log which might contain real logs, let's restore it if it existed.
   });
 
   it('should return 401 when token is missing or invalid', async () => {
-    const router = createDashboardRouter({} as Client, new Map(), {} as any);
+    const router = createDashboardRouter(mockClient, new Map(), {} as any);
     
     // Find the /logs-data route
     const layer = router.stack.find((l: any) => l.route && l.route.path === '/logs-data');
@@ -61,9 +70,6 @@ describe('Logs API Tests', () => {
       }
     };
 
-    // Since verifyToken middleware is run first in Express, we mock the middleware logic or call the route directly.
-    // Let's call the middleware first (if any) then the handler.
-    // Let's execute the handler sequence
     let nextCalled = false;
     const next = () => { nextCalled = true; };
 
@@ -78,7 +84,7 @@ describe('Logs API Tests', () => {
   });
 
   it('should return logs in reverse chronological order when owner token is valid', async () => {
-    const router = createDashboardRouter({} as Client, new Map(), {} as any);
+    const router = createDashboardRouter(mockClient, new Map(), {} as any);
     const layer = router.stack.find((l: any) => l.route && l.route.path === '/logs-data');
     assert.ok(layer);
 
@@ -113,15 +119,17 @@ describe('Logs API Tests', () => {
     await mainHandler(req, res);
 
     assert.strictEqual(statusVal, 200);
-    assert.ok(Array.isArray(jsonVal));
-    assert.strictEqual(jsonVal.length, 2);
+    assert.ok(jsonVal && jsonVal.logs && Array.isArray(jsonVal.logs));
+    assert.strictEqual(jsonVal.logs.length, 2);
     // Order: latest first
-    assert.strictEqual(jsonVal[0].message, 'Log 2');
-    assert.strictEqual(jsonVal[1].message, 'Log 1');
+    assert.strictEqual(jsonVal.logs[0].message, 'Log 2');
+    assert.strictEqual(jsonVal.logs[1].message, 'Log 1');
+    assert.strictEqual(jsonVal.user.avatarUrl, 'mock-avatar-url');
+    assert.strictEqual(jsonVal.user.displayName, 'Mock Owner');
   });
 
   it('should return 401 when token user is not owner', async () => {
-    const router = createDashboardRouter({} as Client, new Map(), {} as any);
+    const router = createDashboardRouter(mockClient, new Map(), {} as any);
     const layer = router.stack.find((l: any) => l.route && l.route.path === '/logs-data');
     assert.ok(layer);
 
