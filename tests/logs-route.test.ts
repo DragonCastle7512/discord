@@ -3,12 +3,12 @@ import assert from 'node:assert';
 import { createSystemRouter } from '../routes/system';
 
 describe('Logs Route Tests', () => {
-  it('should serve logs.html on GET /logs', async () => {
+  it('should serve logs.html on GET /admin/:token', async () => {
     const router = createSystemRouter();
     
-    // Find the /logs route
-    const layer = router.stack.find((l: any) => l.route && l.route.path === '/logs');
-    assert.ok(layer, 'Route /logs should exist');
+    // Find the /admin/:token route
+    const layer = router.stack.find((l: any) => l.route && l.route.path === '/admin/:token');
+    assert.ok(layer, 'Route /admin/:token should exist');
 
     const handler = layer.route.stack[layer.route.stack.length - 1].handle;
     

@@ -22,7 +22,7 @@ export function createSystemRouter(): Router {
     res.sendFile(path.join(__dirname, '../public/dashboard/dashboard.html'));
   });
 
-  router.get('/logs', (req: Request, res: Response) => {
+  router.get('/admin/:token', (req: Request, res: Response) => {
     res.sendFile(path.join(__dirname, '../public/logs/logs.html'));
   });
 

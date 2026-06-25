@@ -36,10 +36,28 @@
   .filter-input {
     width: 240px;
   }
+
+  @media (max-width: 600px) {
+    .filter-row {
+      flex-direction: column;
+      align-items: stretch;
+      gap: 8px;
+    }
+    .filter-item {
+      width: 100%;
+    }
+    .filter-select, .filter-input {
+      width: 100% !important;
+    }
+    .reload-btn {
+      width: 100%;
+    }
+  }
   
   /* 로그 테이블 및 뱃지 스타일 */
   .logs-table {
     width: 100%;
+    min-width: 650px;
     border-collapse: collapse;
     font-size: 13px;
     text-align: left;
@@ -202,10 +220,6 @@
   <div class="sidebar" id="sidebar">
     <div class="nav-section">
       <div class="nav-label">메뉴</div>
-      <div class="nav-item" id="menu-dashboard">
-        <i data-icon="dashboard"></i>
-        대시보드
-      </div>
       <div class="nav-item active" id="menu-logs">
         <i data-icon="queue"></i>
         시스템 로그
@@ -250,7 +264,7 @@
       </div>
 
       <!-- LOG TABLE -->
-      <div class="scrollable" style="max-height: calc(100vh - 250px); overflow-y: auto;">
+      <div class="scrollable" style="max-height: calc(100vh - 250px); overflow-y: auto; overflow-x: auto; width: 100%;">
         <table class="logs-table">
           <thead>
             <tr>

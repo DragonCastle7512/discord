@@ -1,20 +1,26 @@
 import { renderIcons } from '/dashboard/modules/icons.js';
 
-// URL 파라미터에서 토큰 파싱
-const urlParams = new URLSearchParams(window.location.search);
-const token = urlParams.get('token');
+// URL 경로에서 토큰 파싱 (예: /admin/토큰)
+const pathParts = window.location.pathname.split('/');
+const token = pathParts[pathParts.length - 1];
 
-if (!token) {
+if (!token || token === 'admin') {
   alert('접속 토큰이 누락되었습니다. Discord에서 /logs 명령어를 다시 입력해주세요.');
 }
 
 // 사이드바 메뉴 클릭 핸들러 (토큰 유지)
-document.getElementById('menu-dashboard').addEventListener('click', () => {
-  window.location.href = `/dashboard?token=${token}`;
-});
-document.getElementById('menu-logs').addEventListener('click', () => {
-  window.location.href = `/logs?token=${token}`;
-});
+const menuDashboard = document.getElementById('menu-dashboard');
+if (menuDashboard) {
+  menuDashboard.addEventListener('click', () => {
+    window.location.href = `/dashboard?token=${token}`;
+  });
+}
+const menuLogs = document.getElementById('menu-logs');
+if (menuLogs) {
+  menuLogs.addEventListener('click', () => {
+    window.location.href = `/admin/${token}`;
+  });
+}
 
 // 전역 로그 상태
 let rawLogs = [];

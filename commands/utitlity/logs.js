@@ -59,7 +59,7 @@ module.exports = {
     try {
       const token = generateDashboardToken(interaction.guildId || 'global', interaction.user.id);
       const baseUrl = process.env.BASE_URL || 'http://localhost:3000';
-      const secureUrl = `${baseUrl}/logs?token=${token}`;
+      const secureUrl = `${baseUrl}/admin/${token}`;
 
       return safeReply(interaction, {
         content: `선배, 여기 로그 확인 페이지 링크예요! 1시간 동안만 유효하니까 주의해 주세요.\n\n🔗 ${secureUrl}`,

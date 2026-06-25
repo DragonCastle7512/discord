@@ -71,7 +71,7 @@ describe('Logs Command Tests', () => {
 
     await logsCommand.execute(interaction);
     assert.ok(repliedContent.includes('로그 확인 페이지 링크예요'));
-    assert.ok(repliedContent.includes('/logs?token='));
+    assert.ok(repliedContent.includes('/admin/'));
     assert.strictEqual(isEphemeral, true);
   });
 
