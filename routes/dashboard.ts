@@ -1,6 +1,8 @@
 // @ts-ignore
 import { Router, Request, Response } from 'express';
 import { Client } from 'discord.js';
+import fs from 'node:fs';
+import path from 'node:path';
 import { MusicRuntime, GuildState, PlaylistEntry, TrackInfo, HistoryEntry, Track } from '../music/types';
 import { findAllHistory } from '../music/repositorys/music-history.repository';
 import { findPlaylist } from '../music/repositorys/playlist.repository';
@@ -476,6 +478,37 @@ export function createDashboardRouter(
       res.json({ ok: true, items: items });
     } catch (err: any) {
       console.error(`[DEBUG] search-preview error:`, err);
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/logs-data', verifyToken, async (req: Request, res: Response) => {
+    const session = (req as any).session;
+    if (session.userId !== process.env.OWNER_ID) {
+      res.status(401).json({ error: '권한이 없습니다.' });
+      return;
+    }
+
+    const logPath = path.join(__dirname, '../logs/app.log');
+    if (!fs.existsSync(logPath)) {
+      res.json([]);
+      return;
+    }
+
+    try {
+      const rawContent = fs.readFileSync(logPath, 'utf8');
+      const lines = rawContent.split('\n').filter(line => line.trim() !== '');
+      const entries = lines.map(line => {
+        try {
+          return JSON.parse(line);
+        } catch {
+          return null;
+        }
+      }).filter(entry => entry !== null);
+
+      entries.reverse();
+      res.json(entries);
+    } catch (err: any) {
       res.status(500).json({ error: err.message });
     }
   });
