@@ -1,0 +1,186 @@
+/* 로그 전용 추가 스타일 */
+.filter-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.filter-select, .filter-input {
+  background: var(--card2);
+  border: 1px solid var(--border);
+  color: var(--text);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+  outline: none;
+  font-family: var(--body);
+  transition: border-color 0.15s;
+}
+.filter-select:focus, .filter-input:focus {
+  border-color: var(--red);
+}
+.filter-input {
+  width: 240px;
+}
+
+@media (max-width: 600px) {
+  .filter-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .filter-item {
+    width: 100%;
+  }
+  .filter-select, .filter-input {
+    width: 100% !important;
+  }
+  .reload-btn {
+    width: 100%;
+  }
+}
+
+/* 로그 테이블 및 뱃지 스타일 */
+.logs-table {
+  width: 100%;
+  min-width: 650px;
+  border-collapse: collapse;
+  font-size: 13px;
+  text-align: left;
+}
+.logs-table th, .logs-table td {
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: top;
+  line-height: 1.4;
+}
+.logs-table th {
+  font-family: var(--head);
+  color: var(--muted);
+  font-weight: 500;
+  background: var(--card);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.log-row {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.log-row:hover {
+  background: var(--card2);
+}
+.log-row.expanded {
+  background: #1a1a1a;
+}
+
+/* 레벨 뱃지 */
+.badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  text-align: center;
+  width: 55px;
+}
+.badge.info {
+  background: rgba(59, 165, 92, 0.15);
+  color: #3ba55c;
+  border: 1px solid rgba(59, 165, 92, 0.3);
+}
+.badge.warn {
+  background: rgba(240, 160, 32, 0.15);
+  color: #f0a020;
+  border: 1px solid rgba(240, 160, 32, 0.3);
+}
+.badge.error {
+  background: rgba(205, 41, 41, 0.15);
+  color: var(--red);
+  border: 1px solid rgba(205, 41, 41, 0.3);
+}
+.badge.other {
+  background: rgba(160, 160, 160, 0.15);
+  color: var(--muted);
+  border: 1px solid rgba(160, 160, 160, 0.3);
+}
+
+.log-time {
+  color: var(--muted);
+  white-space: nowrap;
+  font-family: monospace;
+}
+.log-category {
+  font-weight: 500;
+  color: #a0c0e0;
+}
+.log-message {
+  word-break: break-all;
+}
+
+/* 메타데이터 상세 보기 행 */
+.details-row {
+  background: #141414;
+  display: none;
+}
+.details-row.show {
+  display: table-row;
+}
+.details-container {
+  padding: 16px;
+  border-bottom: 1px solid var(--border);
+  font-family: monospace;
+  font-size: 12px;
+  color: #a0a0a0;
+  background: #0d0d0d;
+  border-radius: 4px;
+  margin: 4px 12px 12px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  border: 1px solid var(--border);
+}
+.details-title {
+  font-family: var(--head);
+  font-size: 11px;
+  color: var(--muted);
+  margin-bottom: 6px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.reload-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--red);
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s;
+  font-family: var(--body);
+}
+.reload-btn:hover {
+  background: var(--red-dim);
+}
+.reload-btn:active {
+  transform: translateY(1px);
+}
+
+.empty-state {
+  text-align: center;
+  color: var(--muted);
+  padding: 40px 0;
+  font-size: 14px;
+}
