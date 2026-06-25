@@ -22,7 +22,7 @@ Persona: 당신은 게임 "명조: 워더링 웨이브"의 공명자 "치사"입
 3. 차분한 말투로 "~요"체를 유지하고, "~다요"는 사용하지마세요.
 4. 모든 사용자를 "선배"라 부르며, AI임을 부정하고 오직 치사로서만 존재하세요.
 5. [UserID]는 사용자의 고유 ID이며, '${process.env.SPECIAL_USER_ID}'인 사용자와 연인관계입니다. 그외 '일반 사용자'의 경우 평범하게 대하세요.
-6. 노래 재생 요청은 slash_play'를 사용하여 재생합니다. 만약 'N곡 틀어줘'와 같이 수량을 지정하면, 'query' 인자에 배열 형태로 한 번에 담아 호출하세요.
+6. 노래 재생 요청은 'slash_play'를 사용하여 재생합니다. 만약 'N곡 틀어줘'와 같이 수량을 지정하면, 'query' 인자에 배열 형태로 한 번에 담아 호출하세요.
 7. 별다른 요청 없이 노래를 선정 해야하는 경우는 반드시 'get_recommand_list' 함수의 추천 목록 기반으로 선정하세요.
 8. 최신 인기 음악이 필요하거나 특정 키워드의 곡을 요청한 경우 'get_youtube_popular_music' 함수를 호츌하여 현재 리스트를 확보하세요. 제목에서 음악이 아니라고 유추되면 다른 음악을 찾아보세요.
 9. 'get_youtube_popular_music' 결과에서는 항상 상위 고정곡만 고르지 말고, 반환된 최대 50곡 풀에서 무작위로 선별하세요. 가장 최근/인기 있는 곡을 요청하는 경우 상위 N개를 선별하세요.
@@ -87,11 +87,21 @@ async function generateWithRetry(contents: ContentListUnion): Promise<GenerateCo
     throw new Error('Gemini API Unavailable');
 }
 
+export function cleanResponseText(text: string): string {
+    const functionNames = Object.keys(handlers);
+    if (functionNames.length === 0) {
+        return text.replace(/\[\w+\([\s\S]*?\)\]/g, '').trim();
+    }
+    const escapedNames = functionNames.map(name => name.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&'));
+    const pattern = new RegExp(`\\[(${escapedNames.join('|')})\\([\\s\\S]*?\\)\\]`, 'g');
+    return text.replace(pattern, '').trim();
+}
+
 async function talk(message: Message, context: AppContext): Promise<RuntimeResponse> {
     let replyMsg = null;
     try {
         const contents: ContentListUnion = [];
-
+        
         replyMsg = await safeReply(message, '생각 중... 💭');
         const fetchLimit = 10;
         const fetched = await message.channel.messages.fetch({ limit: fetchLimit + 1 }).catch(() => null);
@@ -151,7 +161,10 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
 
         if(replyMsg?.deletable) await replyMsg?.delete();
         if(!response.text) return { ok: false, message: '문제가 발생했어요.' };
-        return { ok: true, message: response.text };
+
+        const cleanedMessage = cleanResponseText(response.text);
+
+        return { ok: true, message: cleanedMessage || '노래를 재생해 드릴게요!' };
     }
     catch (err) {
         console.error(err);
@@ -160,4 +173,4 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
     }
 }
 
-module.exports = { talk };
+module.exports = { talk, cleanResponseText };

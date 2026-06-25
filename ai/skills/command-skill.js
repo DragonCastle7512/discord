@@ -57,6 +57,10 @@ module.exports = {
         type: 'OBJECT',
         properties: {
           query: {
+            type: 'ARRAY',
+            items: {
+              type: 'STRING',
+            },
             description: '재생하고 싶은 노래 제목/URL 또는 이들의 배열입니다. 여러 곡을 한 번에 틀려면 배열 형식을 사용하세요.',
           },
         },
