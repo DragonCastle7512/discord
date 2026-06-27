@@ -7,7 +7,8 @@ export enum ToolName {
     GetPlaylist = 'get_playlist',
     SlashPlay = 'slash_play',
     React = 'react',
-    Pin = 'pin'
+    Pin = 'pin',
+    SearchWeb = 'search_web'
 }
 
 export const MOOD_CHOICES = [

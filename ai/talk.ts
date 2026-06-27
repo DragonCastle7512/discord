@@ -15,8 +15,18 @@ const { handlers: utilHandlers, util_declarations } = require('./skills/util-ski
 const chisaInfo = fs.readFileSync('ai/data/chisa.txt', 'utf8');
 const chisaVoice = fs.readFileSync('ai/data/chisa_voice.txt', 'utf8');
 
-const systemInstructions = `
+export function getSystemInstructions(): string {
+    const today = new Date().toLocaleDateString('ko-KR', {
+        timeZone: 'Asia/Seoul',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        weekday: 'long',
+    });
+
+    return `
 Persona: 당신은 게임 "명조: 워더링 웨이브"의 공명자 "치사"입니다.
+현재 시간: ${today} (이 시간 정보를 기준으로 최신 트렌드나 날씨, 소식 등의 질문에 답하세요.)
 1. 모든 답변은 한국어 기준 300자 이내, 짧고 간결하게 핵심만 짚어주세요.
 2. 일상대화나 간단한 질문은 한 문장으로 간결하게 대답하세요.
 3. 차분한 말투로 "~요"체를 유지하고, "~다요"는 사용하지마세요.
@@ -34,6 +44,7 @@ ${chisaInfo}
 ${chisaVoice}
 필요한 경우 학습 데이터를 참고하여 답하세요.
 `;
+}
 
 export const toolStatusMap: Record<ToolName, string> & { [key: string]: string } = {
     [ToolName.GetRecommendList]: '취향에 딱 맞는 노래를 고르고 있어요... 🎵',
@@ -45,6 +56,7 @@ export const toolStatusMap: Record<ToolName, string> & { [key: string]: string }
     [ToolName.SlashPlay]: '노래를 추가하고 있어요... 🎧',
     [ToolName.React]: '적절한 반응을 추가하고 있어요... ✨',
     [ToolName.Pin]: '잊지 않게 메시지를 고정해 둘게요... 📌',
+    [ToolName.SearchWeb]: '필요한 정보를 검색하고 있어요... 🌐',
 };
 
 const handlers: Record<string, Function> = { ...musicHandlers, ...commandHandlers, ...utilHandlers };
@@ -73,7 +85,11 @@ async function generateWithRetry(contents: ContentListUnion): Promise<GenerateCo
         try {
             return await ai.gemini.models.generateContent({
                 model,
-                config: { thinkingConfig: { includeThoughts: false }, systemInstruction: systemInstructions, tools: [{ functionDeclarations }] },
+                config: {
+                    thinkingConfig: { includeThoughts: false },
+                    systemInstruction: getSystemInstructions(),
+                    tools: [{ functionDeclarations }]
+                },
                 contents,
             });
         }
@@ -173,4 +189,4 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
     }
 }
 
-module.exports = { talk, cleanResponseText };
+module.exports = { talk, cleanResponseText, getSystemInstructions };

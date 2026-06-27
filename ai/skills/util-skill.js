@@ -1,3 +1,5 @@
+const axios = require('axios');
+
 module.exports = {
   util_declarations: [
     {
@@ -44,6 +46,20 @@ module.exports = {
           },
         },
         required: ['messageId'],
+      },
+    },
+    {
+      name: 'search_web',
+      description: '웹에서 실시간 최신 정보나 뉴스를 검색합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          query: {
+            type: 'STRING',
+            description: '검색할 키워드 또는 질문 문장',
+          },
+        },
+        required: ['query'],
       },
     },
   ],
@@ -158,6 +174,33 @@ module.exports = {
           messageId,
           reason: err?.message || String(err),
         };
+      }
+    },
+    search_web: async (args) => {
+      const query = String(args?.query || '').trim();
+      if (!query) return '검색어가 비어있습니다.';
+
+      const apiKey = process.env.TAVILY_API_KEY;
+      if (!apiKey) return '오류: Tavily API Key가 설정되지 않았습니다.';
+
+      try {
+        const res = await axios.post('https://api.tavily.com/search', {
+          api_key: apiKey,
+          query: query,
+          include_answer: true,
+          max_results: 3,
+        });
+
+        if (res.data?.results && res.data.results.length > 0) {
+          const resultsText = res.data.results
+            .map((r, i) => `[${i + 1}] 제목: ${r.title}\n내용: ${r.content}\n출처: ${r.url}`)
+            .join('\n\n');
+          return `검색어: "${query}"에 대한 검색 결과:\n\n${resultsText}`;
+        }
+        return '검색 결과가 없습니다.';
+      }
+      catch (err) {
+        return `검색 중 오류 발생: ${err?.message || err}`;
       }
     },
   },
