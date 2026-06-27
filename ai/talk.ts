@@ -176,14 +176,21 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
         }
 
         if(replyMsg?.deletable) await replyMsg?.delete();
-        if(!response.text) return { ok: false, message: '문제가 발생했어요.' };
+        if(!response.text) {
+            logger.error('ai', 'Gemini response text is empty or blocked', { 
+                response: JSON.parse(JSON.stringify(response)) 
+            });
+            return { ok: false, message: '문제가 발생했어요.' };
+        }
 
         const cleanedMessage = cleanResponseText(response.text);
 
         return { ok: true, message: cleanedMessage || '노래를 재생해 드릴게요!' };
     }
-    catch (err) {
-        console.error(err);
+    catch (err: any) {
+        logger.error('ai', 'Error in talk handler', { 
+            error: err instanceof Error ? { message: err.message, stack: err.stack } : String(err) 
+        });
         if(replyMsg?.deletable) await replyMsg?.delete();
         return { ok: false, message: '문제가 발생했어요.' };
     }
