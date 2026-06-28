@@ -1,4 +1,5 @@
 const axios = require('axios');
+const { logger } = require('../common/logger');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
@@ -56,7 +57,7 @@ async function normalizeWavWithFfmpeg(buffer) {
             }
             catch (err) {
                 if (err?.code !== 'ENOENT') {
-                    console.error(err);
+                    logger.error('ai', `TTS normalisation temp file unlink failed: ${err instanceof Error ? err.message : String(err)}`, { error: err });
                 }
             }
         }
@@ -93,14 +94,14 @@ const generateTTS = async function generateVoice(text) {
             louder = await normalizeWavWithFfmpeg(louder);
         }
         catch (error) {
-            console.error(error);
+            logger.error('ai', `TTS normalisation failed: ${error instanceof Error ? error.message : String(error)}`, { error });
         }
 
         fs.writeFileSync('output_voice.wav', louder);
         return louder;
     }
     catch (err) {
-        console.error(err);
+        logger.error('ai', `TTS generation failed: ${err instanceof Error ? err.message : String(err)}`, { error: err });
     }
 };
 

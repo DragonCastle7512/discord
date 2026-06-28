@@ -1,4 +1,5 @@
 const { GoogleGenAI } = require('@google/genai');
+const { logger } = require('../../common/logger');
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const models = ['gemini-3.1-flash-lite', 'gemma-4-26b-a4b-it', 'gemma-4-31b-it'];
@@ -52,7 +53,7 @@ async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
     return lines;
   }
   catch (err) {
-    console.error('[Gemini Mood Service] Error generating song batch:', err);
+    logger.error('ai', '[Gemini Mood Service] Error generating song batch', { error: err instanceof Error ? err.stack : String(err) });
     return [];
   }
 }
@@ -109,7 +110,7 @@ ${videoTitles.map((title, idx) => `${idx + 1}. ${title}`).join('\n')}
     return lines;
   }
   catch (err) {
-    console.error('[Gemini Mood Service] Error in selectAndCleanSongsFromSearch:', err);
+    logger.error('ai', '[Gemini Mood Service] Error in selectAndCleanSongsFromSearch', { error: err instanceof Error ? err.stack : String(err) });
     return [];
   }
 }

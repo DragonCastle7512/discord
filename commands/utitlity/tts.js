@@ -1,6 +1,7 @@
 const { SlashCommandBuilder } = require('discord.js');
 const { generateTTS } = require('../../tts/tts');
 import { safeReply } from '../../common/reply-util';
+import { logger } from '../../common/logger';
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -48,7 +49,7 @@ module.exports = {
             await safeReply(interaction, { content: `치사가 읽어드려요: "${input}"` });
         }
         catch (err) {
-            console.error(err);
+            logger.error('ai', `TTS command execution failed: ${err instanceof Error ? err.message : String(err)}`, { error: err });
             await safeReply(interaction, { content: '문제가 생겼어요. 다시 한 번 시도해주세요.' });
         }
     },
