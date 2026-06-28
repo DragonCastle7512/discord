@@ -3,6 +3,7 @@ import { initPlayListModel } from '../music/models/playlist';
 import { initKeywordBlacklistModel } from '../music/models/keyword-blacklist';
 import { initUserKeywordBlacklistModel } from '../music/models/user-keyword-blacklist';
 import { sequelize } from './sequelize';
+import { logger } from '../common/logger';
 
 export async function initDb(): Promise<void> {
     try {
@@ -16,6 +17,6 @@ export async function initDb(): Promise<void> {
         console.log('db 연결 성공!');
     }
     catch (err) {
-        console.error(err);
+        logger.error('system', `Database initialization failed: ${err instanceof Error ? err.message : String(err)}`, { error: err });
     }
 }

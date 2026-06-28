@@ -2,6 +2,7 @@ const fs = require('node:fs');
 const path = require('node:path');
 
 const { REST, Routes } = require('discord.js');
+const { logger } = require('../common/logger');
 
 function loadCommandModules(commandsRoot) {
   const commands = new Map();
@@ -48,7 +49,7 @@ async function deployCommands({ clientId, token, commands, guildId = null }) {
     }
   }
   catch (error) {
-    console.error('[Deploy] Error:', error);
+    logger.error('command', `Deploy Error: ${error instanceof Error ? error.message : String(error)}`, { error });
   }
 }
 

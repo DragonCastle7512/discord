@@ -10,6 +10,7 @@ import { DashboardResponse, MusicItem } from './types';
 import { verifyDashboardToken } from '../common/auth';
 import { notifyMusicUpdate } from '../common/socket';
 import { isDurationInRange } from '../music/utils/track-parser';
+import { logger } from '../common/logger';
 
 import { KeywordBlacklist } from '../music/models/keyword-blacklist';
 import { MusicHistory } from '../music/models/music-history';
@@ -94,7 +95,7 @@ export function createDashboardRouter(
         try {
           allHistory = await findAllHistory(guildId);
         } catch (e) {
-          console.error('History fetch failed:', e);
+          logger.error('music', 'History fetch failed in dashboard data', { error: e });
         }
 
         const now = Date.now();
@@ -152,7 +153,7 @@ export function createDashboardRouter(
 
       res.json(response);
     } catch (err) {
-      console.error(err);
+      logger.error('system', `Dashboard data get failed: ${err instanceof Error ? err.message : String(err)}`, { error: err });
       res.status(500).json({ error: 'Internal error' });
     }
   });
@@ -337,7 +338,7 @@ export function createDashboardRouter(
               // 1m 30s ~ 6m duration filter
               return rawTracks.filter((t: Track) => isDurationInRange(t.info.length));
             } catch (err) {
-              console.error(`[GET /admin/keywords] search for "${kw}" failed:`, err);
+              logger.error('music', `[GET /admin/keywords] search for "${kw}" failed`, { error: err });
               return [];
             }
           });
@@ -371,7 +372,7 @@ export function createDashboardRouter(
             thumbnail: t.info.artworkUrl || (t.info.identifier ? `https://i.ytimg.com/vi/${t.info.identifier}/mqdefault.jpg` : null)
           }));
         } catch (searchErr) {
-          console.error('[GET /admin/keywords] Mixing recommendation failed:', searchErr);
+          logger.error('music', '[GET /admin/keywords] Mixing recommendation failed', { error: searchErr });
         }
       }
 
@@ -477,7 +478,7 @@ export function createDashboardRouter(
 
       res.json({ ok: true, items: items });
     } catch (err: any) {
-      console.error(`[DEBUG] search-preview error:`, err);
+      logger.error('music', 'search-preview error', { error: err });
       res.status(500).json({ error: err.message });
     }
   });
@@ -500,7 +501,7 @@ export function createDashboardRouter(
         displayName = user.globalName || user.username;
       }
     } catch (userErr) {
-      console.error('Failed to fetch user profile for logs page:', userErr);
+      logger.error('system', 'Failed to fetch user profile for logs page', { error: userErr });
     }
 
     if (!fs.existsSync(logPath)) {

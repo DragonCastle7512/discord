@@ -49,7 +49,7 @@ const ttsHttpStore = createTtsHttpStore({
 });
 
 if (!token || !lavalinkHost || !lavalinkPassword) {
-  console.error('Missing essential environment variables.');
+  logger.error('system', 'Missing essential environment variables.');
   process.exit(1);
 }
 
@@ -144,7 +144,7 @@ shoukaku.on('ready', (name: string) => {
 
 shoukaku.on('error', (name: string, error: Error) => {
   readyNodes.delete(name);
-  console.error(`[Lavalink] Node error (${name}):`, error);
+  logger.error('system', `[Lavalink] Node error (${name}): ${error.message}`, { error });
 });
 
 client.once(Events.ClientReady, async (readyClient) => {
@@ -201,7 +201,7 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
       await interaction.reply({
         content: `명령어 호출이 너무 빠릅니다! 잠시 후 다시 시도해 주세요. (${Math.ceil(rateCheck.retryAfterMs / 1000)}초 후 가능)`,
         ephemeral: true
-      }).catch(console.error);
+      }).catch((err) => logger.error('command', 'Interaction reply error during rate limit', { error: err }));
       return;
     }
 
@@ -224,9 +224,9 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
     if (interaction.isRepliable()) {
       const text = '오류가 발생했어요.';
       if (interaction.deferred || interaction.replied) {
-        await interaction.editReply(text).catch(console.error);
+        await interaction.editReply(text).catch((err) => logger.error('command', 'Interaction editReply error during exception handling', { error: err }));
       } else {
-        await interaction.reply({ content: text, ephemeral: true }).catch(console.error);
+        await interaction.reply({ content: text, ephemeral: true }).catch((err) => logger.error('command', 'Interaction reply error during exception handling', { error: err }));
       }
     }
   }
@@ -259,7 +259,7 @@ client.on('voiceStateUpdate', (oldState: VoiceState, newState: VoiceState) => {
             await runtimeUtils.stopShoukaku(guildId);
           }
           catch (error) {
-            console.error('Error during leave:', error);
+            logger.error('music', `Error during automatic voice channel leave: ${error instanceof Error ? error.message : String(error)}`, { error });
           }
         }
       }, 3000);

@@ -10,6 +10,7 @@ import {
   MessageEditOptions,
   BaseGuildTextChannel
 } from 'discord.js';
+import { logger } from './logger';
 
 /**
  * 메시지나 인터랙션에 대해 안전하게 응답하거나 수정합니다.
@@ -56,7 +57,7 @@ async function fallbackSend(target: Message | Interaction, options: any): Promis
       return await (channel as BaseGuildTextChannel).send(options);
     }
   } catch (sendErr) {
-    console.error('[SafeReply] Fallback send failed:', sendErr);
+    logger.error('system', `[SafeReply] Fallback send failed: ${sendErr instanceof Error ? sendErr.message : String(sendErr)}`, { error: sendErr });
   }
   return null;
 }

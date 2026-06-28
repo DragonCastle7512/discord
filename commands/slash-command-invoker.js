@@ -109,7 +109,7 @@ function createSyntheticInteraction(message, options) {
           return this._replyMessage;
         }
         catch (err) {
-          console.error('[EditReply Error]:' + err);
+          logger.error('command', `EditReply Error: ${err instanceof Error ? err.message : String(err)}`, { error: err });
           return this.reply(normalized);
         }
       }
