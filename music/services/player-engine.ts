@@ -93,7 +93,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       try {
         await shoukaku.leaveVoiceChannel(guild.id);
       } catch (err) {
-        console.error(err);
+        logger.error('music', `Voice channel leave failed during setup: ${err instanceof Error ? err.message : String(err)}`, { error: err });
       }
 
       let player: Player;
@@ -141,7 +141,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
 
         if (endedHistoryId && event?.reason !== 'finished') {
           updateHistorySkipped(endedHistoryId, true).catch((err) =>
-            console.error('Failed to mark track as skipped in history db:', err)
+            logger.error('music', 'Failed to mark track as skipped in history db', { error: err })
           );
         }
         if (
@@ -171,7 +171,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
         notifyMusicUpdate(guild.id, 'music');
         const textChannel = getTextChannel(state.textChannelId);
         if (textChannel) {
-          textChannel.send('재생 도중에 오류가 발생했어요!').catch((err) => console.error(err));
+          textChannel.send('재생 도중에 오류가 발생했어요!').catch((err) => logger.error('music', 'Failed to send playback error notification', { error: err }));
         }
       });
 
@@ -318,7 +318,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
     if (!next) {
       state.current = null;
       if (state.auto) {
-        autoplayService.triggerAutoPlay(guildId).catch((err) => console.error('autoplay failed:', err));
+        autoplayService.triggerAutoPlay(guildId).catch((err) => logger.error('music', 'Autoplay trigger failed', { error: err }));
       }
       return;
     }
@@ -330,7 +330,10 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       info: next.info || ({} as any),
       requestedBy: next.requestedBy || null,
       tags: extractTagsFromTrackInfo(next.info || {}),
-    }).catch((err) => console.error('Failed to insert history:', err));
+    }).catch((err) => {
+      logger.error('music', 'Failed to insert history', { error: err });
+      return null;
+    });
 
     if (historyItem) {
       state.currentHistoryId = historyItem.id;
@@ -367,10 +370,10 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
           thumbnailUrl,
           footer: textChannel?.name || 'Music',
         });
-        textChannel.send({ embeds: [embed] }).catch((err) => console.error(err));
+        textChannel.send({ embeds: [embed] }).catch((err) => logger.error('music', 'Failed to send now playing embed', { error: err }));
       }
     } catch (error) {
-      console.error('PlayTrack failed:', error);
+      logger.error('music', 'PlayTrack failed', { error });
       state.playing = false;
       state.current = null;
       return;

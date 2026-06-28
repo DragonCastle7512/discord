@@ -8,6 +8,7 @@ const {
 } = require('discord.js');
 const { buildTrackListContainer, formatTitle } = require('../../music/embeds/track-list-components');
 import { safeReply } from '../../common/reply-util';
+import { logger } from '../../common/logger';
 
 const PAGE_SIZE = 4;
 const COLLECTOR_MS = 5 * 60 * 1000;
@@ -199,7 +200,7 @@ module.exports = {
         });
       }
       catch (error) {
-        console.error('Playlist component error:', error);
+        logger.error('music', `Playlist component error: ${error instanceof Error ? error.message : String(error)}`, { error });
         await safeReply(component, { content: '조작 중 오류가 발생했어요.', ephemeral: true });
       }
     });

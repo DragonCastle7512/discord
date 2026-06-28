@@ -16,6 +16,7 @@ import {
   deletePlaylist 
 } from './repositorys/playlist.repository';
 import { notifyMusicUpdate } from '../common/socket';
+import { logger } from '../common/logger';
 
 export function createMusicRuntime({ 
   guildStates, 
@@ -72,7 +73,7 @@ export function createMusicRuntime({
           try {
             return await resolveTracks(trimmed);
           } catch (e) {
-            console.error(`Resolve failed for ${trimmed}:`, e);
+            logger.error('music', `Resolve failed for ${trimmed}: ${e instanceof Error ? e.message : String(e)}`, { error: e });
             return null;
           }
         })
@@ -125,7 +126,7 @@ export function createMusicRuntime({
         return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
       }
       catch (err) {
-        console.error(err);
+        logger.error('music', `Failed to queue playlist: ${err instanceof Error ? err.message : String(err)}`, { error: err });
         return { ok: false, message: '찾을 수 없는 노래에요!' };
       }
     }
@@ -380,13 +381,13 @@ export function createMusicRuntime({
           const readyNode = await waitForReadyNode();
           if (readyNode) {
             await joinOrMovePlayer(context.guild, context.channelId || state.textChannelId, voiceChannel);
-            playNext(guildId).catch((err: Error) => console.error('Autoplay trigger on enable failed:', err));
+            playNext(guildId).catch((err: Error) => logger.error('music', 'Autoplay trigger on enable failed', { error: err }));
           }
         } catch (err) {
-          console.error('Auto join failed:', err);
+          logger.error('music', `Auto join failed: ${err instanceof Error ? err.message : String(err)}`, { error: err });
         }
       } else if (state.player) {
-        playNext(guildId).catch((err: Error) => console.error('Autoplay trigger on enable failed:', err));
+        playNext(guildId).catch((err: Error) => logger.error('music', 'Autoplay trigger on enable failed', { error: err }));
       }
     }
     
