@@ -2,7 +2,7 @@ import test, { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { Logger } from '../common/logger';
+import { Logger, sentryWrapper } from '../common/logger';
 
 describe('Logger Tests', () => {
   const logDir = path.join(__dirname, '../logs-test');
@@ -81,5 +81,45 @@ describe('Logger Tests', () => {
     assert.strictEqual(parsed.category, 'music');
     assert.strictEqual(parsed.metadata.userId, 'user-123');
     assert.strictEqual(parsed.metadata.recommendedCount, 3);
+  });
+
+  it('should call Sentry captureMessage when warning level is logged and SENTRY_DSN is set', (t) => {
+    // Temporarily mock SENTRY_DSN
+    const originalDsn = process.env.SENTRY_DSN;
+    process.env.SENTRY_DSN = 'https://mock@sentry.io/123';
+
+    // Mock Sentry methods
+    const captureMessageMock = t.mock.method(sentryWrapper, 'captureMessage', () => 'mock-id');
+    
+    const logger = new Logger(logFile, 1024 * 10);
+    logger.warn('music', 'Recommendation issue warning', { issue: 'slow response' });
+
+    assert.strictEqual(captureMessageMock.mock.callCount(), 1);
+    const firstCall = captureMessageMock.mock.calls[0];
+    assert.strictEqual(firstCall.arguments[0], 'Recommendation issue warning');
+    assert.strictEqual(firstCall.arguments[1].level, 'warning');
+    assert.strictEqual(firstCall.arguments[1].tags.category, 'music');
+    assert.deepStrictEqual(firstCall.arguments[1].extra, { issue: 'slow response' });
+
+    // Restore env
+    process.env.SENTRY_DSN = originalDsn;
+  });
+
+  it('should call Sentry captureException when error level with error metadata is logged and SENTRY_DSN is set', (t) => {
+    const originalDsn = process.env.SENTRY_DSN;
+    process.env.SENTRY_DSN = 'https://mock@sentry.io/123';
+
+    const captureExceptionMock = t.mock.method(sentryWrapper, 'captureException', () => 'mock-id');
+    
+    const logger = new Logger(logFile, 1024 * 10);
+    const mockError = new Error('Database connection failed');
+    logger.error('system', 'DB connection error message', { error: mockError });
+
+    assert.strictEqual(captureExceptionMock.mock.callCount(), 1);
+    const firstCall = captureExceptionMock.mock.calls[0];
+    assert.strictEqual(firstCall.arguments[0], mockError);
+    assert.strictEqual(firstCall.arguments[1].tags.category, 'system');
+
+    process.env.SENTRY_DSN = originalDsn;
   });
 });
