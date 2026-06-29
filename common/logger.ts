@@ -1,5 +1,25 @@
 import fs from 'node:fs';
 import path from 'node:path';
+import * as Sentry from '@sentry/node';
+
+// Initialize Sentry early if DSN is set
+if (process.env.SENTRY_DSN) {
+  Sentry.init({
+    dsn: process.env.SENTRY_DSN,
+    environment: process.env.NODE_ENV || 'development',
+    tracesSampleRate: 1.0,
+  });
+}
+
+// Wrap Sentry calls to allow mocking in tests without dealing with read-only ESM namespace objects
+export const sentryWrapper = {
+  captureException(exception: any, captureContext?: any) {
+    return Sentry.captureException(exception, captureContext);
+  },
+  captureMessage(message: string, captureContext?: any) {
+    return Sentry.captureMessage(message, captureContext);
+  }
+};
 
 export interface LogEntry {
   timestamp: string;
@@ -45,6 +65,37 @@ export class Logger {
       const colorMap = { INFO: '\x1b[32m', WARN: '\x1b[33m', ERROR: '\x1b[31m' };
       const reset = '\x1b[0m';
       console.log(`${colorMap[level] || ''}[${entry.timestamp}] [${level}] [${category}] ${message}${reset}`);
+
+      // Sentry integration for WARN and ERROR
+      if (process.env.SENTRY_DSN) {
+        if (level === 'ERROR') {
+          // If metadata contains an actual Error object, capture it as exception
+          if (metadata && metadata.error instanceof Error) {
+            sentryWrapper.captureException(metadata.error, {
+              tags: { category },
+              extra: metadata,
+            });
+          } else if (metadata && typeof metadata.error === 'string') {
+            // If error is string stack/message, construct an Error object
+            sentryWrapper.captureException(new Error(metadata.error), {
+              tags: { category },
+              extra: { ...metadata, originalMessage: message },
+            });
+          } else {
+            sentryWrapper.captureMessage(message, {
+              level: 'error',
+              tags: { category },
+              extra: metadata,
+            });
+          }
+        } else if (level === 'WARN') {
+          sentryWrapper.captureMessage(message, {
+            level: 'warning',
+            tags: { category },
+            extra: metadata,
+          });
+        }
+      }
     } catch (err) {
       console.error('Failed to write log:', err);
     }
