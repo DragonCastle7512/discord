@@ -16,22 +16,23 @@ export function initPlayListModel(sequelize: Sequelize): typeof PlayList {
         type: DataTypes.BIGINT,
         autoIncrement: true,
         primaryKey: true,
+        field: 'ID',
       },
       userId: {
         type: DataTypes.STRING(64),
         allowNull: false,
-        field: 'user_id',
+        field: 'USER_ID',
       },
       musicInfo: {
         type: DataTypes.JSON,
         allowNull: false,
-        field: 'music_info',
+        field: 'MUSIC_INFO',
       },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
-        field: 'created_at',
+        field: 'CREATED_AT',
       },
     },
     {

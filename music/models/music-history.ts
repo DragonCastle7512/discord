@@ -16,22 +16,23 @@ export function initMusicHistoryModel(sequelize: Sequelize): typeof MusicHistory
         type: DataTypes.BIGINT,
         autoIncrement: true,
         primaryKey: true,
+        field: 'ID',
       },
       guildId: {
         type: DataTypes.STRING(32),
         allowNull: false,
-        field: 'guild_id',
+        field: 'GUILD_ID',
       },
       musicInfo: {
         type: DataTypes.JSON,
         allowNull: false,
-        field: 'music_info',
+        field: 'MUSIC_INFO',
       },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
-        field: 'created_at',
+        field: 'CREATED_AT',
       },
     },
     {

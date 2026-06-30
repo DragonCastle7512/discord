@@ -15,22 +15,23 @@ export function initKeywordBlacklistModel(sequelize: Sequelize): typeof KeywordB
         type: DataTypes.BIGINT,
         autoIncrement: true,
         primaryKey: true,
+        field: 'ID',
       },
       guildId: {
         type: DataTypes.STRING(32),
         allowNull: false,
-        field: 'guild_id',
+        field: 'GUILD_ID',
       },
       keyword: {
         type: DataTypes.STRING(255),
         allowNull: false,
-        field: 'keyword',
+        field: 'KEYWORD',
       },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
-        field: 'created_at',
+        field: 'CREATED_AT',
       },
     },
     {
@@ -41,8 +42,9 @@ export function initKeywordBlacklistModel(sequelize: Sequelize): typeof KeywordB
       updatedAt: false,
       indexes: [
         {
+          name: 'k_e_y_w_o_r_d__b_l_a_c_k_l_i_s_t_guild_id_keyword',
           unique: true,
-          fields: ['guild_id', 'keyword'],
+          fields: ['GUILD_ID', 'KEYWORD'],
         },
       ],
     },

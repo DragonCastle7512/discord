@@ -15,22 +15,23 @@ export function initUserKeywordBlacklistModel(sequelize: Sequelize): typeof User
         type: DataTypes.BIGINT,
         autoIncrement: true,
         primaryKey: true,
+        field: 'ID',
       },
       userId: {
         type: DataTypes.STRING(32),
         allowNull: false,
-        field: 'user_id',
+        field: 'USER_ID',
       },
       keyword: {
         type: DataTypes.STRING(255),
         allowNull: false,
-        field: 'keyword',
+        field: 'KEYWORD',
       },
       createdAt: {
         type: DataTypes.DATE,
         allowNull: false,
         defaultValue: sequelize.literal('CURRENT_TIMESTAMP'),
-        field: 'created_at',
+        field: 'CREATED_AT',
       },
     },
     {
@@ -41,8 +42,9 @@ export function initUserKeywordBlacklistModel(sequelize: Sequelize): typeof User
       updatedAt: false,
       indexes: [
         {
+          name: 'u_s_e_r__k_e_y_w_o_r_d__b_l_a_c_k_l_i_s_t_user_id_keyword',
           unique: true,
-          fields: ['user_id', 'keyword'],
+          fields: ['USER_ID', 'KEYWORD'],
         },
       ],
     },
