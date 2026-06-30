@@ -485,7 +485,7 @@ export function createDashboardRouter(
 
   router.get('/logs-data', verifyToken, async (req: Request, res: Response) => {
     const session = (req as any).session;
-    if (session.userId !== process.env.OWNER_ID) {
+    if (!process.env.OWNER_ID || session.userId !== process.env.OWNER_ID) {
       res.status(401).json({ error: '권한이 없습니다.' });
       return;
     }

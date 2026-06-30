@@ -26,7 +26,7 @@ export function createSystemRouter(): Router {
   router.get('/admin/:token', (req: Request, res: Response) => {
     const token = req.params.token;
     const session = verifyDashboardToken(token);
-    if (!session || session.userId !== process.env.OWNER_ID) {
+    if (!session || !process.env.OWNER_ID || session.userId !== process.env.OWNER_ID) {
       res.status(404).sendFile(path.join(__dirname, '../public/error/404.html'));
       return;
     }
