@@ -11,7 +11,6 @@ describe('UserKeywordBlacklist Model Compatibility Tests', () => {
     await sequelize.authenticate();
     initUserKeywordBlacklistModel(sequelize);
     initKeywordBlacklistModel(sequelize);
-    await UserKeywordBlacklist.sync();
     await UserKeywordBlacklist.destroy({ 
       where: { 
         userId: ['test-user-xyz', 'test-user-A'],

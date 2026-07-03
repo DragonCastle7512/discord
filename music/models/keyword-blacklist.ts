@@ -42,9 +42,9 @@ export function initKeywordBlacklistModel(sequelize: Sequelize): typeof KeywordB
       updatedAt: false,
       indexes: [
         {
-          name: 'k_e_y_w_o_r_d__b_l_a_c_k_l_i_s_t_guild_id_keyword',
+          name: 'IX_KW_BLACKLIST_GID_KW',
           unique: true,
-          fields: ['GUILD_ID', 'KEYWORD'],
+          fields: ['guildId', 'keyword'],
         },
       ],
     },
