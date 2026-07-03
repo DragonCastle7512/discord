@@ -132,8 +132,18 @@ export function renderKeywordsTable(keywords) {
     return;
   }
 
-  keywords.forEach((item, index) => {
+  // 1. 고정 키워드를 최상단에, 그 다음 빈도수 내림차순 정렬
+  const sortedKeywords = [...keywords].sort((a, b) => {
+    if (a.isPinned && !b.isPinned) return -1;
+    if (!a.isPinned && b.isPinned) return 1;
+    return b.freq - a.freq || a.tag.localeCompare(b.tag);
+  });
+
+  sortedKeywords.forEach((item, index) => {
     const tr = document.createElement('tr');
+    if (item.isPinned) {
+      tr.style.background = 'rgba(235, 87, 87, 0.05)'; // 고정 키워드 행 배경색 변경 (약한 빨간색 하이라이트)
+    }
 
     const tdRank = document.createElement('td');
     tdRank.textContent = String(index + 1);
@@ -141,22 +151,113 @@ export function renderKeywordsTable(keywords) {
     tdRank.style.fontWeight = index < 3 ? '700' : '400';
 
     const tdTag = document.createElement('td');
-    tdTag.textContent = item.tag;
     tdTag.style.fontWeight = '500';
+    tdTag.style.display = 'flex';
+    tdTag.style.alignItems = 'center';
+    tdTag.style.gap = '6px';
+    
+    // 키워드 이름 노출
+    const spanText = document.createElement('span');
+    spanText.textContent = item.tag;
+    tdTag.appendChild(spanText);
+
+    // 고정된 키워드면 제목 옆에 '못 아이콘' 표시
+    if (item.isPinned) {
+      const pinIconSpan = document.createElement('span');
+      pinIconSpan.style.color = 'var(--red)';
+      pinIconSpan.innerHTML = getIcon('pin');
+      pinIconSpan.title = '고정됨';
+      tdTag.appendChild(pinIconSpan);
+    }
 
     const tdFreq = document.createElement('td');
     tdFreq.textContent = `${item.freq}회`;
 
     const tdManage = document.createElement('td');
-    const btn = document.createElement('button');
-    btn.className = 'keyword-btn-remove';
-    btn.textContent = '제거';
-    btn.onclick = () => addBlacklist(item.tag);
-    tdManage.appendChild(btn);
+    tdManage.style.display = 'flex';
+    tdManage.style.gap = '8px';
+
+    // 1. 고정/해제 토글 버튼
+    const pinBtn = document.createElement('button');
+    pinBtn.style.padding = '4px 8px';
+    pinBtn.style.fontSize = '12px';
+    pinBtn.style.borderRadius = '4px';
+    pinBtn.style.border = 'none';
+    pinBtn.style.cursor = 'pointer';
+    
+    if (item.isPinned) {
+      pinBtn.className = 'keyword-btn-pin active';
+      pinBtn.textContent = '해제';
+      pinBtn.style.background = 'var(--red-muted)';
+      pinBtn.style.color = '#fff';
+      pinBtn.onclick = () => togglePin(item.tag, true);
+    } else {
+      pinBtn.className = 'keyword-btn-pin';
+      pinBtn.textContent = '고정';
+      pinBtn.style.background = 'var(--bg-card-hover)';
+      pinBtn.style.color = 'var(--text)';
+      pinBtn.onclick = () => togglePin(item.tag, false);
+    }
+    
+    // 2. 제거 버튼
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'keyword-btn-remove';
+    removeBtn.textContent = '제거';
+    removeBtn.onclick = () => addBlacklist(item.tag);
+
+    tdManage.append(pinBtn, removeBtn);
 
     tr.append(tdRank, tdTag, tdFreq, tdManage);
     tbody.appendChild(tr);
   });
+}
+
+// togglePin 함수 신규 구현 (낙관적 업데이트 적용)
+export async function togglePin(keyword, isCurrentlyPinned) {
+  if (!keyword || !token) return;
+
+  const backupKeywords = [...allKeywordsData];
+
+  // 고정 제한 5개 체크 (고정을 요청하는 경우만 검사)
+  if (!isCurrentlyPinned) {
+    const pinnedCount = allKeywordsData.filter(item => item.isPinned).length;
+    if (pinnedCount >= 5) {
+      showToast('최대 5개까지만 고정할 수 있습니다.');
+      return;
+    }
+  }
+
+  // 낙관적 업데이트: 로컬 데이터 상태를 즉시 토글
+  allKeywordsData = allKeywordsData.map(item => {
+    if (item.tag === keyword) {
+      return { ...item, isPinned: !isCurrentlyPinned };
+    }
+    return item;
+  });
+  renderKeywordsTable(allKeywordsData);
+
+  try {
+    let res;
+    if (isCurrentlyPinned) {
+      res = await api.removePin(keyword, currentKeywordMode);
+    } else {
+      res = await api.addPin(keyword, currentKeywordMode);
+    }
+
+    if (res.ok) {
+      showToast(`키워드 '${keyword}' ${isCurrentlyPinned ? '고정을 해제했습니다.' : '고정했습니다.'}`);
+      loadAdminKeywords(false); // 백그라운드 갱신
+    } else {
+      // 실패 시 원래대로 복구
+      allKeywordsData = backupKeywords;
+      renderKeywordsTable(allKeywordsData);
+      showToast(res.error || '고정 상태를 변경하는 데 실패했습니다.');
+    }
+  } catch (err) {
+    console.error('고정 요청 오류:', err);
+    allKeywordsData = backupKeywords;
+    renderKeywordsTable(allKeywordsData);
+  }
 }
 
 export async function addBlacklist(keyword) {

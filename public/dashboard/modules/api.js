@@ -29,5 +29,7 @@ export const api = {
   fetchKeywords: (mode) => request(`/api/admin/keywords?mode=${mode}`),
   addBlacklist: (keyword, mode) => request('/api/admin/blacklist', { method: 'POST', body: JSON.stringify({ token, keyword, mode }) }),
   removeBlacklist: (keyword, mode) => request('/api/admin/blacklist', { method: 'DELETE', body: JSON.stringify({ token, keyword, mode }) }),
+  addPin: (keyword, mode) => request('/api/admin/pin', { method: 'POST', body: JSON.stringify({ token, keyword, mode }) }),
+  removePin: (keyword, mode) => request('/api/admin/pin', { method: 'DELETE', body: JSON.stringify({ token, keyword, mode }) }),
   searchPreview: (keyword) => request(`/api/admin/search-preview?keyword=${encodeURIComponent(keyword)}`),
 };

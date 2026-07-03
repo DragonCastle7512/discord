@@ -15,6 +15,8 @@ import { logger } from '../common/logger';
 import { KeywordBlacklist } from '../music/models/keyword-blacklist';
 import { MusicHistory } from '../music/models/music-history';
 import { UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
+import { KeywordPin } from '../music/models/keyword-pin';
+import { UserKeywordPin } from '../music/models/user-keyword-pin';
 
 
 export function createDashboardRouter(
@@ -320,15 +322,35 @@ export function createDashboardRouter(
         blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
       }
 
+      // 고정 키워드 조회
+      let pinnedSet = new Set<string>();
+      if (mode === 'personal') {
+        const pinRecords = await UserKeywordPin.findAll({ where: { userId: session.userId } }).catch(() => []);
+        pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
+      } else {
+        const pinRecords = await KeywordPin.findAll({ where: { guildId: session.guildId } }).catch(() => []);
+        pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
+      }
+
       const keywords = dedupedKeywordsList
         .filter(tag => !blacklistSet.has(tag))
-        .map(tag => ({ tag, freq: keywordMap.get(tag) || 0 }))
+        .map(tag => ({ 
+          tag, 
+          freq: keywordMap.get(tag) || 0,
+          isPinned: pinnedSet.has(tag)
+        }))
         .filter(item => item.freq > 0)
         .sort((a, b) => b.freq - a.freq || a.tag.localeCompare(b.tag));
 
       let recommendation = { keywords: [] as string[], items: [] as any[] };
       if (keywords.length > 0) {
-        const topKeywords = keywords.slice(0, 3).map(k => k.tag);
+        // 고정 키워드가 믹싱 시 최우선 배치되도록 정렬하여 상위 3개 키워드 추출
+        const sortedForRec = [...keywords].sort((a, b) => {
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          return b.freq - a.freq || a.tag.localeCompare(b.tag);
+        });
+        const topKeywords = sortedForRec.slice(0, 3).map(k => k.tag);
 
         try {
           const searchPromises = topKeywords.map(async (kw) => {
@@ -381,8 +403,10 @@ export function createDashboardRouter(
         mode,
         totalKeywordsCount: dedupedKeywordsList.length,
         blacklistCount: blacklistSet.size,
+        pinnedCount: pinnedSet.size,
         keywords,
         blacklist: Array.from(blacklistSet),
+        pinned: Array.from(pinnedSet),
         recommendation
       });
     } catch (err: any) {
@@ -442,6 +466,80 @@ export function createDashboardRouter(
         });
       } else {
         await KeywordBlacklist.destroy({ 
+          where: { 
+            guildId: session.guildId, 
+            keyword: normalized 
+          } 
+        });
+      }
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.post('/admin/pin', verifyToken, async (req: Request, res: Response) => {
+    const { keyword, mode } = req.body;
+    if (!keyword || typeof keyword !== 'string') {
+      res.status(400).json({ error: '올바른 키워드를 입력해주세요.' });
+      return;
+    }
+    try {
+      const session = (req as any).session;
+      const normalized = keyword.toLowerCase().trim();
+      const currentMode = mode || 'server';
+
+      if (currentMode === 'personal') {
+        const count = await UserKeywordPin.count({ where: { userId: session.userId } });
+        if (count >= 5) {
+          res.status(400).json({ error: '최대 5개까지만 고정할 수 있습니다.' });
+          return;
+        }
+        await UserKeywordPin.findOrCreate({ 
+          where: { 
+            userId: session.userId, 
+            keyword: normalized 
+          } 
+        });
+      } else {
+        const count = await KeywordPin.count({ where: { guildId: session.guildId } });
+        if (count >= 5) {
+          res.status(400).json({ error: '최대 5개까지만 고정할 수 있습니다.' });
+          return;
+        }
+        await KeywordPin.findOrCreate({ 
+          where: { 
+            guildId: session.guildId, 
+            keyword: normalized 
+          } 
+        });
+      }
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.delete('/admin/pin', verifyToken, async (req: Request, res: Response) => {
+    const { keyword, mode } = req.body;
+    if (!keyword || typeof keyword !== 'string') {
+      res.status(400).json({ error: '올바른 키워드를 입력해주세요.' });
+      return;
+    }
+    try {
+      const session = (req as any).session;
+      const normalized = keyword.toLowerCase().trim();
+      const currentMode = mode || 'server';
+
+      if (currentMode === 'personal') {
+        await UserKeywordPin.destroy({ 
+          where: { 
+            userId: session.userId, 
+            keyword: normalized 
+          } 
+        });
+      } else {
+        await KeywordPin.destroy({ 
           where: { 
             guildId: session.guildId, 
             keyword: normalized 
