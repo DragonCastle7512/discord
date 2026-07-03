@@ -156,56 +156,44 @@ export function renderKeywordsTable(keywords) {
     tdTag.style.alignItems = 'center';
     tdTag.style.gap = '6px';
     
-    // 키워드 이름 노출
+    // 키워드 이름 노출 (길면 잘림 처리 및 툴팁 제공)
     const spanText = document.createElement('span');
     spanText.textContent = item.tag;
+    spanText.style.maxWidth = '95%';
+    spanText.style.overflow = 'hidden';
+    spanText.style.textOverflow = 'ellipsis';
+    spanText.style.whiteSpace = 'nowrap';
+    spanText.style.display = 'inline-block';
+    spanText.title = item.tag; // 마우스 오버 시 전체 태그명 확인용 툴팁
     tdTag.appendChild(spanText);
 
-    // 고정된 키워드면 제목 옆에 '못 아이콘' 표시
+    // 못 아이콘 생성 (클릭 시 고정 토글 동작)
+    const pinIconSpan = document.createElement('span');
+    pinIconSpan.innerHTML = getIcon('pin');
+    
     if (item.isPinned) {
-      const pinIconSpan = document.createElement('span');
-      pinIconSpan.style.color = 'var(--red)';
-      pinIconSpan.innerHTML = getIcon('pin');
-      pinIconSpan.title = '고정됨';
-      tdTag.appendChild(pinIconSpan);
+      pinIconSpan.className = 'pin-icon pinned';
+      pinIconSpan.title = '고정 해제하기';
+      pinIconSpan.onclick = () => togglePin(item.tag, true);
+    } else {
+      pinIconSpan.className = 'pin-icon unpinned';
+      pinIconSpan.title = '고정하기';
+      pinIconSpan.onclick = () => togglePin(item.tag, false);
     }
+    tdTag.appendChild(pinIconSpan);
 
     const tdFreq = document.createElement('td');
     tdFreq.textContent = `${item.freq}회`;
 
     const tdManage = document.createElement('td');
-    tdManage.style.display = 'flex';
-    tdManage.style.gap = '8px';
-
-    // 1. 고정/해제 토글 버튼
-    const pinBtn = document.createElement('button');
-    pinBtn.style.padding = '4px 8px';
-    pinBtn.style.fontSize = '12px';
-    pinBtn.style.borderRadius = '4px';
-    pinBtn.style.border = 'none';
-    pinBtn.style.cursor = 'pointer';
     
-    if (item.isPinned) {
-      pinBtn.className = 'keyword-btn-pin active';
-      pinBtn.textContent = '해제';
-      pinBtn.style.background = 'var(--red-muted)';
-      pinBtn.style.color = '#fff';
-      pinBtn.onclick = () => togglePin(item.tag, true);
-    } else {
-      pinBtn.className = 'keyword-btn-pin';
-      pinBtn.textContent = '고정';
-      pinBtn.style.background = 'var(--bg-card-hover)';
-      pinBtn.style.color = 'var(--text)';
-      pinBtn.onclick = () => togglePin(item.tag, false);
-    }
-    
-    // 2. 제거 버튼
+    // 제거 버튼
     const removeBtn = document.createElement('button');
     removeBtn.className = 'keyword-btn-remove';
     removeBtn.textContent = '제거';
     removeBtn.onclick = () => addBlacklist(item.tag);
 
-    tdManage.append(pinBtn, removeBtn);
+    tdManage.appendChild(removeBtn);
 
     tr.append(tdRank, tdTag, tdFreq, tdManage);
     tbody.appendChild(tr);

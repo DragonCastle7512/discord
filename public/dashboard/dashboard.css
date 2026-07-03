@@ -412,8 +412,11 @@ body.is-dragging .pl-card * {
 .keyword-table td {
   padding: 12px 10px;
   font-size: 14px;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
   vertical-align: middle;
+}
+
+.keyword-table tr {
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
 }
 
 .keyword-table tbody tr:hover {
@@ -792,6 +795,43 @@ body.is-dragging .pl-card * {
   transform-origin: center center;
   transition: transform 0.05s linear;
 }
+
+/* Keyword Pin Action Icon Styles */
+.pin-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  color: var(--muted);
+  opacity: 0;
+  padding: 4px;
+  border-radius: 4px;
+}
+
+/* Already pinned state */
+.pin-icon.pinned {
+  opacity: 1;
+  color: var(--red-bright) !important;
+}
+
+.pin-icon.pinned:hover {
+  transform: scale(1.2);
+  color: var(--red) !important;
+}
+
+/* Unpinned state (revealed on row hover) */
+tr:hover .pin-icon.unpinned {
+  opacity: 0.35;
+}
+
+tr:hover .pin-icon.unpinned:hover {
+  opacity: 1;
+  color: var(--red-bright);
+  transform: scale(1.2);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 
 
 
