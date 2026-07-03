@@ -334,6 +334,7 @@ async function recommendFromHistory({
   randomizeKeywordsCount = null,
   guildId = null,
   userId = null,
+  pinnedKeywords = [],
 }) {
   const normalizedCount = clampRecommendationCount(count);
   const recentHistoryItems = (Array.isArray(historyItems) ? historyItems : []).slice(0, historyLimit);
@@ -380,14 +381,25 @@ async function recommendFromHistory({
   const keywordStats = [];
   const usedKeywords = [];
 
-  let keywordsToTry = tagKeywords.length > 0 ? tagKeywords : ['music'];
-  if (randomizeKeywordsCount && tagKeywords.length > 0) {
-    keywordsToTry = [...tagKeywords]
-      .sort(() => Math.random() - 0.5)
-      .slice(0, randomizeKeywordsCount);
+  const normalizedPins = (pinnedKeywords || [])
+    .map(k => normalizeText(k))
+    .filter(k => !blacklistSet.has(k))
+    .slice(0, 5);
+
+  const pinnedSet = new Set(normalizedPins);
+  const remainingKeywords = tagKeywords.filter(k => !pinnedSet.has(k));
+
+  let keywordsToTry = [];
+  if (randomizeKeywordsCount && (tagKeywords.length > 0 || normalizedPins.length > 0)) {
+    const shuffledRemaining = [...remainingKeywords].sort(() => Math.random() - 0.5);
+    keywordsToTry = [...normalizedPins, ...shuffledRemaining].slice(0, randomizeKeywordsCount);
   }
   else {
-    keywordsToTry = keywordsToTry.slice(0, 5);
+    keywordsToTry = [...normalizedPins, ...remainingKeywords].slice(0, 5);
+  }
+
+  if (keywordsToTry.length === 0) {
+    keywordsToTry = ['music'];
   }
   const firstHalfTarget = Math.ceil(normalizedCount / 2);
 

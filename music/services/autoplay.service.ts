@@ -2,9 +2,10 @@ import { Client } from 'discord.js';
 import { GuildState, Track } from '../types';
 import { findAllHistory } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
-import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild } from './recommand-service';
+import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText } from './recommand-service';
 import { isDurationInRange } from '../utils/track-parser';
 import { logger } from '../../common/logger';
+import { KeywordPin } from '../models/keyword-pin';
 
 
 export interface AutoplayDeps {
@@ -59,9 +60,21 @@ export function createAutoplayService(deps: AutoplayDeps) {
                     .filter(k => !blacklistSet.has(k))
                     .slice(0, 7);
 
-                if (tagKeywords.length > 0) {
-                    const shuffledKeywords = [...tagKeywords].sort(() => Math.random() - 0.5);
-                    const selectedKeywords = shuffledKeywords.slice(0, Math.min(5, shuffledKeywords.length));
+                // 고정 키워드 조회
+                const pinRecords = await KeywordPin.findAll({ where: { guildId } }).catch(() => []);
+                const pinnedKeywords = pinRecords
+                    .map(p => normalizeText(p.keyword))
+                    .filter(k => !blacklistSet.has(k))
+                    .slice(0, 5);
+                const pinnedSet = new Set(pinnedKeywords);
+
+                if (tagKeywords.length > 0 || pinnedKeywords.length > 0) {
+                    const remainingKeywords = tagKeywords.filter(k => !pinnedSet.has(k));
+                    const shuffledRemaining = [...remainingKeywords].sort(() => Math.random() - 0.5);
+                    const selectedKeywords = [
+                        ...pinnedKeywords,
+                        ...shuffledRemaining.slice(0, Math.max(0, 5 - pinnedKeywords.length))
+                    ].slice(0, 5);
                     // console.log(tagKeywords+"\n"+selectedKeywords);
 
                     const searchResults: Track[] = [];
