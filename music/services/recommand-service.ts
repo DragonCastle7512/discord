@@ -1,16 +1,87 @@
-const { KeywordBlacklist } = require('../models/keyword-blacklist');
-const { isDurationInRange } = require('../utils/track-parser');
-const { logger } = require('../../common/logger');
+import { KeywordBlacklist } from '../models/keyword-blacklist';
+import { UserKeywordBlacklist } from '../models/user-keyword-blacklist';
+import { isDurationInRange } from '../utils/track-parser';
+import { logger } from '../../common/logger';
+import { Track, TrackInfo } from '../types';
 
-async function getBlacklistForGuild(guildId) {
-  if (!guildId) return new Set();
-  try {
-    const records = await KeywordBlacklist.findAll({ where: { guildId } });
-    return new Set(records.map(r => normalizeText(r.keyword)));
-  } catch (err) {
-    logger.error('system', `[Recommend Service] Failed to load blacklist for guild ${guildId}`, { error: err.stack });
-    return new Set();
-  }
+/**
+ * 추천 트랙 확장 인터페이스
+ */
+export interface RecommendedTrack extends Track {
+  source?: string;
+  keyword?: string;
+}
+
+/**
+ * 납작하게 정제된 트랙 정보 인터페이스
+ */
+export interface FlattenedTrackInfo {
+  title: string;
+  author: string;
+  uri: string;
+  artworkUrl: string | null;
+  length: number;
+  tags: string[];
+}
+
+/**
+ * 원시 트랙 입력 인터페이스 (HistoryEntry, PlaylistEntry 등 다중 구조 호환)
+ */
+export interface RawTrackInput {
+  musicInfo?: Track;
+  info?: Partial<TrackInfo>;
+  tags?: string[];
+  isSkipped?: boolean;
+  guildId?: string;
+}
+
+/**
+ * 인기 아이템 데이터 구조
+ */
+export interface PopularItem {
+  id?: string;
+  url?: string;
+}
+
+/**
+ * 추천 통계 인터페이스
+ */
+export interface KeywordStat {
+  keyword: string;
+  rawCount: number;
+  collectedCount: number;
+  limitApplied?: number | null;
+}
+
+/**
+ * 추천 실행 인수 인터페이스
+ */
+export interface RecommendFromHistoryArgs {
+  historyItems: RawTrackInput[];
+  count: number | string;
+  fetchPopularByKeyword: (args: { keyword: string; limit: number; region: string }) => Promise<PopularItem[]>;
+  searchTracks: (query: string) => Promise<{ tracks: Track[] | null; playlistName?: string | null }>;
+  region?: string;
+  historyLimit?: number;
+  popularLimit?: number;
+  randomizeKeywordsCount?: number | null;
+  guildId?: string | null;
+  userId?: string | null;
+  pinnedKeywords?: string[];
+}
+
+/**
+ * 추천 실행 결과 반환 인터페이스
+ */
+export interface RecommendResult {
+  ok: boolean;
+  reason: string | null;
+  count: number;
+  historyUsed: number;
+  items: RecommendedTrack[];
+  keywords: string[];
+  keywordStats?: KeywordStat[];
+  tagFrequencies?: [string, number][];
 }
 
 const DEFAULT_COUNT = 5;
@@ -21,8 +92,18 @@ const TAG_KEYWORD_LIMIT = 4;
 const KEYWORD_SIMILARITY_THRESHOLD = 0.6;
 const MIN_TAG_KEYWORD_LENGTH = 4;
 
+export async function getBlacklistForGuild(guildId: string | null | undefined): Promise<Set<string>> {
+  if (!guildId) return new Set<string>();
+  try {
+    const records = await KeywordBlacklist.findAll({ where: { guildId } });
+    return new Set<string>(records.map(r => normalizeText(r.keyword)));
+  } catch (err) {
+    logger.error('system', `[Recommend Service] Failed to load blacklist for guild ${guildId}`, { error: err instanceof Error ? err.stack : String(err) });
+    return new Set<string>();
+  }
+}
 
-function normalizeText(value) {
+export function normalizeText(value: unknown): string {
   return String(value || '')
     .toLowerCase()
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
@@ -30,13 +111,13 @@ function normalizeText(value) {
     .trim();
 }
 
-function tokenize(value) {
+export function tokenize(value: string): string[] {
   const normalized = normalizeText(value);
   if (!normalized) return [];
   return normalized.split(' ').filter(Boolean);
 }
 
-function jaccardSimilarity(a, b) {
+export function jaccardSimilarity(a: string, b: string): number {
   const setA = new Set(tokenize(a));
   const setB = new Set(tokenize(b));
   if (!setA.size || !setB.size) return 0;
@@ -49,7 +130,7 @@ function jaccardSimilarity(a, b) {
   return union > 0 ? (intersection / union) : 0;
 }
 
-function containmentSimilarity(a, b) {
+export function containmentSimilarity(a: string, b: string): number {
   const tokensA = new Set(tokenize(a));
   const tokensB = new Set(tokenize(b));
   if (!tokensA.size || !tokensB.size) return 0;
@@ -61,11 +142,11 @@ function containmentSimilarity(a, b) {
   return Math.max(inter / tokensA.size, inter / tokensB.size);
 }
 
-function keywordSimilarity(a, b) {
+export function keywordSimilarity(a: string, b: string): number {
   return Math.max(jaccardSimilarity(a, b), containmentSimilarity(a, b));
 }
 
-function isValidTagKeyword(value) {
+export function isValidTagKeyword(value: unknown): boolean {
   const normalized = normalizeText(value);
   if (!normalized) return false;
 
@@ -75,8 +156,8 @@ function isValidTagKeyword(value) {
   return normalized.replace(/\s+/g, '').length >= MIN_TAG_KEYWORD_LENGTH;
 }
 
-function dedupeSimilarKeywords(keywords, threshold = KEYWORD_SIMILARITY_THRESHOLD) {
-  const selected = [];
+export function dedupeSimilarKeywords(keywords: string[] | null | undefined, threshold: number = KEYWORD_SIMILARITY_THRESHOLD): string[] {
+  const selected: string[] = [];
   for (const keyword of keywords || []) {
     const normalized = normalizeText(keyword);
     if (!isValidTagKeyword(normalized)) continue;
@@ -88,32 +169,35 @@ function dedupeSimilarKeywords(keywords, threshold = KEYWORD_SIMILARITY_THRESHOL
   return selected;
 }
 
-function getTrackInfo(raw) {
-  const base = raw?.musicInfo || raw || {};
-  const info = base?.info || {};
+export function getTrackInfo(raw: RawTrackInput | null | undefined): FlattenedTrackInfo {
+  if (!raw) {
+    return { title: 'Unknown title', author: '', uri: '', artworkUrl: null, length: 0, tags: [] };
+  }
+  const base = (raw.musicInfo || raw) as Record<string, any>;
+  const info = (base?.info || {}) as Record<string, any>;
   return {
-    title: info.title || 'Unknown title',
-    author: info.author || '',
-    uri: info.uri || '',
-    artworkUrl: info.artworkUrl || null,
+    title: String(info.title || 'Unknown title'),
+    author: String(info.author || ''),
+    uri: String(info.uri || ''),
+    artworkUrl: info.artworkUrl ? String(info.artworkUrl) : null,
     length: Number(info.length) || 0,
-    tags: Array.isArray(base?.tags) ? base.tags : [],
+    tags: Array.isArray(base?.tags) ? (base.tags as string[]) : [],
   };
 }
 
-function getTrackKey(track) {
+export function getTrackKey(track: { uri?: string; author?: string; title?: string }): string {
   const uri = normalizeText(track.uri);
   if (uri) return `uri:${uri}`;
   return `meta:${normalizeText(track.author)}|${normalizeText(track.title)}`;
 }
 
-function clampRecommendationCount(input) {
+export function clampRecommendationCount(input: unknown): number {
   const parsed = Number.parseInt(String(input || DEFAULT_COUNT), 10);
   if (!Number.isInteger(parsed) || parsed <= 0) return DEFAULT_COUNT;
   return Math.min(parsed, MAX_COUNT);
 }
 
-function formatDuration(durationMs) {
+export function formatDuration(durationMs: number): string {
   if (!Number.isFinite(durationMs) || durationMs <= 0) return '?:??';
   const totalSeconds = Math.floor(durationMs / 1000);
   const minutes = Math.floor(totalSeconds / 60);
@@ -121,28 +205,32 @@ function formatDuration(durationMs) {
   return `${minutes}:${String(seconds).padStart(2, '0')}`;
 }
 
-function isPrimarySource(source) {
+export function isPrimarySource(source: string | null | undefined): boolean {
   return String(source || '').startsWith('history-tag-1');
 }
 
-function interleaveBySource(tracks, count) {
+export function interleaveBySource(tracks: RecommendedTrack[], count: number): RecommendedTrack[] {
   const firstList = tracks.filter((track) => isPrimarySource(track.source));
   const secondList = tracks.filter((track) => !isPrimarySource(track.source));
-  const ordered = [];
+  const ordered: RecommendedTrack[] = [];
   let useFirst = true;
 
   while (ordered.length < count && (firstList.length > 0 || secondList.length > 0)) {
     if (useFirst && firstList.length > 0) {
-      ordered.push(firstList.shift());
+      const item = firstList.shift();
+      if (item) ordered.push(item);
     }
     else if (!useFirst && secondList.length > 0) {
-      ordered.push(secondList.shift());
+      const item = secondList.shift();
+      if (item) ordered.push(item);
     }
     else if (firstList.length > 0) {
-      ordered.push(firstList.shift());
+      const item = firstList.shift();
+      if (item) ordered.push(item);
     }
     else if (secondList.length > 0) {
-      ordered.push(secondList.shift());
+      const item = secondList.shift();
+      if (item) ordered.push(item);
     }
     useFirst = !useFirst;
   }
@@ -150,7 +238,7 @@ function interleaveBySource(tracks, count) {
   return ordered.slice(0, count);
 }
 
-function getVideoIdFromUrl(url) {
+export function getVideoIdFromUrl(url: string | null | undefined): string | null {
   try {
     const value = String(url || '').trim();
     if (!value) return null;
@@ -164,9 +252,9 @@ function getVideoIdFromUrl(url) {
   }
 }
 
-function buildHistoryTagKeywords(historyItems, limit = TAG_KEYWORD_LIMIT) {
-  const artistWeight = new Map();
-  const tagWeight = new Map();
+export function buildHistoryTagKeywords(historyItems: RawTrackInput[], limit: number = TAG_KEYWORD_LIMIT): string[] {
+  const artistWeight = new Map<string, number>();
+  const tagWeight = new Map<string, number>();
 
   const validHistoryItems = (historyItems || []).filter((entry) => {
     const base = entry?.musicInfo || entry || {};
@@ -181,7 +269,7 @@ function buildHistoryTagKeywords(historyItems, limit = TAG_KEYWORD_LIMIT) {
       artistWeight.set(author, (artistWeight.get(author) || 0) + 1);
     }
 
-    const unique = new Set(
+    const unique = new Set<string>(
       (track.tags || [])
         .map((tag) => normalizeText(tag))
         .filter((tag) => isValidTagKeyword(tag)),
@@ -225,8 +313,8 @@ function buildHistoryTagKeywords(historyItems, limit = TAG_KEYWORD_LIMIT) {
     .map((item) => item.tag);
 }
 
-function buildHistoryTagFrequencies(historyItems) {
-  const weight = new Map();
+export function buildHistoryTagFrequencies(historyItems: RawTrackInput[]): [string, number][] {
+  const weight = new Map<string, number>();
 
   const validHistoryItems = (historyItems || []).filter((entry) => {
     const base = entry?.musicInfo || entry || {};
@@ -235,7 +323,7 @@ function buildHistoryTagFrequencies(historyItems) {
 
   validHistoryItems.forEach((entry) => {
     const track = getTrackInfo(entry);
-    const unique = new Set(
+    const unique = new Set<string>(
       (track.tags || [])
         .map((tag) => normalizeText(tag))
         .filter((tag) => isValidTagKeyword(tag)),
@@ -247,9 +335,11 @@ function buildHistoryTagFrequencies(historyItems) {
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 }
 
-function parseUserIdFromArg(value) {
+export function parseUserIdFromArg(value: unknown): string | null {
   if (value === undefined || value === null) return null;
-  if (typeof value === 'object' && value.id) return String(value.id);
+  if (typeof value === 'object' && value !== null && 'id' in value) {
+    return String((value as { id: unknown }).id);
+  }
 
   const text = String(value).trim();
   if (!text) return null;
@@ -257,6 +347,16 @@ function parseUserIdFromArg(value) {
   if (mention) return mention[1];
   if (/^\d+$/.test(text)) return text;
   return null;
+}
+
+interface CollectFromPopularItemsArgs {
+  popularItems: PopularItem[];
+  searchTracks: (query: string) => Promise<{ tracks: Track[] | null; playlistName?: string | null }>;
+  excludedTrackKeys: Set<string>;
+  globalSeenKeys: Set<string>;
+  maxCount: number;
+  source: string;
+  keyword: string;
 }
 
 async function collectFromPopularItems({
@@ -267,8 +367,8 @@ async function collectFromPopularItems({
   maxCount,
   source,
   keyword,
-}) {
-  const collected = [];
+}: CollectFromPopularItemsArgs): Promise<RecommendedTrack[]> {
+  const collected: RecommendedTrack[] = [];
   const items = popularItems || [];
   const BATCH_SIZE = 10;
 
@@ -294,36 +394,49 @@ async function collectFromPopularItems({
       const first = Array.isArray(resolved?.tracks) ? resolved.tracks[0] : null;
       if (!first) continue;
 
-      const track = getTrackInfo(first);
-      const titleLower = String(track.title || '').toLowerCase();
+      const trackInfo = getTrackInfo(first);
+      const titleLower = trackInfo.title.toLowerCase();
       const noiseWords = ['official', 'lyrics', 'lyric', '가사'];
       if (noiseWords.some(word => titleLower.includes(word))) {
           continue;
       }
 
-      const key = getTrackKey(track);
+      const key = getTrackKey(trackInfo);
       if (!key || globalSeenKeys.has(key)) continue;
       if (excludedTrackKeys.has(key)) continue;
-      if (!isDurationInRange(track.length)) continue;
+      if (!isDurationInRange(trackInfo.length)) continue;
 
       const videoId = getVideoIdFromUrl(videoUrl);
       const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
-      if (!track.artworkUrl && fallbackThumb) {
-        track.artworkUrl = fallbackThumb;
+      let artworkUrl = trackInfo.artworkUrl;
+      if (!artworkUrl && fallbackThumb) {
+        artworkUrl = fallbackThumb;
       }
 
-      track.source = source;
-      track.keyword = keyword;
+      const fullTrack: RecommendedTrack = {
+        encoded: first.encoded,
+        info: {
+          ...first.info,
+          title: trackInfo.title,
+          author: trackInfo.author,
+          uri: trackInfo.uri,
+          artworkUrl: artworkUrl || undefined,
+          length: trackInfo.length,
+        },
+        tags: trackInfo.tags,
+        source: source,
+        keyword: keyword,
+      };
 
       globalSeenKeys.add(key);
-      collected.push(track);
+      collected.push(fullTrack);
       if (collected.length >= maxCount) return collected;
     }
   }
   return collected;
 }
 
-async function recommendFromHistory({
+export async function recommendFromHistory({
   historyItems,
   count,
   fetchPopularByKeyword,
@@ -335,7 +448,7 @@ async function recommendFromHistory({
   guildId = null,
   userId = null,
   pinnedKeywords = [],
-}) {
+}: RecommendFromHistoryArgs): Promise<RecommendResult> {
   const normalizedCount = clampRecommendationCount(count);
   const recentHistoryItems = (Array.isArray(historyItems) ? historyItems : []).slice(0, historyLimit);
 
@@ -356,11 +469,10 @@ async function recommendFromHistory({
 
   if (userId) {
     try {
-      const { UserKeywordBlacklist } = require('../models/user-keyword-blacklist');
       const userRecords = await UserKeywordBlacklist.findAll({ where: { userId } });
-      userRecords.forEach(r => blacklistSet.add(normalizeText(r.keyword)));
+      userRecords.forEach((r) => blacklistSet.add(normalizeText(r.keyword)));
     } catch (err) {
-      logger.error('system', `[Recommend Service] Failed to load blacklist for user ${userId}`, { error: err.stack });
+      logger.error('system', `[Recommend Service] Failed to load blacklist for user ${userId}`, { error: err instanceof Error ? err.stack : String(err) });
     }
   }
 
@@ -370,16 +482,16 @@ async function recommendFromHistory({
     .filter(k => !blacklistSet.has(k))
     .slice(0, TAG_KEYWORD_LIMIT + 6);
 
-  const excludedTrackKeys = new Set();
+  const excludedTrackKeys = new Set<string>();
   recentHistoryItems.forEach((entry) => {
     const key = getTrackKey(getTrackInfo(entry));
     if (key) excludedTrackKeys.add(key);
   });
 
-  const globalSeenKeys = new Set();
-  const recommendations = [];
-  const keywordStats = [];
-  const usedKeywords = [];
+  const globalSeenKeys = new Set<string>();
+  const recommendations: RecommendedTrack[] = [];
+  const keywordStats: KeywordStat[] = [];
+  const usedKeywords: string[] = [];
 
   const normalizedPins = (pinnedKeywords || [])
     .map(k => normalizeText(k))
@@ -389,7 +501,7 @@ async function recommendFromHistory({
   const pinnedSet = new Set(normalizedPins);
   const remainingKeywords = tagKeywords.filter(k => !pinnedSet.has(k));
 
-  let keywordsToTry = [];
+  let keywordsToTry: string[] = [];
   if (randomizeKeywordsCount && (tagKeywords.length > 0 || normalizedPins.length > 0)) {
     const shuffledRemaining = [...remainingKeywords].sort(() => Math.random() - 0.5);
     keywordsToTry = [...normalizedPins, ...shuffledRemaining].slice(0, randomizeKeywordsCount);
@@ -466,7 +578,6 @@ async function recommendFromHistory({
   }
 
   const finalItems = recommendations.slice(0, normalizedCount);
-
   const displayOrder = interleaveBySource(finalItems, finalItems.length);
 
   logger.info('music', `Generated recommendations for guild ${resolvedGuildId}`, {
@@ -489,15 +600,3 @@ async function recommendFromHistory({
     tagFrequencies,
   };
 }
-
-module.exports = {
-  clampRecommendationCount,
-  formatDuration,
-  parseUserIdFromArg,
-  recommendFromHistory,
-  buildHistoryTagKeywords,
-  dedupeSimilarKeywords,
-  getBlacklistForGuild,
-  isValidTagKeyword,
-  normalizeText,
-};
