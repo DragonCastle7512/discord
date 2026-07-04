@@ -1,13 +1,31 @@
-const { GoogleGenAI } = require('@google/genai');
-const { logger } = require('../../common/logger');
+import { logger } from '../../common/logger';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+async function getAI() {
+  const { GoogleGenAI } = await import('@google/genai');
+  return new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+}
+
+type AIClient = Awaited<ReturnType<typeof getAI>>;
+
+let aiInstance: AIClient | null = null;
+
+async function getAIInstance(): Promise<AIClient> {
+  if (!aiInstance) {
+    aiInstance = await getAI();
+  }
+  return aiInstance;
+}
+
 const models = ['gemini-3.1-flash-lite', 'gemma-4-26b-a4b-it', 'gemma-4-31b-it'];
 
 /**
  * 일반 분위기별 자동 재생(AI 기반 분위기 노래 선정)
  */
-async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
+export async function generateSongBatchForMood(
+  mood: string,
+  excludedTitles: string[] = [],
+  count: number = 20
+): Promise<string[]> {
   const model = models[0];
   const excludedList = excludedTitles.slice(-30).join(', ');
   const randomSeed = Math.random().toString(36).substring(7);
@@ -28,6 +46,7 @@ async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
 볼빨간사춘기 - 우주를 줄게`;
 
   try {
+    const ai = await getAIInstance();
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
@@ -61,7 +80,12 @@ async function generateSongBatchForMood(mood, excludedTitles = [], count = 20) {
 /**
  * 추천 노래 자동 재생(히스토리 태그 분석 -> 검색 후 재생 가능한 목록 조회)
  */
-async function selectAndCleanSongsFromSearch(videoTitles, tagsString, excludedTitles = [], count = 20) {
+export async function selectAndCleanSongsFromSearch(
+  videoTitles: string[],
+  tagsString: string,
+  excludedTitles: string[] = [],
+  count: number = 20
+): Promise<string[]> {
   const model = models[0];
   const excludedList = Array.isArray(excludedTitles) ? excludedTitles.slice(-30).join(', ') : '';
 
@@ -85,6 +109,7 @@ ${videoTitles.map((title, idx) => `${idx + 1}. ${title}`).join('\n')}
 답변은 부연 설명, 번호 표시나 기호 없이 오직 '아티스트 - 곡 제목' 형식으로만 한 줄에 한 곡씩만 작성해주세요.`;
 
   try {
+    const ai = await getAIInstance();
     const response = await ai.models.generateContent({
       model,
       contents: prompt,
@@ -114,5 +139,3 @@ ${videoTitles.map((title, idx) => `${idx + 1}. ${title}`).join('\n')}
     return [];
   }
 }
-
-module.exports = { generateSongBatchForMood, selectAndCleanSongsFromSearch };
