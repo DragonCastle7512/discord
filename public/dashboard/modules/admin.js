@@ -142,7 +142,7 @@ export function renderKeywordsTable(keywords) {
   sortedKeywords.forEach((item, index) => {
     const tr = document.createElement('tr');
     if (item.isPinned) {
-      tr.style.background = 'rgba(235, 87, 87, 0.05)'; // 고정 키워드 행 배경색 변경 (약한 빨간색 하이라이트)
+      tr.style.background = 'rgba(235, 87, 87, 0.05)';
     }
 
     const tdRank = document.createElement('td');
@@ -155,7 +155,7 @@ export function renderKeywordsTable(keywords) {
     tdTag.style.display = 'flex';
     tdTag.style.alignItems = 'center';
     tdTag.style.gap = '6px';
-    
+
     // 키워드 이름 노출 (길면 잘림 처리 및 툴팁 제공)
     const spanText = document.createElement('span');
     spanText.textContent = item.tag;
@@ -164,18 +164,19 @@ export function renderKeywordsTable(keywords) {
     spanText.style.textOverflow = 'ellipsis';
     spanText.style.whiteSpace = 'nowrap';
     spanText.style.display = 'inline-block';
-    spanText.title = item.tag; // 마우스 오버 시 전체 태그명 확인용 툴팁
+    spanText.title = item.tag;
     tdTag.appendChild(spanText);
 
     // 못 아이콘 생성 (클릭 시 고정 토글 동작)
     const pinIconSpan = document.createElement('span');
     pinIconSpan.innerHTML = getIcon('pin');
-    
+
     if (item.isPinned) {
       pinIconSpan.className = 'pin-icon pinned';
       pinIconSpan.title = '고정 해제하기';
       pinIconSpan.onclick = () => togglePin(item.tag, true);
-    } else {
+    }
+    else {
       pinIconSpan.className = 'pin-icon unpinned';
       pinIconSpan.title = '고정하기';
       pinIconSpan.onclick = () => togglePin(item.tag, false);
@@ -186,7 +187,7 @@ export function renderKeywordsTable(keywords) {
     tdFreq.textContent = `${item.freq}회`;
 
     const tdManage = document.createElement('td');
-    
+
     // 제거 버튼
     const removeBtn = document.createElement('button');
     removeBtn.className = 'keyword-btn-remove';
@@ -228,20 +229,23 @@ export async function togglePin(keyword, isCurrentlyPinned) {
     let res;
     if (isCurrentlyPinned) {
       res = await api.removePin(keyword, currentKeywordMode);
-    } else {
+    }
+    else {
       res = await api.addPin(keyword, currentKeywordMode);
     }
 
     if (res.ok) {
       showToast(`키워드 '${keyword}' ${isCurrentlyPinned ? '고정을 해제했습니다.' : '고정했습니다.'}`);
-      loadAdminKeywords(false); // 백그라운드 갱신
-    } else {
+      loadAdminKeywords(false);
+    }
+    else {
       // 실패 시 원래대로 복구
       allKeywordsData = backupKeywords;
       renderKeywordsTable(allKeywordsData);
       showToast(res.error || '고정 상태를 변경하는 데 실패했습니다.');
     }
-  } catch (err) {
+  }
+  catch (err) {
     console.error('고정 요청 오류:', err);
     allKeywordsData = backupKeywords;
     renderKeywordsTable(allKeywordsData);

@@ -253,7 +253,7 @@ export function showToast(message) {
 
 // Custom Alert Dialog System
 export function initCustomAlert() {
-  window.alert = function (message) {
+  window.alert = function(message) {
     // Prevent duplicated modals
     if (document.querySelector('.custom-modal-overlay')) return;
 
@@ -367,7 +367,7 @@ export function showCustomConfirm(message) {
 
     confirmBtn.onclick = () => closeWithResult(true);
     cancelBtn.onclick = () => closeWithResult(false);
-    
+
     overlay.onclick = (e) => {
       if (e.target === overlay) closeWithResult(false);
     };
