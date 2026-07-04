@@ -118,7 +118,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                     else {
                         const textChannel = getTextChannel(state.textChannelId);
                         if (textChannel) {
-                            textChannel.send('[오토모드] 최근 히스토리가 부족하여, 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch((err) => logger.error('music', 'Failed to send auto-play disabled notification', { error: err }));
+                            textChannel.send('[오토모드] 최근 히스토리가 부족하여, 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch((err: any) => logger.error('music', 'Failed to send auto-play disabled notification', { error: err }));
                         }
                         state.auto = false;
                         state.autoPool = [];
@@ -129,7 +129,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 else {
                     const textChannel = getTextChannel(state.textChannelId);
                     if (textChannel) {
-                        textChannel.send('[오토모드] 최근 히스토리가 부족해 추천 곡을 자동 재생할 수 없어요! 더 많은 곡을 먼저 재생해 주세요.').catch((err) => logger.error('music', 'Failed to send history insufficient notification', { error: err }));
+                        textChannel.send('[오토모드] 최근 히스토리가 부족해 추천 곡을 자동 재생할 수 없어요! 더 많은 곡을 먼저 재생해 주세요.').catch((err: any) => logger.error('music', 'Failed to send history insufficient notification', { error: err }));
                     }
                     state.auto = false;
                     state.autoPool = [];
@@ -141,7 +141,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 logger.error('music', 'AI tag recommendation failed in autoplay', { error: err.stack });
                 const textChannel = getTextChannel(state.textChannelId);
                 if (textChannel) {
-                    textChannel.send('[오토모드] 추천 곡을 준비하는 중 오류가 발생하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch((err) => logger.error('music', 'Failed to send auto-play prepare error notification', { error: err }));
+                    textChannel.send('[오토모드] 추천 곡을 준비하는 중 오류가 발생하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch((err: any) => logger.error('music', 'Failed to send auto-play prepare error notification', { error: err }));
                 }
                 state.auto = false;
                 state.autoPool = [];
@@ -204,10 +204,10 @@ export function createAutoplayService(deps: AutoplayDeps) {
         const textChannel = getTextChannel(state.textChannelId);
         if (textChannel) {
             if (mood === '추천 곡') {
-                textChannel.send('[오토모드] 추천 곡 리스트의 모든 곡을 로드하는 데 실패하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 보세요!').catch((err) => logger.error('music', 'Failed to send all tracks load failed notification', { error: err }));
+                textChannel.send('[오토모드] 추천 곡 리스트의 모든 곡을 로드하는 데 실패하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 보세요!').catch((err: any) => logger.error('music', 'Failed to send all tracks load failed notification', { error: err }));
             }
             else {
-                textChannel.send(`[오토모드] '${mood}' 분위기의 자동 재생 곡을 준비하는 데 실패했어요.`).catch((err) => logger.error('music', `Failed to send auto-play mood prepare failed notification for mood ${mood}`, { error: err }));
+                textChannel.send(`[오토모드] '${mood}' 분위기의 자동 재생 곡을 준비하는 데 실패했어요.`).catch((err: any) => logger.error('music', `Failed to send auto-play mood prepare failed notification for mood ${mood}`, { error: err }));
             }
         }
         if (mood === '추천 곡') {
@@ -238,7 +238,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
         logger.error('music', `Autoplay resolve/play failed: ${err instanceof Error ? err.message : String(err)}`, { error: err });
         const textChannel = getTextChannel(state.textChannelId);
         if (textChannel) {
-            textChannel.send(`자동 재생 곡 (**${recommendedTitle}**)을 준비하는 데 실패했어요.`).catch((err) => logger.error('music', `Failed to send auto-play recommended track prepare failed notification for ${recommendedTitle}`, { error: err }));
+            textChannel.send(`자동 재생 곡 (**${recommendedTitle}**)을 준비하는 데 실패했어요.`).catch((err: any) => logger.error('music', `Failed to send auto-play recommended track prepare failed notification for ${recommendedTitle}`, { error: err }));
         }
         throw err;
     }

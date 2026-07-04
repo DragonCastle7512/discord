@@ -4,6 +4,7 @@ import { sequelize } from '../db/sequelize';
 import { initUserKeywordBlacklistModel, UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
 import { initKeywordBlacklistModel } from '../music/models/keyword-blacklist';
 import { isDurationInRange } from '../music/utils/track-parser';
+import { normalizeText, recommendFromHistory } from '../music/services/recommand-service';
 
 
 describe('UserKeywordBlacklist Model Compatibility Tests', () => {
@@ -86,7 +87,7 @@ describe('UserKeywordBlacklist Model Compatibility Tests', () => {
     const personalHistories = dummyHistories.filter(h => h.musicInfo.requestedBy === 'test-user-xyz');
     assert.strictEqual(personalHistories.length, 1);
     
-    const { normalizeText } = require('../music/services/recommand-service');
+    
     const tags = personalHistories.flatMap(h => h.musicInfo.tags);
     
     const blacklistRecords = await UserKeywordBlacklist.findAll({ where: { userId: 'test-user-xyz' } });
@@ -114,7 +115,7 @@ describe('UserKeywordBlacklist Model Compatibility Tests', () => {
       keyword: 'personal-blacklist-tag' 
     });
 
-    const { recommendFromHistory } = require('../music/services/recommand-service');
+
 
     const dummyHistory = [
       {

@@ -17,6 +17,7 @@ import { MusicHistory } from '../music/models/music-history';
 import { UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
 import { KeywordPin } from '../music/models/keyword-pin';
 import { UserKeywordPin } from '../music/models/user-keyword-pin';
+import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText } from '../music/services/recommand-service';
 
 
 export function createDashboardRouter(
@@ -290,8 +291,6 @@ export function createDashboardRouter(
 
       const histories = await MusicHistory.findAll({ where: { guildId: session.guildId } });
       const keywordMap = new Map<string, number>();
-
-      const { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText } = require('../music/services/recommand-service');
 
       const filteredHistories = mode === 'personal'
         ? histories.filter(h => String((h.musicInfo as any)?.requestedBy || '') === String(session.userId))

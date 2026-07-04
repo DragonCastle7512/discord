@@ -2,6 +2,7 @@ import test, { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 import { sequelize } from '../db/sequelize';
 import { initKeywordBlacklistModel, KeywordBlacklist } from '../music/models/keyword-blacklist';
+import { recommendFromHistory } from '../music/services/recommand-service';
 
 describe('KeywordBlacklist Model Compatibility Tests', () => {
   before(async () => {
@@ -62,7 +63,7 @@ describe('KeywordBlacklist Model Compatibility Tests', () => {
       keyword: 'blacklist-tag' 
     });
 
-    const { recommendFromHistory } = require('../music/services/recommand-service');
+
 
     const dummyHistory = [
       {
