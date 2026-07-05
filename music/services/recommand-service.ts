@@ -1,5 +1,8 @@
 import { KeywordBlacklist } from '../models/keyword-blacklist';
 import { UserKeywordBlacklist } from '../models/user-keyword-blacklist';
+import { KeywordPin } from '../models/keyword-pin';
+import { UserKeywordPin } from '../models/user-keyword-pin';
+
 import { isDurationInRange } from '../utils/track-parser';
 import { logger } from '../../common/logger';
 import { Track, TrackInfo } from '../types';
@@ -476,6 +479,26 @@ export async function recommendFromHistory({
     }
   }
 
+  const dbPins: string[] = [];
+  if (userId) {
+    try {
+      const userPins = await UserKeywordPin.findAll({ where: { userId } });
+      dbPins.push(...userPins.map(p => p.keyword));
+    } catch (err) {
+      logger.error('system', `[Recommend Service] Failed to load pinned keywords for user ${userId}`, { error: err instanceof Error ? err.stack : String(err) });
+    }
+  }
+  if (resolvedGuildId) {
+    try {
+      const guildPins = await KeywordPin.findAll({ where: { guildId: resolvedGuildId } });
+      dbPins.push(...guildPins.map(p => p.keyword));
+    } catch (err) {
+      logger.error('system', `[Recommend Service] Failed to load pinned keywords for guild ${resolvedGuildId}`, { error: err instanceof Error ? err.stack : String(err) });
+    }
+  }
+  const combinedPins = Array.from(new Set([...(pinnedKeywords || []), ...dbPins]));
+
+
   const tagFrequencies = buildHistoryTagFrequencies(recentHistoryItems);
   const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 26);
   const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
@@ -493,7 +516,7 @@ export async function recommendFromHistory({
   const keywordStats: KeywordStat[] = [];
   const usedKeywords: string[] = [];
 
-  const normalizedPins = (pinnedKeywords || [])
+  const normalizedPins = combinedPins
     .map(k => normalizeText(k))
     .filter(k => !blacklistSet.has(k))
     .slice(0, 5);
