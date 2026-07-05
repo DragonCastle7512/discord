@@ -25,6 +25,7 @@ export interface FlattenedTrackInfo {
   artworkUrl: string | null;
   length: number;
   tags: string[];
+  identifier: string;
 }
 
 /**
@@ -62,7 +63,7 @@ export interface KeywordStat {
 export interface RecommendFromHistoryArgs {
   historyItems: RawTrackInput[];
   count: number | string;
-  fetchPopularByKeyword: (args: { keyword: string; limit: number; region: string }) => Promise<PopularItem[]>;
+  fetchPopularByKeyword?: (args: { keyword: string; limit: number; region: string }) => Promise<PopularItem[]>;
   searchTracks: (query: string) => Promise<{ tracks: Track[] | null; playlistName?: string | null }>;
   region?: string;
   historyLimit?: number;
@@ -174,7 +175,7 @@ export function dedupeSimilarKeywords(keywords: string[] | null | undefined, thr
 
 export function getTrackInfo(raw: RawTrackInput | null | undefined): FlattenedTrackInfo {
   if (!raw) {
-    return { title: 'Unknown title', author: '', uri: '', artworkUrl: null, length: 0, tags: [] };
+    return { title: 'Unknown title', author: '', uri: '', artworkUrl: null, length: 0, tags: [], identifier: '' };
   }
   const base = (raw.musicInfo || raw) as Record<string, any>;
   const info = (base?.info || {}) as Record<string, any>;
@@ -185,6 +186,7 @@ export function getTrackInfo(raw: RawTrackInput | null | undefined): FlattenedTr
     artworkUrl: info.artworkUrl ? String(info.artworkUrl) : null,
     length: Number(info.length) || 0,
     tags: Array.isArray(base?.tags) ? (base.tags as string[]) : [],
+    identifier: String(info.identifier || ''),
   };
 }
 
@@ -513,7 +515,6 @@ export async function recommendFromHistory({
 
   const globalSeenKeys = new Set<string>();
   const recommendations: RecommendedTrack[] = [];
-  const keywordStats: KeywordStat[] = [];
   const usedKeywords: string[] = [];
 
   const normalizedPins = combinedPins
@@ -538,47 +539,113 @@ export async function recommendFromHistory({
   }
   const firstHalfTarget = Math.ceil(normalizedCount / 2);
 
-  for (const keyword of keywordsToTry) {
-    const currentTotal = recommendations.length;
-    if (currentTotal >= normalizedCount) break;
+  // 각 키워드별 검색 결과를 비동기적으로 조회 (Lavalink 직접 검색)
+  const searchPromises = keywordsToTry.map(async (keyword) => {
+    try {
+      const res = await searchTracks(keyword);
+      const rawTracks = res?.tracks || [];
+      return { keyword, tracks: rawTracks };
+    } catch (err) {
+      logger.error('music', `[Recommend Service] Search failed for keyword "${keyword}"`, { error: err });
+      return { keyword, tracks: [] as Track[] };
+    }
+  });
 
-    const popularItems = await fetchPopularByKeyword({
-      keyword,
-      limit: popularLimit,
-      region,
-    });
+  const searchResultsWithKeyword = await Promise.all(searchPromises);
 
-    if (!popularItems || popularItems.length === 0) {
-      keywordStats.push({ keyword, rawCount: 0, collectedCount: 0 });
+  // 대시보드 스타일로 Interleave (교차 배치)
+  const maxTracks = Math.max(...searchResultsWithKeyword.map(r => r.tracks.length), 0);
+  const mixedTracksWithKeyword: { track: Track; keyword: string }[] = [];
+
+  for (let i = 0; i < maxTracks; i++) {
+    for (const result of searchResultsWithKeyword) {
+      if (result.tracks[i]) {
+        mixedTracksWithKeyword.push({ track: result.tracks[i], keyword: result.keyword });
+      }
+    }
+  }
+
+  // 중복 제거, 노이즈 및 재생 시간 필터링 적용
+  const keywordStatsMap = new Map<string, { rawCount: number; collectedCount: number }>();
+  
+  for (const kw of keywordsToTry) {
+    keywordStatsMap.set(kw, { rawCount: 0, collectedCount: 0 });
+  }
+  
+  for (const result of searchResultsWithKeyword) {
+    const stat = keywordStatsMap.get(result.keyword);
+    if (stat) {
+      stat.rawCount = result.tracks.length;
+    }
+  }
+
+  const noiseWords = ['official', 'lyrics', 'lyric', '가사'];
+
+  for (const { track, keyword } of mixedTracksWithKeyword) {
+    if (recommendations.length >= normalizedCount) break;
+
+    const trackInfo = getTrackInfo(track);
+    const titleLower = trackInfo.title.toLowerCase();
+    
+    // 노이즈 필터링
+    if (noiseWords.some(word => titleLower.includes(word))) {
       continue;
     }
 
-    usedKeywords.push(keyword);
+    // 재생 시간 필터링 (1m 30s ~ 6m)
+    if (!isDurationInRange(trackInfo.length)) {
+      continue;
+    }
 
-    const isFirstKeyword = usedKeywords.length === 1;
-    const maxToCollect = randomizeKeywordsCount
-      ? Math.ceil(normalizedCount / keywordsToTry.length)
-      : (isFirstKeyword ? Math.min(firstHalfTarget, normalizedCount - currentTotal) : (normalizedCount - currentTotal));
+    // 중복 필터링
+    const key = getTrackKey(trackInfo);
+    if (!key || globalSeenKeys.has(key)) continue;
+    if (excludedTrackKeys.has(key)) continue;
 
-    const collected = await collectFromPopularItems({
-      popularItems,
-      searchTracks,
-      excludedTrackKeys,
-      globalSeenKeys,
-      maxCount: maxToCollect,
-      source: `history-tag-${usedKeywords.length}-popular`,
-      keyword,
-    });
+    const videoUrl = trackInfo.uri || (trackInfo.identifier ? `https://www.youtube.com/watch?v=${trackInfo.identifier}` : '');
+    const videoId = trackInfo.identifier || (trackInfo.uri ? getVideoIdFromUrl(trackInfo.uri) : null);
+    const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
+    let artworkUrl = trackInfo.artworkUrl;
+    if (!artworkUrl && fallbackThumb) {
+      artworkUrl = fallbackThumb;
+    }
 
-    keywordStats.push({
-      keyword,
-      rawCount: popularItems.length,
-      collectedCount: collected.length,
-      limitApplied: isFirstKeyword && !randomizeKeywordsCount ? firstHalfTarget : null,
-    });
+    const fullTrack: RecommendedTrack = {
+      encoded: track.encoded,
+      info: {
+        ...track.info,
+        title: trackInfo.title,
+        author: trackInfo.author,
+        uri: trackInfo.uri,
+        artworkUrl: artworkUrl || undefined,
+        length: trackInfo.length,
+      },
+      tags: trackInfo.tags,
+      source: `history-tag-search`,
+      keyword: keyword,
+    };
 
-    recommendations.push(...collected);
+    globalSeenKeys.add(key);
+    recommendations.push(fullTrack);
+
+    const stat = keywordStatsMap.get(keyword);
+    if (stat) {
+      stat.collectedCount += 1;
+    }
+    
+    if (!usedKeywords.includes(keyword)) {
+      usedKeywords.push(keyword);
+    }
   }
+
+  const keywordStats: KeywordStat[] = keywordsToTry.map(kw => {
+    const stat = keywordStatsMap.get(kw) || { rawCount: 0, collectedCount: 0 };
+    return {
+      keyword: kw,
+      rawCount: stat.rawCount,
+      collectedCount: stat.collectedCount,
+    };
+  });
 
   if (!recommendations.length) {
     logger.warn('music', `Failed to generate recommendations for guild ${resolvedGuildId}`, {

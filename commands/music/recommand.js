@@ -5,7 +5,6 @@ const {
   ActionRowBuilder,
   ButtonBuilder,
 } = require('discord.js');
-const { handlers: musicSkillHandlers } = require('../../ai/skills/music-skill');
 const {
   clampRecommendationCount,
   recommendFromHistory,
@@ -16,18 +15,6 @@ import { safeReply } from '../../common/reply-util';
 // 사용자별 추천 결과를 저장할 인메모리 캐시
 const recommendationCache = new Map();
 
-async function fetchPopularByKeyword({ keyword, limit, region }) {
-  const output = await musicSkillHandlers.get_youtube_popular_music({
-    keyword,
-    order: 'viewCount',
-    limit,
-    region,
-  });
-
-  if (typeof output === 'string') return [];
-  if (!output || typeof output !== 'object' || !Array.isArray(output.items)) return [];
-  return output.items;
-}
 
 function buildRecommendationComponents(tracks, ownerUserId, startIndex = 0) {
   const chunkSize = 5;
@@ -88,7 +75,6 @@ module.exports = {
     const result = await recommendFromHistory({
       historyItems: allHistoryItems,
       count,
-      fetchPopularByKeyword,
       searchTracks: (query) => context.music.searchTracks(query),
       region: 'KR',
       guildId: interaction.guildId,
