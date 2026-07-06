@@ -66,7 +66,7 @@ module.exports = {
 
     const count = clampRecommendationCount(interaction.options.getString('count'));
     const targetUser = interaction.options.getUser('user');
-    const targetUserId = targetUser?.id || null;
+    const targetUserId = targetUser?.id || interaction.user.id;
 
     const historyResult = await context.music.history(interaction.guildId, targetUserId);
     const allHistoryItems = Array.isArray(historyResult?.items) ? historyResult.items : [];
@@ -78,7 +78,7 @@ module.exports = {
       searchTracks: (query) => context.music.searchTracks(query),
       region: 'KR',
       guildId: interaction.guildId,
-      userId: interaction.user.id,
+      userId: targetUserId,
     });
 
     if (!result || !result.ok || !Array.isArray(result.items) || result.items.length === 0) {

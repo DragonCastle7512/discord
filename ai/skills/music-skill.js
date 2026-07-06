@@ -41,7 +41,7 @@ const buildListResponse = (items, region, label, keyword, meta = {}) => {
   };
 };
 
-async function getYoutubePopularMusic(args) {
+async function getYoutubePopularMusic(args, obj) {
   const apiKey = process.env.YOUTUBE_API_KEY;
   if (!apiKey) {
     return 'YOUTUBE_API_KEY가 설정되지 않았습니다. .env에 추가해주세요.';
@@ -50,13 +50,6 @@ async function getYoutubePopularMusic(args) {
   const limit = Math.max(1, Math.min(50, Number(args?.limit) || 10));
   const region = String(args?.region || 'KR').toUpperCase();
   const keyword = String(args?.keyword || '').trim();
-  const pageToken = String(args?.pageToken || '').trim();
-  const orderRaw = String(args?.order || '').trim().toLowerCase();
-  const orderMap = {
-    date: 'date',
-    viewcount: 'viewCount',
-  };
-  const order = orderMap[orderRaw] || 'relevance';
 
   if (!keyword) {
     const url =
@@ -73,86 +66,48 @@ async function getYoutubePopularMusic(args) {
     return buildListResponse(items, region, '유튜브 인기 음악', '', { displayLimit: limit });
   }
 
-    const searchUrl =
-      'https://www.googleapis.com/youtube/v3/search' +
-      `?part=snippet&type=video&videoCategoryId=10&order=${order}` +
-      `&maxResults=50&q=${encodeURIComponent(keyword)} -shorts -short -틱톡 -tiktok` +
-      '&topicId=/m/04rlf' +
-      `&regionCode=${encodeURIComponent(region)}` +
-      (pageToken ? `&pageToken=${encodeURIComponent(pageToken)}` : '') +
-      `&key=${encodeURIComponent(apiKey)}`;
-
-    const items = await searchYoutube(searchUrl);
-
-    if (!Array.isArray(items)) {
-      return items || 'API 요청 실패';
-    }
-    if (!items.length) {
-      return '키워드 인기 음악 결과를 찾지 못했습니다.';
+  if (keyword) {
+    if (!obj?.context?.music) {
+      return '음악 실행부 컨텍스트가 존재하지 않습니다.';
     }
 
-    let filteredItems = items;
-    const ids = items
-        .map((item) => item?.id?.videoId)
-        .filter((id) => typeof id === 'string' && id.length > 0);
+    try {
+      const searchRes = await obj.context.music.searchTracks(keyword);
+      const rawTracks = searchRes?.tracks || [];
 
-    if (ids.length) {
-      const detailsUrl =
-        'https://www.googleapis.com/youtube/v3/videos' +
-        `?part=contentDetails&id=${encodeURIComponent(ids.join(','))}` +
-        `&key=${encodeURIComponent(apiKey)}`;
+      // 1m 30s ~ 6m 재생 시간 필터링
+      const filteredTracks = rawTracks.filter(t => isDurationInRange(t.info.length));
 
-      try {
-        const res = await fetch(detailsUrl);
-
-        if (res.ok) {
-          const detailsData = await res.json();
-          const detailsItems = Array.isArray(detailsData?.items) ? detailsData.items : [];
-          const detailsById = detailsItems.reduce((acc, item) => {
-            if (item?.id) {
-              acc[item.id] = item?.contentDetails || {};
-            }
-            return acc;
-          }, {});
-
-          filteredItems = items.filter((item) => {
-            const id = item?.id?.videoId;
-            const duration = id ? detailsById?.[id]?.duration : null;
-            if (!duration) {
-              return true;
-            }
-            return isDurationInRange(duration);
-          });
-        }
+      if (!filteredTracks.length) {
+        return '키워드 인기 음악 결과를 찾지 못했습니다.';
       }
-      catch (err) {
-        logger.error('ai', 'Failed to fetch YouTube popular music in music-skill', { error: err.stack });
-      }
+
+      // buildListResponse 형식으로 매핑
+      const mappedItems = filteredTracks.map(t => ({
+        snippet: {
+          title: t.info.title,
+          channelTitle: t.info.author,
+        },
+        id: t.info.identifier,
+      }));
+
+      const response = buildListResponse(mappedItems, region, '키워드 인기 음악 (Lavalink)', keyword, {
+        displayLimit: limit,
+        requestedLimit: limit,
+        filteredCount: mappedItems.length,
+        filterApplied: true,
+      });
+
+      logger.info('ai', 'Lavalink keyword popular music skill output generated', { responseText: response?.text });
+      return response;
+    }
+    catch (err) {
+      logger.error('ai', `Lavalink search failed in getYoutubePopularMusic for keyword "${keyword}"`, { error: err.stack });
+      return '인기 음악 결과를 검색하는 중 오류가 발생했습니다.';
+    }
   }
-  const nextToken = String(items?.nextPageToken || '');
-  const response = buildListResponse(filteredItems, region, '키워드 인기 음악', keyword, {
-    displayLimit: limit,
-    requestedLimit: limit,
-    nextPageToken: nextToken || null,
-    filteredCount: filteredItems.length,
-    filterApplied: true,
-  });
-  logger.info('ai', 'YouTube popular music skill output generated', { responseText: response?.text });
-  return response;
 }
 
-async function fetchPopularByKeywordViaSkill({ keyword, limit, region }) {
-  const output = await getYoutubePopularMusic({
-    keyword,
-    order: 'viewCount',
-    limit,
-    region,
-  });
-
-  if (typeof output === 'string') return [];
-  if (!output || typeof output !== 'object' || !Array.isArray(output.items)) return [];
-  return output.items;
-}
 
 const searchYoutube = async (url) => {
   try {
@@ -182,7 +137,7 @@ module.exports = {
     },
     {
       name: 'get_youtube_popular_music',
-      description: '유튜브 인기 음악을 조회합니다. 요청 수에 못 미치면 nextPageToken을 사용해 pageToken으로 재호출할 수 있습니다.',
+      description: '유튜브 인기 음악을 조회합니다.',
       parameters: {
         type: 'OBJECT',
         properties: {
@@ -190,20 +145,9 @@ module.exports = {
             type: 'STRING',
             description: '검색 키워드 (곡명/아티스트 등). 제공 시 키워드 기반 인기곡 조회.',
           },
-          order: {
-            type: 'STRING',
-            description: `검색 결과의 정렬 기준을 설정합니다. 반드시 아래 값 중 하나여야 합니다.
-              1. 'date': 최근 업로드된 날짜 순으로 정렬
-              2. 'relevance': 검색어와의 관련성이 높은 순으로 정렬 (기본값)
-              3. 'viewCount': 조회수가 높은 순으로 정렬 (인기 순위 확인 시 권장)`,
-          },
           limit: {
             type: 'NUMBER',
             description: '가져올 개수 (1~50). 기본값: 10',
-          },
-          pageToken: {
-            type: 'STRING',
-            description: '추가 검색 페이지 토큰. 이전 응답에서 nextPageToken을 담은 경우 사용하세요.',
           },
           region: {
             type: 'STRING',
@@ -293,23 +237,27 @@ module.exports = {
         };
       }
 
+      logger.info('ai', '[get_recommand_list] Tool invoked with args', { args, guildId });
+
       const count = clampRecommendationCount(args?.count);
       const region = String(args?.region || 'KR').toUpperCase();
-      const targetUserId = parseUserIdFromArg(args?.user);
+      const targetUserId = parseUserIdFromArg(args?.user || args?.userId);
       const historyResult = await obj?.context?.music?.history(guildId, targetUserId || undefined);
       const allHistoryItems = Array.isArray(historyResult?.items) ? historyResult.items : [];
+
+      logger.info('ai', `[get_recommand_list] History loaded for user: ${targetUserId || 'all'}`, { historyCount: allHistoryItems.length });
 
       const result = await recommendFromHistory({
         historyItems: allHistoryItems,
         count,
-        fetchPopularByKeyword: fetchPopularByKeywordViaSkill,
         searchTracks: (query) => obj?.context?.music?.searchTracks(query),
         region,
         guildId,
-        userId: obj?.message?.author?.id || null,
+        userId: targetUserId || obj?.message?.author?.id || null,
       });
 
       if (!result.ok) {
+        logger.warn('ai', '[get_recommand_list] Recommendation generation failed', { reason: result.reason, targetUserId });
         return {
           ok: false,
           reason: result.reason,
@@ -321,6 +269,12 @@ module.exports = {
         };
       }
 
+      logger.info('ai', '[get_recommand_list] Recommendation generated successfully', {
+        keywords: result.keywords,
+        recommendedCount: result.count,
+        items: result.items.map(t => ({ title: t.info?.title, lengthMs: t.info?.length, uri: t.info?.uri })),
+      });
+
       return {
         ok: true,
         guildId,
@@ -329,16 +283,19 @@ module.exports = {
         keywords: result.keywords,
         keywordStats: result.keywordStats,
         count: result.count,
-        items: result.items.map((track, index) => ({
-          index: index + 1,
-          title: track.title || 'Unknown title',
-          author: track.author || 'Unknown artist',
-          url: track.uri || null,
-          lengthMs: Number.isFinite(track.length) ? track.length : null,
-          artworkUrl: track.artworkUrl || null,
-          source: track.source || null,
-          keyword: track.keyword || null,
-        })),
+        items: result.items.map((track, index) => {
+          const info = track.info || {};
+          return {
+            index: index + 1,
+            title: info.title || 'Unknown title',
+            author: info.author || 'Unknown artist',
+            url: info.uri || null,
+            lengthMs: Number.isFinite(info.length) ? info.length : null,
+            artworkUrl: info.artworkUrl || null,
+            source: track.source || null,
+            keyword: track.keyword || null,
+          };
+        }),
       };
     },
     get_playlist: async (args, obj) => {
