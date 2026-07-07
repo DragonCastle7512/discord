@@ -526,7 +526,10 @@ export async function recommendFromHistory({
   const remainingKeywords = tagKeywords.filter(k => !pinnedSet.has(k));
 
   let keywordsToTry: string[] = [];
-  if (randomizeKeywordsCount && (tagKeywords.length > 0 || normalizedPins.length > 0)) {
+  if (userId) {
+    keywordsToTry = selectTopAndRandomKeywords(normalizedPins, remainingKeywords, 5, 3);
+  }
+  else if (randomizeKeywordsCount && (tagKeywords.length > 0 || normalizedPins.length > 0)) {
     const shuffledRemaining = [...remainingKeywords].sort(() => Math.random() - 0.5);
     keywordsToTry = [...normalizedPins, ...shuffledRemaining].slice(0, randomizeKeywordsCount);
   }
