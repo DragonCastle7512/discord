@@ -146,3 +146,20 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
     assert.strictEqual(result.items[0].info.title, 'Guild Pin Song 1');
   });
 });
+
+describe('selectRandomKeywords Unit Tests', () => {
+  const { selectRandomKeywords } = require('../music/services/recommand-service');
+
+  it('should always include all pinned keywords if they are fewer than selectSize', () => {
+    const pins = ['pin1', 'pin2'];
+    const tags = ['tag1', 'tag2', 'tag3', 'tag4'];
+    
+    // 10번 반복 실행하여 항상 pin1과 pin2가 결과에 들어가 있는지 검증
+    for (let i = 0; i < 10; i++) {
+      const selected = selectRandomKeywords(pins, tags, 5, 3);
+      assert.strictEqual(selected.length, 3);
+      assert.ok(selected.includes('pin1'), 'pin1 should be included');
+      assert.ok(selected.includes('pin2'), 'pin2 should be included');
+    }
+  });
+});
