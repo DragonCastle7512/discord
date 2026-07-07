@@ -27,6 +27,7 @@ describe('MusicRuntime Unit Tests', () => {
             loop: false,
             auto: false,
             autoMood: null,
+            autoRequesterId: null,
             autoPool: [],
           };
           guildStates.set(guild.id, state);
@@ -100,6 +101,7 @@ describe('MusicRuntime Unit Tests', () => {
             loop: false,
             auto: false,
             autoMood: null,
+            autoRequesterId: null,
             autoPool: [],
           };
           guildStates.set(guild.id, state);

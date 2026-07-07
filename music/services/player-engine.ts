@@ -43,6 +43,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
         loop: false,
         auto: false,
         autoMood: null,
+        autoRequesterId: null,
         autoPool: [],
       });
     }
@@ -302,6 +303,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       state.playing = false;
       state.auto = false;
       state.autoMood = null;
+      state.autoRequesterId = null;
       state.autoPool = [];
       await shoukaku.leaveVoiceChannel(guildId);
       state.player = null;
