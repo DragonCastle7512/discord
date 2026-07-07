@@ -2,7 +2,7 @@ import { Client } from 'discord.js';
 import { GuildState, Track } from '../types';
 import { findAllHistory, findHistoryByRequester } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
-import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText, selectRandomKeywords } from './recommand-service';
+import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText, selectRandomKeywords, getPinnedKeywordsForRecommend } from './recommand-service';
 import { isDurationInRange } from '../utils/track-parser';
 import { logger } from '../../common/logger';
 import { KeywordPin } from '../models/keyword-pin';
@@ -78,10 +78,10 @@ export function createAutoplayService(deps: AutoplayDeps) {
                     .filter(k => !blacklistSet.has(k))
                     .slice(0, 7);
 
-                // 고정 키워드 조회
-                const pinRecords = await KeywordPin.findAll({ where: { guildId } }).catch(() => []);
-                const pinnedKeywords = pinRecords
-                    .map(p => normalizeText(p.keyword))
+                // 고정 키워드 조회 (길드 핀 + 개인 핀)
+                const dbPins = await getPinnedKeywordsForRecommend(guildId, state.autoRequesterId);
+                const pinnedKeywords = dbPins
+                    .map(p => normalizeText(p))
                     .filter(k => !blacklistSet.has(k))
                     .slice(0, 5);
                 const pinnedSet = new Set(pinnedKeywords);
