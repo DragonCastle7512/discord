@@ -687,15 +687,29 @@ export function selectRandomKeywords(
   poolSize = 5,
   selectSize = 3
 ): string[] {
-  const combined = Array.from(new Set([...pinnedKeywords, ...tagKeywords]));
-  const pool = combined.slice(0, poolSize);
+  // 1. 중복 제거된 유니크 고정 핀 확보 (최대 poolSize 개)
+  const pins = Array.from(new Set(pinnedKeywords)).slice(0, poolSize);
 
-  if (pool.length <= selectSize) {
-    return pool;
+  // 2. 고정 핀 개수가 요구량을 넘는 경우
+  if (pins.length >= selectSize) {
+    const shuffledPins = [...pins].sort(() => Math.random() - 0.5);
+    return shuffledPins.slice(0, selectSize);
   }
 
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
-  return shuffled.slice(0, selectSize);
+  // 3. 고정 핀 개수가 요구량보다 적은 경우: 고정 핀은 무조건 전체 포함
+  const result = [...pins];
+  const needed = selectSize - pins.length;
+
+  // 히스토리 키워드 중 고정 핀과 겹치지 않는 키워드 필터링
+  const pinnedSet = new Set(pins);
+  const remainingTags = tagKeywords.filter(t => !pinnedSet.has(t));
+
+  // 남은 자리만큼 히스토리에서 무작위 선택하여 보충
+  const availablePool = remainingTags.slice(0, poolSize - pins.length);
+  const shuffledTags = [...availablePool].sort(() => Math.random() - 0.5);
+  const selectedTags = shuffledTags.slice(0, needed);
+
+  return [...result, ...selectedTags];
 }
 
 /**
