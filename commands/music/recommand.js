@@ -66,7 +66,7 @@ module.exports = {
 
     const count = clampRecommendationCount(interaction.options.getString('count'));
     const targetUser = interaction.options.getUser('user');
-    const targetUserId = targetUser?.id || interaction.user.id;
+    const targetUserId = targetUser?.id || null;
 
     const historyResult = await context.music.history(interaction.guildId, targetUserId);
     const allHistoryItems = Array.isArray(historyResult?.items) ? historyResult.items : [];
