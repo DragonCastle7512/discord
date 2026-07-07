@@ -1,6 +1,6 @@
 import { Client } from 'discord.js';
 import { GuildState, Track } from '../types';
-import { findAllHistory } from '../repositorys/music-history.repository';
+import { findAllHistory, findHistoryByRequester } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
 import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText } from './recommand-service';
 import { isDurationInRange } from '../utils/track-parser';
@@ -51,9 +51,27 @@ export function createAutoplayService(deps: AutoplayDeps) {
 
     if (!state.autoPool || state.autoPool.length === 0) {
 
-        if (mood === '추천 곡') {
+        if (mood === '서버 추천 곡' || mood === '내 추천 곡') {
             try {
-                const historyItems = await findAllHistory(guildId);
+                let historyItems = [];
+                if (mood === '내 추천 곡') {
+                    if (state.autoRequesterId) {
+                        historyItems = await findHistoryByRequester(guildId, state.autoRequesterId);
+                    }
+                    if (historyItems.length === 0) {
+                        const textChannel = getTextChannel(state.textChannelId);
+                        if (textChannel) {
+                            textChannel.send('[오토모드] 개인 히스토리가 부족하여 내 추천 곡 자동 재생을 시작할 수 없어요! 더 많은 곡을 먼저 재생해 주세요.').catch((err: any) => logger.error('music', 'Failed to send personal history insufficient notification', { error: err }));
+                        }
+                        state.auto = false;
+                        state.autoPool = [];
+                        notifyMusicUpdate(guildId, 'music');
+                        return;
+                    }
+                } else {
+                    historyItems = await findAllHistory(guildId);
+                }
+
                 const tagKeywordsRaw = buildHistoryTagKeywords(historyItems, 100);
                 const blacklistSet = await getBlacklistForGuild(guildId);
                 const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
@@ -75,7 +93,6 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         ...pinnedKeywords,
                         ...shuffledRemaining.slice(0, Math.max(0, 5 - pinnedKeywords.length))
                     ].slice(0, 5);
-                    // console.log(tagKeywords+"\n"+selectedKeywords);
 
                     const searchResults: Track[] = [];
                     for (const keyword of selectedKeywords) {
@@ -109,7 +126,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         const batch = await selectAndCleanSongsFromSearch(shuffledTitles, tagsString, excludedTitles, 20);
                         const cleanBatch = Array.isArray(batch) ? batch : [];
                         state.autoPool = cleanBatch;
-                        logger.info('music', `[AutoPlay Recommend] Auto pool replenished with ${cleanBatch.length} songs`, {
+                        logger.info('music', `[AutoPlay Recommend] Auto pool replenished with ${cleanBatch.length} songs for mood "${mood}"`, {
                             selectedKeywords,
                             tagKeywords,
                             songs: cleanBatch,
@@ -118,7 +135,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                     else {
                         const textChannel = getTextChannel(state.textChannelId);
                         if (textChannel) {
-                            textChannel.send('[오토모드] 최근 히스토리가 부족하여, 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch((err: any) => logger.error('music', 'Failed to send auto-play disabled notification', { error: err }));
+                            textChannel.send(`[오토모드] ${mood}을 위한 곡 목록을 검색하는 데 실패하여, 자동 재생을 비활성화합니다.`).catch((err: any) => logger.error('music', 'Failed to send auto-play disabled notification', { error: err }));
                         }
                         state.auto = false;
                         state.autoPool = [];
@@ -129,7 +146,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 else {
                     const textChannel = getTextChannel(state.textChannelId);
                     if (textChannel) {
-                        textChannel.send('[오토모드] 최근 히스토리가 부족해 추천 곡을 자동 재생할 수 없어요! 더 많은 곡을 먼저 재생해 주세요.').catch((err: any) => logger.error('music', 'Failed to send history insufficient notification', { error: err }));
+                        textChannel.send(`[오토모드] 최근 히스토리가 부족해 ${mood}을 자동 재생할 수 없어요! 더 많은 곡을 먼저 재생해 주세요.`).catch((err: any) => logger.error('music', 'Failed to send history insufficient notification', { error: err }));
                     }
                     state.auto = false;
                     state.autoPool = [];
@@ -141,7 +158,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 logger.error('music', 'AI tag recommendation failed in autoplay', { error: err.stack });
                 const textChannel = getTextChannel(state.textChannelId);
                 if (textChannel) {
-                    textChannel.send('[오토모드] 추천 곡을 준비하는 중 오류가 발생하여 자동 재생을 비활성화합니다. 더 많은 곡을 재생해 주세요!').catch((err: any) => logger.error('music', 'Failed to send auto-play prepare error notification', { error: err }));
+                    textChannel.send(`[오토모드] ${mood}을 준비하는 중 오류가 발생하여 자동 재생을 비활성화합니다.`).catch((err: any) => logger.error('music', 'Failed to send auto-play prepare error notification', { error: err }));
                 }
                 state.auto = false;
                 state.autoPool = [];
