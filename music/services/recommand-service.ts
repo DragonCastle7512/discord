@@ -527,7 +527,7 @@ export async function recommendFromHistory({
 
   let keywordsToTry: string[] = [];
   if (userId) {
-    keywordsToTry = selectTopAndRandomKeywords(normalizedPins, remainingKeywords, 5, 3);
+    keywordsToTry = selectRandomKeywords(normalizedPins, remainingKeywords, 5, 3);
   }
   else if (randomizeKeywordsCount && (tagKeywords.length > 0 || normalizedPins.length > 0)) {
     const shuffledRemaining = [...remainingKeywords].sort(() => Math.random() - 0.5);
@@ -695,9 +695,9 @@ export async function recommendFromHistory({
 }
 
 /**
- * 키워드 풀에서 최상위 1위를 고정하고, 나머지 후보 중 무작위로 지정된 개수만큼 선택하여 최종 키워드 리스트를 반환합니다.
+ * 키워드 풀에서 무작위로 지정된 개수만큼 선택하여 최종 키워드 리스트를 반환합니다. (1위 고정 없음)
  */
-export function selectTopAndRandomKeywords(
+export function selectRandomKeywords(
   pinnedKeywords: string[],
   tagKeywords: string[],
   poolSize = 5,
@@ -710,11 +710,6 @@ export function selectTopAndRandomKeywords(
     return pool;
   }
 
-  const fixed = pool[0];
-  const remaining = pool.slice(1);
-
-  const shuffled = [...remaining].sort(() => Math.random() - 0.5);
-  const selected = shuffled.slice(0, selectSize - 1);
-
-  return [fixed, ...selected];
+  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, selectSize);
 }
