@@ -715,8 +715,7 @@ export async function getPinnedKeywordsForRecommend(
       logger.error('system', `[Recommend Service] Failed to load pinned keywords for user ${userId}`, { error: err instanceof Error ? err.stack : String(err) });
     }
   }
-
-  if (guildId) {
+  else if (guildId) {
     try {
       const guildPins = await KeywordPin.findAll({ where: { guildId } });
       dbPins.push(...guildPins.map(p => p.keyword));
