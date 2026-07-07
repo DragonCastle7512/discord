@@ -690,3 +690,28 @@ export async function recommendFromHistory({
     tagFrequencies,
   };
 }
+
+/**
+ * 키워드 풀에서 최상위 1위를 고정하고, 나머지 후보 중 무작위로 지정된 개수만큼 선택하여 최종 키워드 리스트를 반환합니다.
+ */
+export function selectTopAndRandomKeywords(
+  pinnedKeywords: string[],
+  tagKeywords: string[],
+  poolSize = 5,
+  selectSize = 3
+): string[] {
+  const combined = Array.from(new Set([...pinnedKeywords, ...tagKeywords]));
+  const pool = combined.slice(0, poolSize);
+
+  if (pool.length <= selectSize) {
+    return pool;
+  }
+
+  const fixed = pool[0];
+  const remaining = pool.slice(1);
+
+  const shuffled = [...remaining].sort(() => Math.random() - 0.5);
+  const selected = shuffled.slice(0, selectSize - 1);
+
+  return [fixed, ...selected];
+}

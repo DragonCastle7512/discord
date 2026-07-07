@@ -53,7 +53,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
 
         if (mood === '서버 추천 곡' || mood === '내 추천 곡') {
             try {
-                let historyItems = [];
+                let historyItems: any[] = [];
                 if (mood === '내 추천 곡') {
                     if (state.autoRequesterId) {
                         historyItems = await findHistoryByRequester(guildId, state.autoRequesterId);
