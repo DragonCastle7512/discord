@@ -713,3 +713,33 @@ export function selectRandomKeywords(
   const shuffled = [...pool].sort(() => Math.random() - 0.5);
   return shuffled.slice(0, selectSize);
 }
+
+/**
+ * 지정된 guildId 및 userId에 매핑된 모든 고정 키워드를 비동기적으로 조회하여 반환합니다.
+ */
+export async function getPinnedKeywordsForRecommend(
+  guildId: string | null,
+  userId?: string | null
+): Promise<string[]> {
+  const dbPins: string[] = [];
+
+  if (userId) {
+    try {
+      const userPins = await UserKeywordPin.findAll({ where: { userId } });
+      dbPins.push(...userPins.map(p => p.keyword));
+    } catch (err) {
+      logger.error('system', `[Recommend Service] Failed to load pinned keywords for user ${userId}`, { error: err instanceof Error ? err.stack : String(err) });
+    }
+  }
+
+  if (guildId) {
+    try {
+      const guildPins = await KeywordPin.findAll({ where: { guildId } });
+      dbPins.push(...guildPins.map(p => p.keyword));
+    } catch (err) {
+      logger.error('system', `[Recommend Service] Failed to load pinned keywords for guild ${guildId}`, { error: err instanceof Error ? err.stack : String(err) });
+    }
+  }
+
+  return Array.from(new Set(dbPins));
+}
