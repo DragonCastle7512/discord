@@ -362,13 +362,20 @@ export function createMusicRuntime({
       state.auto = !state.auto;
     }
     
-    if (state.auto && mood !== null) {
-      if (state.autoMood !== mood) {
-        state.autoMood = mood;
-        state.autoPool = [];
+    const userId = context?.user?.id || context?.author?.id || context?.member?.user?.id || null;
+    if (state.auto) {
+      if (userId) {
+        state.autoRequesterId = userId;
       }
-    } else if (!state.auto) {
+      if (mood !== null) {
+        if (state.autoMood !== mood) {
+          state.autoMood = mood;
+          state.autoPool = [];
+        }
+      }
+    } else {
       state.autoMood = null;
+      state.autoRequesterId = null;
       state.autoPool = [];
     }
     
