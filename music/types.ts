@@ -45,9 +45,11 @@ export interface GuildState {
   loop: boolean;
   auto?: boolean;
   autoMood?: string | null;
+  autoRequesterId?: string | null;
   autoPool?: string[];
   currentHistoryId?: number | null;
 }
+
 
 /**
  * 음악 유틸리티 인터페이스 (runtime-util.js 기반)

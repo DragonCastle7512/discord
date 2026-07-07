@@ -21,5 +21,6 @@ export const MOOD_CHOICES = [
   { name: '비오는 날 어울리는', value: '비오는 날' },
   { name: '카페 분위기 BGM', value: '카페' },
   { name: '우울한', value: '우울한' },
-  { name: '추천 곡', value: '추천 곡' },
-];
+  { name: '서버 추천 곡 (서버 인기 기반)', value: '서버 추천 곡' },
+  { name: '내 추천 곡 (개인 감상 기록 기반)', value: '내 추천 곡' },
+];
