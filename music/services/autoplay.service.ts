@@ -79,7 +79,8 @@ export function createAutoplayService(deps: AutoplayDeps) {
                     .slice(0, 7);
 
                 // 고정 키워드 조회 (길드 핀 + 개인 핀)
-                const dbPins = await getPinnedKeywordsForRecommend(guildId, state.autoRequesterId);
+                const targetUserId = mood === '내 추천 곡' ? state.autoRequesterId : null;
+                const dbPins = await getPinnedKeywordsForRecommend(guildId, targetUserId);
                 const pinnedKeywords = dbPins
                     .map(p => normalizeText(p))
                     .filter(k => !blacklistSet.has(k))
