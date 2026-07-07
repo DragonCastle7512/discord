@@ -2,7 +2,7 @@ import { Client } from 'discord.js';
 import { GuildState, Track } from '../types';
 import { findAllHistory, findHistoryByRequester } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
-import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText, selectTopAndRandomKeywords } from './recommand-service';
+import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText, selectRandomKeywords } from './recommand-service';
 import { isDurationInRange } from '../utils/track-parser';
 import { logger } from '../../common/logger';
 import { KeywordPin } from '../models/keyword-pin';
@@ -90,7 +90,7 @@ export function createAutoplayService(deps: AutoplayDeps) {
                     const remainingKeywords = tagKeywords.filter(k => !pinnedSet.has(k));
                     let selectedKeywords: string[] = [];
                     if (mood === '내 추천 곡') {
-                        selectedKeywords = selectTopAndRandomKeywords(pinnedKeywords, remainingKeywords, 5, 3);
+                        selectedKeywords = selectRandomKeywords(pinnedKeywords, remainingKeywords, 5, 3);
                     } else {
                         const shuffledRemaining = [...remainingKeywords].sort(() => Math.random() - 0.5);
                         selectedKeywords = [
