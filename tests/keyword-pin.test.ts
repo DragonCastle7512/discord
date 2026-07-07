@@ -14,12 +14,12 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
     
     await KeywordPin.destroy({
       where: {
-        guildId: 'test-guild-pin',
+        guildId: ['test-guild-pin-user', 'test-guild-pin-guild'],
       }
     });
     await UserKeywordPin.destroy({
       where: {
-        userId: 'test-user-pin',
+        userId: ['test-user-pin-user', 'test-user-pin-guild'],
       }
     });
   });
@@ -27,33 +27,33 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
   after(async () => {
     await KeywordPin.destroy({
       where: {
-        guildId: 'test-guild-pin',
+        guildId: ['test-guild-pin-user', 'test-guild-pin-guild'],
       }
     });
     await UserKeywordPin.destroy({
       where: {
-        userId: 'test-user-pin',
+        userId: ['test-user-pin-user', 'test-user-pin-guild'],
       }
     });
     await sequelize.close();
   });
 
-  it('should successfully prioritize and interleave pinned keywords in recommendFromHistory via searchTracks', async () => {
+  it('should only prioritize user pinned keywords when userId is provided', async () => {
     // 1. 길드 핀 생성
     await KeywordPin.create({
-      guildId: 'test-guild-pin',
+      guildId: 'test-guild-pin-user',
       keyword: 'pin-guild-tag'
     });
 
     // 2. 유저 핀 생성
     await UserKeywordPin.create({
-      userId: 'test-user-pin',
+      userId: 'test-user-pin-user',
       keyword: 'pin-user-tag'
     });
 
     const dummyHistory = [
       {
-        guildId: 'test-guild-pin',
+        guildId: 'test-guild-pin-user',
         musicInfo: {
           info: { title: 'Song 1', author: 'Artist 1', uri: 'https://youtube.com/1' },
           tags: ['normal-tag-1', 'normal-tag-2']
@@ -73,6 +73,50 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
           ] as unknown as Track[]
         };
       }
+      return { tracks: [] };
+    };
+
+    // guildId, userId 지정해서 핀 조회 및 정렬 테스트
+    const result = await recommendFromHistory({
+      historyItems: dummyHistory,
+      count: 5,
+      searchTracks: searchTracksMock,
+      randomizeKeywordsCount: null,
+      guildId: 'test-guild-pin-user',
+      userId: 'test-user-pin-user'
+    });
+
+    // 개인 추천이므로 유저 핀만 결과에 들어가고 길드 핀은 배제되어야 함
+    assert.ok(result.keywords.includes('pin user tag'), 'pin user tag should be present in keywords');
+    assert.ok(!result.keywords.includes('pin guild tag'), 'pin guild tag should NOT be present in keywords');
+    assert.strictEqual(result.items[0].info.title, 'User Pin Song 1');
+  });
+
+  it('should only prioritize guild pinned keywords when userId is not provided', async () => {
+    // 1. 길드 핀 생성
+    await KeywordPin.create({
+      guildId: 'test-guild-pin-guild',
+      keyword: 'pin-guild-tag'
+    });
+
+    // 2. 유저 핀 생성
+    await UserKeywordPin.create({
+      userId: 'test-user-pin-guild',
+      keyword: 'pin-user-tag'
+    });
+
+    const dummyHistory = [
+      {
+        guildId: 'test-guild-pin-guild',
+        musicInfo: {
+          info: { title: 'Song 1', author: 'Artist 1', uri: 'https://youtube.com/1' },
+          tags: ['normal-tag-1', 'normal-tag-2']
+        }
+      }
+    ];
+
+    // Mock searchTracks: 키워드에 따라 다른 트랙을 리턴함
+    const searchTracksMock = async (query: string) => {
       if (query === 'pin guild tag') {
         return {
           tracks: [
@@ -86,23 +130,19 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
       return { tracks: [] };
     };
 
-    // guildId, userId 지정해서 핀 조회 및 정렬 테스트
+    // guildId 지정, userId는 null로 해서 서버 핀 테스트
     const result = await recommendFromHistory({
       historyItems: dummyHistory,
       count: 5,
       searchTracks: searchTracksMock,
       randomizeKeywordsCount: null,
-      guildId: 'test-guild-pin',
-      userId: 'test-user-pin'
+      guildId: 'test-guild-pin-guild',
+      userId: null
     });
 
-    // 핀된 키워드가 결과 키워드 리스트의 첫 부분에 존재해야 함
-    assert.ok(result.keywords.includes('pin user tag'), 'pin user tag should be present in keywords');
+    // 서버 추천이므로 길드 핀만 결과에 들어가고 유저 핀은 배제되어야 함
     assert.ok(result.keywords.includes('pin guild tag'), 'pin guild tag should be present in keywords');
-    
-    // 교차배치(Interleave)에 따라 유저 핀 트랙과 길드 핀 트랙이 순서대로 들어가 있어야 함
-    assert.ok(result.items.length >= 2, 'Should return at least 2 items');
-    assert.strictEqual(result.items[0].info.title, 'User Pin Song 1');
-    assert.strictEqual(result.items[1].info.title, 'Guild Pin Song 1');
+    assert.ok(!result.keywords.includes('pin user tag'), 'pin user tag should NOT be present in keywords');
+    assert.strictEqual(result.items[0].info.title, 'Guild Pin Song 1');
   });
 });
