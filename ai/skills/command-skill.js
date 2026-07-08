@@ -196,20 +196,6 @@ module.exports = {
       },
     },
     {
-      name: 'slash_echo',
-      description: '사용자에게 입력한 메시지를 채널에 전송합니다.',
-      parameters: {
-        type: 'OBJECT',
-        properties: {
-          input: {
-            type: 'STRING',
-            description: '전송할 메시지',
-          },
-        },
-        required: ['input'],
-      },
-    },
-    {
       name: 'slash_tts',
       description: '입력한 문장을 TTS로 재생합니다.',
       parameters: {
@@ -273,7 +259,6 @@ module.exports = {
     slash_shuffle: async (args, obj) => executeSlash(obj, 'shuffle'),
     slash_skip: async (args, obj) => executeSlash(obj, 'skip'),
     slash_stop: async (args, obj) => executeSlash(obj, 'stop'),
-    slash_echo: async (args, obj) => executeSlash(obj, 'echo', { input: args?.input }),
     slash_tts: async (args, obj) => {
       const whitelist = (process.env.TTS_GUILD_WHITELIST || '').split(',').map(id => id.trim());
       const guildId = obj?.message?.guild?.id;
