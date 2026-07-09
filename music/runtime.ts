@@ -552,14 +552,26 @@ export function createMusicRuntime({
       logger.info('music', `[getKeywords] Raw Blacklist: ${Array.from(blacklistSet).join(', ')}`);
       logger.info('music', `[getKeywords] Raw Pinned: ${Array.from(pinnedSet).join(', ')}`);
 
-      const keywords = dedupedKeywordsList
+      const initialKeywords = dedupedKeywordsList
         .filter(tag => !isKeywordMatched(tag, blacklistSet))
         .map(tag => ({ 
           tag, 
           freq: keywordMap.get(tag) || 0,
           isPinned: isKeywordMatched(tag, pinnedSet)
-        }))
-        .filter(item => item.freq > 0)
+        }));
+
+      const existingTags = new Set(initialKeywords.map(k => k.tag));
+      const missingPinnedKeywords = Array.from(pinnedSet)
+        .filter(pinTag => !isKeywordMatched(pinTag, blacklistSet))
+        .filter(pinTag => !existingTags.has(pinTag))
+        .map(pinTag => ({
+          tag: pinTag,
+          freq: 0,
+          isPinned: true
+        }));
+
+      const keywords = [...initialKeywords, ...missingPinnedKeywords]
+        .filter(item => item.freq > 0 || item.isPinned)
         .sort((a, b) => b.freq - a.freq || a.tag.localeCompare(b.tag));
 
       logger.info('music', `[getKeywords] Final Matched Keywords Count: ${keywords.length}`, { keywords });

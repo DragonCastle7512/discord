@@ -3,6 +3,8 @@ import assert from 'node:assert';
 import { sequelize } from '../db/sequelize';
 import { initKeywordPinModel, KeywordPin } from '../music/models/keyword-pin';
 import { initUserKeywordPinModel, UserKeywordPin } from '../music/models/user-keyword-pin';
+import { initKeywordBlacklistModel } from '../music/models/keyword-blacklist';
+import { initUserKeywordBlacklistModel } from '../music/models/user-keyword-blacklist';
 import { recommendFromHistory } from '../music/services/recommand-service';
 import { Track } from '../music/types';
 
@@ -11,6 +13,8 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
     await sequelize.authenticate();
     initKeywordPinModel(sequelize);
     initUserKeywordPinModel(sequelize);
+    initKeywordBlacklistModel(sequelize);
+    initUserKeywordBlacklistModel(sequelize);
     
     await KeywordPin.destroy({
       where: {
@@ -177,6 +181,34 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
 
     await KeywordPin.destroy({ where: { guildId } });
     await MusicHistory.destroy({ where: { guildId } });
+  });
+
+  it('should include pinned keyword in getKeywords even if frequency is 0 and missing from history', async () => {
+    const guildId = 'test-guild-pin-guild';
+    const { MusicHistory } = require('../music/models/music-history');
+    await MusicHistory.destroy({ where: { guildId } });
+
+    await KeywordPin.destroy({ where: { guildId } });
+    await KeywordPin.create({
+      guildId,
+      keyword: 'zero-freq-pin'
+    });
+
+    const { createMusicRuntime } = require('../music/runtime');
+    const runtime = createMusicRuntime({
+      guildStates: new Map(),
+      runtimeUtils: {} as any
+    });
+
+    const res = await runtime.getKeywords(guildId, 'any-user', false);
+    assert.strictEqual(res.ok, true);
+    
+    const pinItem = res.keywords.find(k => k.tag === 'zero freq pin');
+    assert.ok(pinItem, 'zero freq pin should be present in getKeywords results');
+    assert.strictEqual(pinItem.freq, 0, 'Frequency of zero freq pin should be 0');
+    assert.strictEqual(pinItem.isPinned, true, 'isPinned of zero freq pin should be true');
+
+    await KeywordPin.destroy({ where: { guildId } });
   });
 });
 

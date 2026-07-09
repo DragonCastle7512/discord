@@ -17,7 +17,7 @@ import { MusicHistory } from '../music/models/music-history';
 import { UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
 import { KeywordPin } from '../music/models/keyword-pin';
 import { UserKeywordPin } from '../music/models/user-keyword-pin';
-import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText } from '../music/services/recommand-service';
+import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText, isKeywordMatched } from '../music/services/recommand-service';
 
 
 export function createDashboardRouter(
@@ -331,14 +331,26 @@ export function createDashboardRouter(
         pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
       }
 
-      const keywords = dedupedKeywordsList
-        .filter(tag => !blacklistSet.has(tag))
+      const initialKeywords = dedupedKeywordsList
+        .filter(tag => !isKeywordMatched(tag, blacklistSet))
         .map(tag => ({ 
           tag, 
           freq: keywordMap.get(tag) || 0,
-          isPinned: pinnedSet.has(tag)
-        }))
-        .filter(item => item.freq > 0)
+          isPinned: isKeywordMatched(tag, pinnedSet)
+        }));
+
+      const existingTags = new Set(initialKeywords.map(k => k.tag));
+      const missingPinnedKeywords = Array.from(pinnedSet)
+        .filter(pinTag => !isKeywordMatched(pinTag, blacklistSet))
+        .filter(pinTag => !existingTags.has(pinTag))
+        .map(pinTag => ({
+          tag: pinTag,
+          freq: 0,
+          isPinned: true
+        }));
+
+      const keywords = [...initialKeywords, ...missingPinnedKeywords]
+        .filter(item => item.freq > 0 || item.isPinned)
         .sort((a, b) => b.freq - a.freq || a.tag.localeCompare(b.tag));
 
       let recommendation = { keywords: [] as string[], items: [] as any[] };
