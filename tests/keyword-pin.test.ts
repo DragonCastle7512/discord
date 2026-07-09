@@ -145,6 +145,39 @@ describe('KeywordPin Model & Recommendation Integration Tests', () => {
     assert.ok(!result.keywords.includes('pin user tag'), 'pin user tag should NOT be present in keywords');
     assert.strictEqual(result.items[0].info.title, 'Guild Pin Song 1');
   });
+
+  it('should automatically resolve partial keyword to full tag in runtime addKeywordPin', async () => {
+    const { MusicHistory } = require('../music/models/music-history');
+    const { initMusicHistoryModel } = require('../music/models/music-history');
+    initMusicHistoryModel(sequelize);
+
+    const guildId = 'test-guild-pin-guild';
+    await MusicHistory.destroy({ where: { guildId } });
+    await MusicHistory.create({
+      guildId,
+      musicInfo: {
+        info: { title: 'Deco Song', author: 'Deco', uri: 'http://youtube.com/deco' },
+        tags: ['deco 27', 'vocaloid']
+      }
+    });
+
+    const { createMusicRuntime } = require('../music/runtime');
+    const runtime = createMusicRuntime({
+      guildStates: new Map(),
+      runtimeUtils: {} as any
+    });
+
+    await KeywordPin.destroy({ where: { guildId } });
+    const res = await runtime.addKeywordPin(guildId, 'deco', false);
+    assert.strictEqual(res.ok, true, 'Pin should be added successfully');
+
+    const records = await KeywordPin.findAll({ where: { guildId } });
+    assert.strictEqual(records.length, 1);
+    assert.strictEqual(records[0].keyword, 'deco 27', 'Partial keyword deco should be resolved to deco 27');
+
+    await KeywordPin.destroy({ where: { guildId } });
+    await MusicHistory.destroy({ where: { guildId } });
+  });
 });
 
 describe('selectRandomKeywords Unit Tests', () => {

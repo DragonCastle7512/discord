@@ -439,6 +439,7 @@ export function createDashboardRouter(
           } 
         });
       }
+      notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -471,6 +472,7 @@ export function createDashboardRouter(
           } 
         });
       }
+      notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -513,6 +515,7 @@ export function createDashboardRouter(
           } 
         });
       }
+      notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -545,6 +548,7 @@ export function createDashboardRouter(
           } 
         });
       }
+      notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ error: err.message });

@@ -17,6 +17,12 @@ import {
 } from './repositorys/playlist.repository';
 import { notifyMusicUpdate } from '../common/socket';
 import { logger } from '../common/logger';
+import { MusicHistory } from './models/music-history';
+import { KeywordBlacklist } from './models/keyword-blacklist';
+import { UserKeywordBlacklist } from './models/user-keyword-blacklist';
+import { KeywordPin } from './models/keyword-pin';
+import { UserKeywordPin } from './models/user-keyword-pin';
+import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText, isKeywordMatched, keywordSimilarity } from './services/recommand-service';
 
 export function createMusicRuntime({ 
   guildStates, 
@@ -494,6 +500,253 @@ export function createMusicRuntime({
     return { ok: true, message: `이전 곡을 재생합니다: **${prevTrack.info.title}**` };
   }
 
+  async function getKeywords(guildId: string, userId: string, isPersonal: boolean): Promise<{
+    ok: boolean;
+    keywords: Array<{ tag: string; freq: number; isPinned: boolean }>;
+    blacklist: string[];
+    pinned: string[];
+  }> {
+    try {
+      const histories = await MusicHistory.findAll({ where: { guildId } });
+      const keywordMap = new Map<string, number>();
+
+      const filteredHistories = isPersonal
+        ? histories.filter(h => String((h.musicInfo as any)?.requestedBy || '') === String(userId))
+        : histories;
+
+      filteredHistories.forEach(h => {
+        if ((h.musicInfo as any)?.isSkipped) return;
+
+        const tags = (h.musicInfo as any)?.tags || [];
+        tags.forEach((tag: string) => {
+          const normalized = normalizeText(tag);
+          if (isValidTagKeyword(normalized)) {
+            keywordMap.set(normalized, (keywordMap.get(normalized) || 0) + 1);
+          }
+        });
+      });
+
+      const plainHistories = filteredHistories.map(h => h.get({ plain: true }));
+      const tagKeywordsRaw = buildHistoryTagKeywords(plainHistories, 9999);
+      const dedupedKeywordsList: string[] = dedupeSimilarKeywords(tagKeywordsRaw);
+
+      let blacklistSet = new Set<string>();
+      if (isPersonal) {
+        const blacklistRecords = await UserKeywordBlacklist.findAll({ where: { userId } });
+        blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
+      } else {
+        const blacklistRecords = await KeywordBlacklist.findAll({ where: { guildId } });
+        blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
+      }
+
+      let pinnedSet = new Set<string>();
+      if (isPersonal) {
+        const pinRecords = await UserKeywordPin.findAll({ where: { userId } }).catch(() => []);
+        pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
+      } else {
+        const pinRecords = await KeywordPin.findAll({ where: { guildId } }).catch(() => []);
+        pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
+      }
+
+      logger.info('music', `[getKeywords] Fetching keywords for guild ${guildId}, user ${userId}, personal: ${isPersonal}`);
+      logger.info('music', `[getKeywords] Raw Blacklist: ${Array.from(blacklistSet).join(', ')}`);
+      logger.info('music', `[getKeywords] Raw Pinned: ${Array.from(pinnedSet).join(', ')}`);
+
+      const keywords = dedupedKeywordsList
+        .filter(tag => !isKeywordMatched(tag, blacklistSet))
+        .map(tag => ({ 
+          tag, 
+          freq: keywordMap.get(tag) || 0,
+          isPinned: isKeywordMatched(tag, pinnedSet)
+        }))
+        .filter(item => item.freq > 0)
+        .sort((a, b) => b.freq - a.freq || a.tag.localeCompare(b.tag));
+
+      logger.info('music', `[getKeywords] Final Matched Keywords Count: ${keywords.length}`, { keywords });
+
+      return {
+        ok: true,
+        keywords,
+        blacklist: Array.from(blacklistSet),
+        pinned: Array.from(pinnedSet)
+      };
+    } catch (err: any) {
+      logger.error('music', 'Failed to get keywords in runtime', { error: err.stack });
+      return { ok: false, keywords: [], blacklist: [], pinned: [] };
+    }
+  }
+
+  async function getKeywordBlacklist(targetId: string, isPersonal: boolean): Promise<{ ok: boolean; keywords: string[] }> {
+    try {
+      if (isPersonal) {
+        const records = await UserKeywordBlacklist.findAll({ where: { userId: targetId } });
+        return { ok: true, keywords: records.map(r => r.keyword) };
+      } else {
+        const records = await KeywordBlacklist.findAll({ where: { guildId: targetId } });
+        return { ok: true, keywords: records.map(r => r.keyword) };
+      }
+    } catch (err: any) {
+      logger.error('music', `Failed to get keyword blacklist for ${targetId}`, { error: err.stack });
+      return { ok: false, keywords: [] };
+    }
+  }
+
+  async function resolveSimilarKeyword(guildId: string, inputKeyword: string): Promise<string> {
+    const normalizedInput = (inputKeyword || '').toLowerCase().trim();
+    if (!normalizedInput) return normalizedInput;
+
+    try {
+      const histories = await MusicHistory.findAll({ where: { guildId } });
+      const tagKeywordsRaw: string[] = [];
+      histories.forEach(h => {
+        if ((h.musicInfo as any)?.isSkipped) return;
+        const tags = (h.musicInfo as any)?.tags || [];
+        tags.forEach((tag: string) => {
+          const normalized = normalizeText(tag);
+          if (isValidTagKeyword(normalized)) {
+            tagKeywordsRaw.push(normalized);
+          }
+        });
+      });
+      
+      const dedupedKeywords = dedupeSimilarKeywords(tagKeywordsRaw);
+      
+      for (const tag of dedupedKeywords) {
+        const normTag = normalizeText(tag);
+        if (normTag === normalizedInput) return tag;
+        if (normTag.includes(normalizedInput) || normalizedInput.includes(normTag)) {
+          return tag;
+        }
+        if (keywordSimilarity(normTag, normalizedInput) >= 0.6) {
+          return tag;
+        }
+      }
+    } catch (err) {
+      logger.error('music', 'Failed to resolve similar keyword', { error: err });
+    }
+    
+    return inputKeyword;
+  }
+
+  async function addKeywordBlacklist(targetId: string, keyword: string, isPersonal: boolean, guildId?: string): Promise<RuntimeResponse> {
+    const refGuildId = guildId || (!isPersonal ? targetId : undefined);
+    let resolvedKeyword = keyword;
+    if (refGuildId) {
+      resolvedKeyword = await resolveSimilarKeyword(refGuildId, keyword);
+    }
+    const normalized = (resolvedKeyword || '').toLowerCase().trim();
+    if (!normalized) {
+      return { ok: false, message: '올바른 키워드를 입력해주세요.' };
+    }
+    try {
+      if (isPersonal) {
+        await UserKeywordBlacklist.findOrCreate({ where: { userId: targetId, keyword: normalized } });
+      } else {
+        await KeywordBlacklist.findOrCreate({ where: { guildId: targetId, keyword: normalized } });
+      }
+      notifyMusicUpdate(targetId);
+      return { ok: true, message: `키워드 '${normalized}'를 블랙리스트에 추가했습니다.` };
+    } catch (err: any) {
+      logger.error('music', `Failed to add blacklist for ${targetId}`, { error: err.stack });
+      return { ok: false, message: `블랙리스트 추가 중 오류가 발생했습니다: ${err.message}` };
+    }
+  }
+
+  async function removeKeywordBlacklist(targetId: string, keyword: string, isPersonal: boolean, guildId?: string): Promise<RuntimeResponse> {
+    const refGuildId = guildId || (!isPersonal ? targetId : undefined);
+    let resolvedKeyword = keyword;
+    if (refGuildId) {
+      resolvedKeyword = await resolveSimilarKeyword(refGuildId, keyword);
+    }
+    const normalized = (resolvedKeyword || '').toLowerCase().trim();
+    if (!normalized) {
+      return { ok: false, message: '올바른 키워드를 입력해주세요.' };
+    }
+    try {
+      if (isPersonal) {
+        await UserKeywordBlacklist.destroy({ where: { userId: targetId, keyword: normalized } });
+      } else {
+        await KeywordBlacklist.destroy({ where: { guildId: targetId, keyword: normalized } });
+      }
+      notifyMusicUpdate(targetId);
+      return { ok: true, message: `키워드 '${normalized}'를 블랙리스트에서 제거했습니다.` };
+    } catch (err: any) {
+      logger.error('music', `Failed to remove blacklist for ${targetId}`, { error: err.stack });
+      return { ok: false, message: `블랙리스트 제거 중 오류가 발생했습니다: ${err.message}` };
+    }
+  }
+
+  async function getKeywordPins(targetId: string, isPersonal: boolean): Promise<{ ok: boolean; keywords: string[] }> {
+    try {
+      if (isPersonal) {
+        const records = await UserKeywordPin.findAll({ where: { userId: targetId } });
+        return { ok: true, keywords: records.map(r => r.keyword) };
+      } else {
+        const records = await KeywordPin.findAll({ where: { guildId: targetId } });
+        return { ok: true, keywords: records.map(r => r.keyword) };
+      }
+    } catch (err: any) {
+      logger.error('music', `Failed to get pins for ${targetId}`, { error: err.stack });
+      return { ok: false, keywords: [] };
+    }
+  }
+
+  async function addKeywordPin(targetId: string, keyword: string, isPersonal: boolean, guildId?: string): Promise<RuntimeResponse> {
+    const refGuildId = guildId || (!isPersonal ? targetId : undefined);
+    let resolvedKeyword = keyword;
+    if (refGuildId) {
+      resolvedKeyword = await resolveSimilarKeyword(refGuildId, keyword);
+    }
+    const normalized = (resolvedKeyword || '').toLowerCase().trim();
+    if (!normalized) {
+      return { ok: false, message: '올바른 키워드를 입력해주세요.' };
+    }
+    try {
+      if (isPersonal) {
+        const count = await UserKeywordPin.count({ where: { userId: targetId } });
+        if (count >= 5) {
+          return { ok: false, message: '최대 5개까지만 고정할 수 있습니다.' };
+        }
+        await UserKeywordPin.findOrCreate({ where: { userId: targetId, keyword: normalized } });
+      } else {
+        const count = await KeywordPin.count({ where: { guildId: targetId } });
+        if (count >= 5) {
+          return { ok: false, message: '최대 5개까지만 고정할 수 있습니다.' };
+        }
+        await KeywordPin.findOrCreate({ where: { guildId: targetId, keyword: normalized } });
+      }
+      notifyMusicUpdate(targetId);
+      return { ok: true, message: `키워드 '${normalized}'를 고정 목록에 추가했습니다.` };
+    } catch (err: any) {
+      logger.error('music', `Failed to add pin for ${targetId}`, { error: err.stack });
+      return { ok: false, message: `키워드 고정 중 오류가 발생했습니다: ${err.message}` };
+    }
+  }
+
+  async function removeKeywordPin(targetId: string, keyword: string, isPersonal: boolean, guildId?: string): Promise<RuntimeResponse> {
+    const refGuildId = guildId || (!isPersonal ? targetId : undefined);
+    let resolvedKeyword = keyword;
+    if (refGuildId) {
+      resolvedKeyword = await resolveSimilarKeyword(refGuildId, keyword);
+    }
+    const normalized = (resolvedKeyword || '').toLowerCase().trim();
+    if (!normalized) {
+      return { ok: false, message: '올바른 키워드를 입력해주세요.' };
+    }
+    try {
+      if (isPersonal) {
+        await UserKeywordPin.destroy({ where: { userId: targetId, keyword: normalized } });
+      } else {
+        await KeywordPin.destroy({ where: { guildId: targetId, keyword: normalized } });
+      }
+      notifyMusicUpdate(targetId);
+      return { ok: true, message: `키워드 '${normalized}'를 고정 목록에서 제거했습니다.` };
+    } catch (err: any) {
+      logger.error('music', `Failed to remove pin for ${targetId}`, { error: err.stack });
+      return { ok: false, message: `키워드 고정 해제 중 오류가 발생했습니다: ${err.message}` };
+    }
+  }
+
   return {
     play,
     skip,
@@ -513,6 +766,13 @@ export function createMusicRuntime({
     deleteFromPlaylist,
     movePlaylistItem,
     pause,
-    previous
+    previous,
+    getKeywords,
+    getKeywordBlacklist,
+    addKeywordBlacklist,
+    removeKeywordBlacklist,
+    getKeywordPins,
+    addKeywordPin,
+    removeKeywordPin
   };
 }

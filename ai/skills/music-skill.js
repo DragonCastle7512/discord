@@ -234,6 +234,120 @@ module.exports = {
         required: ['index'],
       },
     },
+    {
+      name: 'get_keywords',
+      description: '현재 서버(길드)의 고정 키워드 목록 또는 요청자의 개인 고정 키워드 목록을 수집 빈도와 함께 조회합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          mode: {
+            type: 'STRING',
+            description: '조회할 대상 모드 (server: 서버 수집 키워드, personal: 요청자의 개인 수집 키워드)',
+          },
+        },
+        required: ['mode'],
+      },
+    },
+    {
+      name: 'get_keyword_blacklist',
+      description: '서버 또는 개인 키워드 블랙리스트 목록을 조회합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          mode: {
+            type: 'STRING',
+            description: '조회할 대상 모드 (server: 서버 블랙리스트, personal: 개인 블랙리스트)',
+          },
+        },
+        required: ['mode'],
+      },
+    },
+    {
+      name: 'add_keyword_blacklist',
+      description: '특정 키워드를 서버 또는 개인 키워드 블랙리스트에 추가합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          keyword: {
+            type: 'STRING',
+            description: '블랙리스트에 추가할 키워드',
+          },
+          mode: {
+            type: 'STRING',
+            description: '추가할 대상 모드 (server: 서버 블랙리스트, personal: 개인 블랙리스트)',
+          },
+        },
+        required: ['keyword', 'mode'],
+      },
+    },
+    {
+      name: 'remove_keyword_blacklist',
+      description: '특정 키워드를 서버 또는 개인 키워드 블랙리스트에서 제거합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          keyword: {
+            type: 'STRING',
+            description: '블랙리스트에서 제거할 키워드',
+          },
+          mode: {
+            type: 'STRING',
+            description: '제거할 대상 모드 (server: 서버 블랙리스트, personal: 개인 블랙리스트)',
+          },
+        },
+        required: ['keyword', 'mode'],
+      },
+    },
+    {
+      name: 'get_keyword_pins',
+      description: '서버 또는 개인의 고정 키워드 목록을 조회합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          mode: {
+            type: 'STRING',
+            description: '조회할 대상 모드 (server: 서버 고정 키워드, personal: 개인 고정 키워드)',
+          },
+        },
+        required: ['mode'],
+      },
+    },
+    {
+      name: 'add_keyword_pin',
+      description: '특정 키워드를 서버 또는 개인 고정 키워드 목록에 추가합니다. (최대 5개 제한)',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          keyword: {
+            type: 'STRING',
+            description: '고정 목록에 추가할 키워드',
+          },
+          mode: {
+            type: 'STRING',
+            description: '추가할 대상 모드 (server: 서버 고정 키워드, personal: 개인 고정 키워드)',
+          },
+        },
+        required: ['keyword', 'mode'],
+      },
+    },
+    {
+      name: 'remove_keyword_pin',
+      description: '특정 키워드를 서버 또는 개인 고정 키워드 목록에서 제거합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          keyword: {
+            type: 'STRING',
+            description: '고정 목록에서 제거할 키워드',
+          },
+          mode: {
+            type: 'STRING',
+            description: '제거할 대상 모드 (server: 서버 고정 키워드, personal: 개인 고정 키워드)',
+          },
+        },
+        required: ['keyword', 'mode'],
+      },
+    },
   ],
 
   handlers: {
@@ -413,6 +527,86 @@ module.exports = {
         return { ok: false, reason: 'index는 필수 매개변수입니다.' };
       }
       return obj?.context?.music?.removeQueueItem(guildId, index);
+    },
+    get_keywords: async (args, obj) => {
+      const guildId = obj?.message?.guild?.id;
+      if (!guildId) {
+        return { ok: false, reason: '서버 채널에서만 사용할 수 있습니다.' };
+      }
+      const userId = obj?.message?.author?.id;
+      const mode = args?.mode || 'server';
+      const isPersonal = mode === 'personal';
+      return obj?.context?.music?.getKeywords(guildId, userId, isPersonal);
+    },
+    get_keyword_blacklist: async (args, obj) => {
+      const mode = args?.mode || 'server';
+      const isPersonal = mode === 'personal';
+      const targetId = isPersonal ? obj?.message?.author?.id : obj?.message?.guild?.id;
+      if (!targetId) {
+        return { ok: false, reason: '해당 대상을 찾을 수 없습니다.' };
+      }
+      return obj?.context?.music?.getKeywordBlacklist(targetId, isPersonal);
+    },
+    add_keyword_blacklist: async (args, obj) => {
+      const keyword = args?.keyword;
+      if (!keyword) {
+        return { ok: false, reason: 'keyword는 필수 매개변수입니다.' };
+      }
+      const mode = args?.mode || 'server';
+      const isPersonal = mode === 'personal';
+      const targetId = isPersonal ? obj?.message?.author?.id : obj?.message?.guild?.id;
+      if (!targetId) {
+        return { ok: false, reason: '해당 대상을 찾을 수 없습니다.' };
+      }
+      return obj?.context?.music?.addKeywordBlacklist(targetId, keyword, isPersonal, obj?.message?.guild?.id);
+    },
+    remove_keyword_blacklist: async (args, obj) => {
+      const keyword = args?.keyword;
+      if (!keyword) {
+        return { ok: false, reason: 'keyword는 필수 매개변수입니다.' };
+      }
+      const mode = args?.mode || 'server';
+      const isPersonal = mode === 'personal';
+      const targetId = isPersonal ? obj?.message?.author?.id : obj?.message?.guild?.id;
+      if (!targetId) {
+        return { ok: false, reason: '해당 대상을 찾을 수 없습니다.' };
+      }
+      return obj?.context?.music?.removeKeywordBlacklist(targetId, keyword, isPersonal, obj?.message?.guild?.id);
+    },
+    get_keyword_pins: async (args, obj) => {
+      const mode = args?.mode || 'server';
+      const isPersonal = mode === 'personal';
+      const targetId = isPersonal ? obj?.message?.author?.id : obj?.message?.guild?.id;
+      if (!targetId) {
+        return { ok: false, reason: '해당 대상을 찾을 수 없습니다.' };
+      }
+      return obj?.context?.music?.getKeywordPins(targetId, isPersonal);
+    },
+    add_keyword_pin: async (args, obj) => {
+      const keyword = args?.keyword;
+      if (!keyword) {
+        return { ok: false, reason: 'keyword는 필수 매개변수입니다.' };
+      }
+      const mode = args?.mode || 'server';
+      const isPersonal = mode === 'personal';
+      const targetId = isPersonal ? obj?.message?.author?.id : obj?.message?.guild?.id;
+      if (!targetId) {
+        return { ok: false, reason: '해당 대상을 찾을 수 없습니다.' };
+      }
+      return obj?.context?.music?.addKeywordPin(targetId, keyword, isPersonal, obj?.message?.guild?.id);
+    },
+    remove_keyword_pin: async (args, obj) => {
+      const keyword = args?.keyword;
+      if (!keyword) {
+        return { ok: false, reason: 'keyword는 필수 매개변수입니다.' };
+      }
+      const mode = args?.mode || 'server';
+      const isPersonal = mode === 'personal';
+      const targetId = isPersonal ? obj?.message?.author?.id : obj?.message?.guild?.id;
+      if (!targetId) {
+        return { ok: false, reason: '해당 대상을 찾을 수 없습니다.' };
+      }
+      return obj?.context?.music?.removeKeywordPin(targetId, keyword, isPersonal, obj?.message?.guild?.id);
     },
   },
 };

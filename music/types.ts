@@ -106,4 +106,16 @@ export interface MusicRuntime {
   movePlaylistItem: (userId: string, fromIndex: number | string, toIndex: number | string) => Promise<RuntimeResponse>;
   pause: (guildId: string) => Promise<RuntimeResponse>;
   previous: (guildId: string) => Promise<RuntimeResponse>;
+  getKeywords: (guildId: string, userId: string, isPersonal: boolean) => Promise<{
+    ok: boolean;
+    keywords: Array<{ tag: string; freq: number; isPinned: boolean }>;
+    blacklist: string[];
+    pinned: string[];
+  }>;
+  getKeywordBlacklist: (targetId: string, isPersonal: boolean) => Promise<{ ok: boolean; keywords: string[] }>;
+  addKeywordBlacklist: (targetId: string, keyword: string, isPersonal: boolean, guildId?: string) => Promise<RuntimeResponse>;
+  removeKeywordBlacklist: (targetId: string, keyword: string, isPersonal: boolean, guildId?: string) => Promise<RuntimeResponse>;
+  getKeywordPins: (targetId: string, isPersonal: boolean) => Promise<{ ok: boolean; keywords: string[] }>;
+  addKeywordPin: (targetId: string, keyword: string, isPersonal: boolean, guildId?: string) => Promise<RuntimeResponse>;
+  removeKeywordPin: (targetId: string, keyword: string, isPersonal: boolean, guildId?: string) => Promise<RuntimeResponse>;
 }
