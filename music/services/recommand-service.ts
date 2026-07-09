@@ -488,7 +488,7 @@ export async function recommendFromHistory({
   const tagFrequencies = buildHistoryTagFrequencies(recentHistoryItems);
   const tagKeywordsRaw = buildHistoryTagKeywords(recentHistoryItems, TAG_KEYWORD_LIMIT + 26);
   const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
-    .filter(k => !blacklistSet.has(k))
+    .filter(k => !isKeywordMatched(k, blacklistSet))
     .slice(0, TAG_KEYWORD_LIMIT + 6);
 
   const excludedTrackKeys = new Set<string>();
@@ -739,4 +739,17 @@ export async function getPinnedKeywordsForRecommend(
   }
 
   return Array.from(new Set(dbPins));
+}
+
+/**
+ * 주어진 태그가 블랙리스트 또는 고정 키워드 목록의 패턴 중 하나와 유사하게 매칭되는지 확인합니다.
+ */
+export function isKeywordMatched(tag: string, patterns: string[] | Set<string>): boolean {
+  const normTag = normalizeText(tag);
+  const threshold = KEYWORD_SIMILARITY_THRESHOLD;
+  return Array.from(patterns).some(pattern => {
+    const normPattern = normalizeText(pattern);
+    if (normTag === normPattern) return true;
+    return keywordSimilarity(normTag, normPattern) >= threshold;
+  });
 }
