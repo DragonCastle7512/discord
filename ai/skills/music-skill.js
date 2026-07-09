@@ -202,6 +202,38 @@ module.exports = {
         required: [],
       },
     },
+    {
+      name: 'move_queue_item',
+      description: '현재 서버의 대기열(큐)에서 특정 위치의 곡을 다른 위치로 이동합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          fromIndex: {
+            type: 'NUMBER',
+            description: '이동할 곡의 현재 대기열 번호 (1부터 시작하는 대기열 번호)',
+          },
+          toIndex: {
+            type: 'NUMBER',
+            description: '곡을 이동할 목표 대기열 번호 (1부터 시작하는 대기열 번호)',
+          },
+        },
+        required: ['fromIndex', 'toIndex'],
+      },
+    },
+    {
+      name: 'remove_queue_item',
+      description: '현재 서버의 대기열(큐)에서 특정 위치의 곡을 제거합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          index: {
+            type: 'NUMBER',
+            description: '제거할 곡의 대기열 번호 (1부터 시작하는 대기열 번호)',
+          },
+        },
+        required: ['index'],
+      },
+    },
   ],
 
   handlers: {
@@ -358,6 +390,29 @@ module.exports = {
           requestedBy: track?.requestedBy || null,
         })),
       };
+    },
+    move_queue_item: async (args, obj) => {
+      const guildId = obj?.message?.guild?.id;
+      if (!guildId) {
+        return { ok: false, reason: '서버 채널에서만 사용할 수 있습니다.' };
+      }
+      const fromIndex = args?.fromIndex;
+      const toIndex = args?.toIndex;
+      if (fromIndex === undefined || toIndex === undefined) {
+        return { ok: false, reason: 'fromIndex와 toIndex는 필수 매개변수입니다.' };
+      }
+      return obj?.context?.music?.moveQueueItem(guildId, fromIndex, toIndex);
+    },
+    remove_queue_item: async (args, obj) => {
+      const guildId = obj?.message?.guild?.id;
+      if (!guildId) {
+        return { ok: false, reason: '서버 채널에서만 사용할 수 있습니다.' };
+      }
+      const index = args?.index;
+      if (index === undefined) {
+        return { ok: false, reason: 'index는 필수 매개변수입니다.' };
+      }
+      return obj?.context?.music?.removeQueueItem(guildId, index);
     },
   },
 };
