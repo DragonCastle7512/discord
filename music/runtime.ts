@@ -22,6 +22,7 @@ import { KeywordBlacklist } from './models/keyword-blacklist';
 import { UserKeywordBlacklist } from './models/user-keyword-blacklist';
 import { KeywordPin } from './models/keyword-pin';
 import { UserKeywordPin } from './models/user-keyword-pin';
+import { GuildConfig } from './models/guild-config';
 import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText, isKeywordMatched, keywordSimilarity } from './services/recommand-service';
 
 export function createMusicRuntime({ 
@@ -41,11 +42,21 @@ export function createMusicRuntime({
   } = runtimeUtils;
 
   async function play(context: any, query: string | string[]): Promise<RuntimeResponse> {
-    const { channelId, guild, member: contextMember, author, user } = context;
+    const { channelId: originalChannelId, guild, member: contextMember, author, user } = context;
     if (!guild) throw new Error('Guild only command');
 
     const userId = user?.id || author?.id;
     if (!userId) throw new Error('User not found in context');
+
+    let channelId = originalChannelId;
+    try {
+      const config = await GuildConfig.findOne({ where: { guildId: guild.id } });
+      if (config && config.musicChannelId) {
+        channelId = config.musicChannelId;
+      }
+    } catch (err) {
+      logger.error('music', 'Failed to fetch guild channel config', { error: err });
+    }
 
     const member = contextMember || await guild.members.fetch(userId);
     const voiceChannel = member.voice.channel;

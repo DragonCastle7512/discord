@@ -1,7 +1,10 @@
-import { describe, it } from 'node:test';
+import { describe, it, after } from 'node:test';
 import assert from 'node:assert';
 import { createMusicRuntime } from '../music/runtime';
 import { GuildState, Track } from '../music/types';
+import { GuildConfig } from '../music/models/guild-config';
+import { initDb } from '../db/init';
+import { sequelize } from '../db/sequelize';
 
 describe('MusicRuntime Unit Tests', () => {
   it('should trigger playNext immediately when there is no current track', async () => {
@@ -163,4 +166,75 @@ describe('MusicRuntime Unit Tests', () => {
     assert.strictEqual(state.queue.length, 1);
     assert.strictEqual(state.queue[0].encoded, 'encoded_song-2');
   });
+
+  it('should route notifications to the configured channel in GuildConfig if set', async () => {
+    await sequelize.query('DROP TABLE "GUILD_CONFIG"').catch(() => {});
+    await initDb();
+    
+    // DB 설정 추가
+    const targetGuildId = 'guild-1';
+    const targetMusicChannelId = 'configured-text-channel-999';
+    const existingConfig = await GuildConfig.findOne({ where: { guildId: targetGuildId } });
+    if (existingConfig) {
+      await existingConfig.update({ musicChannelId: targetMusicChannelId });
+    } else {
+      await GuildConfig.create({ guildId: targetGuildId, musicChannelId: targetMusicChannelId });
+    }
+
+    const guildStates = new Map<string, GuildState>();
+    let passedTextChannelId = '';
+
+    const runtimeUtilsMock = {
+      waitForReadyNode: async () => ({}) as any,
+      joinOrMovePlayer: async (guild: any, channelId: string, voiceChannel: any) => {
+        passedTextChannelId = channelId;
+        return {
+          player: {} as any,
+          queue: [],
+          history: [],
+          current: null,
+          textChannelId: channelId,
+          voiceChannelId: voiceChannel.id,
+          playing: false,
+          loop: false,
+          auto: false,
+          autoMood: null,
+          autoRequesterId: null,
+          autoPool: [],
+        } as any;
+      },
+      resolveTracks: async (query: string) => {
+        return {
+          tracks: [{ encoded: `encoded_${query}`, info: { title: `Title of ${query}`, length: 3000 } as any }],
+          playlistName: null,
+        };
+      },
+      getCurrentTrackForGuild: async () => null,
+      playNext: async () => {},
+    };
+
+    const runtime = createMusicRuntime({
+      guildStates,
+      runtimeUtils: runtimeUtilsMock as any,
+    });
+
+    const mockContext = {
+      guild: { id: 'guild-1', members: { fetch: async () => ({ voice: { channel: { id: 'voice-1' } } }) } },
+      channelId: 'default-text-channel',
+      member: { voice: { channel: { id: 'voice-1' } } },
+      author: { id: 'user-1' },
+    };
+
+    await runtime.play(mockContext, 'song-test');
+    
+    assert.strictEqual(passedTextChannelId, 'configured-text-channel-999');
+
+    // 정리
+    await GuildConfig.destroy({ where: { guildId: 'guild-1' } });
+  });
+
+  after(async () => {
+    await sequelize.close();
+  });
 });
+
