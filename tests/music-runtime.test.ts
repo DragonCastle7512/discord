@@ -168,7 +168,6 @@ describe('MusicRuntime Unit Tests', () => {
   });
 
   it('should route notifications to the configured channel in GuildConfig if set', async () => {
-    await sequelize.query('DROP TABLE "GUILD_CONFIG"').catch(() => {});
     await initDb();
     
     // DB 설정 추가

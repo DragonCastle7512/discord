@@ -8,7 +8,6 @@ import { generateDashboardToken } from '../common/auth';
 
 describe('Dashboard Play Music Route Integration', () => {
   before(async () => {
-    await sequelize.query('DROP TABLE "GUILD_CONFIG"').catch(() => {});
     await initDb();
   });
 

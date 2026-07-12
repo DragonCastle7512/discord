@@ -12,10 +12,6 @@ describe('GuildConfig Model Definitions', () => {
 });
 
 describe('GuildConfig DB Integration Tests', () => {
-  before(async () => {
-    await sequelize.query('DROP TABLE "GUILD_CONFIG"').catch(() => {});
-  });
-
   after(async () => {
     await sequelize.close();
   });
