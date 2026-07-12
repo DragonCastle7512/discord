@@ -1,4 +1,4 @@
-import { describe, it, after } from 'node:test';
+import { describe, it, before, after } from 'node:test';
 import assert from 'node:assert';
 // @ts-ignore
 import { GuildConfig } from '../music/models/guild-config';
@@ -12,16 +12,24 @@ describe('GuildConfig Model Definitions', () => {
 });
 
 describe('GuildConfig DB Integration Tests', () => {
+  before(async () => {
+    await sequelize.query('DROP TABLE "GUILD_CONFIG"').catch(() => {});
+  });
+
   after(async () => {
     await sequelize.close();
   });
 
   it('should sync GuildConfig model with DB and allow upserting config', async () => {
     await initDb();
-    const [config, created] = await GuildConfig.upsert({
-      guildId: 'test-guild-123',
-      musicChannelId: 'test-channel-456'
-    });
+    const guildId = 'test-guild-123';
+    const musicChannelId = 'test-channel-456';
+    let config = await GuildConfig.findOne({ where: { guildId } });
+    if (config) {
+      await config.update({ musicChannelId });
+    } else {
+      config = await GuildConfig.create({ guildId, musicChannelId });
+    }
     assert.ok(config);
     
     const found = await GuildConfig.findOne({ where: { guildId: 'test-guild-123' } });

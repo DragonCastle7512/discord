@@ -12,24 +12,28 @@ module.exports = {
         .setName('channel')
         .setDescription('알림을 보낼 텍스트 채널')
         .addChannelTypes(ChannelType.GuildText)
-        .setRequired(true)
+        .setRequired(true),
     )
     .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
 
   async execute(interaction, context) {
     await interaction.deferReply({ ephemeral: true });
-    
+
     const channel = interaction.options.getChannel('channel');
     const guildId = interaction.guild.id;
 
     try {
-      await GuildConfig.upsert({
-        guildId: guildId,
-        musicChannelId: channel.id
-      });
+      const config = await GuildConfig.findOne({ where: { guildId } });
+      if (config) {
+        await config.update({ musicChannelId: channel.id });
+      }
+      else {
+        await GuildConfig.create({ guildId, musicChannelId: channel.id });
+      }
 
       await safeReply(interaction, `성공적으로 노래 재생 알림 채널을 ${channel}로 지정하였습니다!`);
-    } catch (error) {
+    }
+    catch (error) {
       console.error(error);
       await safeReply(interaction, '설정 도중 오류가 발생했습니다.');
     }
