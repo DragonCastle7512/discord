@@ -6,6 +6,7 @@ import { UserKeywordPin } from '../models/user-keyword-pin';
 import { isDurationInRange } from '../utils/track-parser';
 import { logger } from '../../common/logger';
 import { Track, TrackInfo } from '../types';
+import { selectAndCleanSongsFromSearch } from './mood-service';
 
 /**
  * 추천 트랙 확장 인터페이스
@@ -469,7 +470,7 @@ export async function recommendFromHistory({
     };
   }
 
-  const resolvedGuildId = guildId || recentHistoryItems[0]?.guildId;
+  const resolvedGuildId = guildId || recentHistoryItems[0]?.guildId || null;
   const blacklistSet = await getBlacklistForGuild(resolvedGuildId);
 
   if (userId) {
@@ -511,7 +512,7 @@ export async function recommendFromHistory({
 
   let keywordsToTry: string[] = [];
   if (userId) {
-    keywordsToTry = selectRandomKeywords(normalizedPins, remainingKeywords, 5, 3);
+    keywordsToTry = selectRandomKeywords(normalizedPins, remainingKeywords, 5, 5);
   }
   else if (randomizeKeywordsCount && (tagKeywords.length > 0 || normalizedPins.length > 0)) {
     const shuffledRemaining = [...remainingKeywords].sort(() => Math.random() - 0.5);
@@ -524,6 +525,8 @@ export async function recommendFromHistory({
   if (keywordsToTry.length === 0) {
     keywordsToTry = ['music'];
   }
+
+
   const firstHalfTarget = Math.ceil(normalizedCount / 2);
 
   // 각 키워드별 검색 결과를 비동기적으로 조회 (Lavalink 직접 검색)
@@ -540,25 +543,18 @@ export async function recommendFromHistory({
 
   const searchResultsWithKeyword = await Promise.all(searchPromises);
 
-  // 대시보드 스타일로 Interleave (교차 배치)
-  const maxTracks = Math.max(...searchResultsWithKeyword.map(r => r.tracks.length), 0);
-  const mixedTracksWithKeyword: { track: Track; keyword: string }[] = [];
-
-  for (let i = 0; i < maxTracks; i++) {
-    for (const result of searchResultsWithKeyword) {
-      if (result.tracks[i]) {
-        mixedTracksWithKeyword.push({ track: result.tracks[i], keyword: result.keyword });
-      }
-    }
+  // 각 키워드별 임시 추천곡 저장소
+  const keywordRecommendationsMap = new Map<string, RecommendedTrack[]>();
+  for (const kw of keywordsToTry) {
+    keywordRecommendationsMap.set(kw, []);
   }
 
-  // 중복 제거, 노이즈 및 재생 시간 필터링 적용
+  // 중복 제거 및 노이즈 등을 통계내기 위한 맵
   const keywordStatsMap = new Map<string, { rawCount: number; collectedCount: number }>();
-  
   for (const kw of keywordsToTry) {
     keywordStatsMap.set(kw, { rawCount: 0, collectedCount: 0 });
   }
-  
+
   for (const result of searchResultsWithKeyword) {
     const stat = keywordStatsMap.get(result.keyword);
     if (stat) {
@@ -566,64 +562,202 @@ export async function recommendFromHistory({
     }
   }
 
-  const noiseWords = ['official', 'lyrics', 'lyric', '가사'];
+  const excludedTitles = recentHistoryItems.map(entry => {
+    const info = getTrackInfo(entry);
+    return `${info.author} - ${info.title}`;
+  });
 
-  for (const { track, keyword } of mixedTracksWithKeyword) {
-    if (recommendations.length >= normalizedCount) break;
+  // 각 키워드별로 검색된 곡 리스트를 루프 돌려 병렬로 AI 정제를 요청
+  const keywordCleanPromises = searchResultsWithKeyword.map(async (result) => {
+    const keyword = result.keyword;
+    const tracks = result.tracks || [];
 
-    const trackInfo = getTrackInfo(track);
-    const titleLower = trackInfo.title.toLowerCase();
-    
-    // 노이즈 필터링
-    if (noiseWords.some(word => titleLower.includes(word))) {
-      continue;
+    // 해당 키워드 내부의 트랙들에 대해 후보 수집
+    const videoTitlesForKeyword: string[] = [];
+    const keywordTitleToTrackMap = new Map<string, Track>();
+
+    for (const track of tracks) {
+      const trackInfo = getTrackInfo(track);
+      if (!isDurationInRange(trackInfo.length)) {
+        continue;
+      }
+      const key = getTrackKey(trackInfo);
+      if (!key || globalSeenKeys.has(key)) continue;
+      if (excludedTrackKeys.has(key)) continue;
+
+      const formattedTitle = `${trackInfo.author} - ${trackInfo.title}`;
+      videoTitlesForKeyword.push(formattedTitle);
+
+      const normTitle = formattedTitle.toLowerCase().replace(/\s+/g, '');
+      if (!keywordTitleToTrackMap.has(normTitle)) {
+        keywordTitleToTrackMap.set(normTitle, track);
+      }
     }
 
-    // 재생 시간 필터링 (1m 30s ~ 6m)
-    if (!isDurationInRange(trackInfo.length)) {
-      continue;
+    if (videoTitlesForKeyword.length === 0) {
+      return { keyword, cleanedTitles: [], titleToTrackMap: keywordTitleToTrackMap, tracks };
     }
 
-    // 중복 필터링
-    const key = getTrackKey(trackInfo);
-    if (!key || globalSeenKeys.has(key)) continue;
-    if (excludedTrackKeys.has(key)) continue;
+    try {
+      // 각 키워드별로 최소 5곡씩 넉넉히 받아내도록 함
+      const aiRequestCountForKeyword = 5;
+      logger.info('music', `[Recommend Service] Requesting AI clean for keyword "${keyword}" with ${videoTitlesForKeyword.length} candidates`);
+      const cleanedTitles = await selectAndCleanSongsFromSearch(
+        videoTitlesForKeyword,
+        `#${keyword}`, // 취향 태그로 이 키워드 단독 전달하여 다른 태그로 인한 임의 배제 방지!
+        excludedTitles,
+        aiRequestCountForKeyword
+      );
 
-    const videoUrl = trackInfo.uri || (trackInfo.identifier ? `https://www.youtube.com/watch?v=${trackInfo.identifier}` : '');
-    const videoId = trackInfo.identifier || (trackInfo.uri ? getVideoIdFromUrl(trackInfo.uri) : null);
-    const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
-    let artworkUrl = trackInfo.artworkUrl;
-    if (!artworkUrl && fallbackThumb) {
-      artworkUrl = fallbackThumb;
+      return { keyword, cleanedTitles: cleanedTitles || [], titleToTrackMap: keywordTitleToTrackMap, tracks };
+    } catch (err) {
+      logger.error('music', `[Recommend Service] AI filtration failed for keyword "${keyword}"`, { error: err });
+      return { keyword, cleanedTitles: null, titleToTrackMap: keywordTitleToTrackMap, tracks };
+    }
+  });
+
+  const cleanedResults = await Promise.all(keywordCleanPromises);
+
+  // 각 키워드별로 추천 트랙 빌드 및 매칭
+  for (const res of cleanedResults) {
+    const { keyword, cleanedTitles, titleToTrackMap, tracks } = res;
+    const kwRecs: RecommendedTrack[] = [];
+    const kwKeySeen = new Set<string>();
+
+    if (Array.isArray(cleanedTitles) && cleanedTitles.length > 0) {
+      for (const cleanedTitle of cleanedTitles) {
+        const normCleaned = cleanedTitle.toLowerCase().replace(/\s+/g, '');
+        let matchedTrack = titleToTrackMap.get(normCleaned);
+
+        if (!matchedTrack) {
+          let bestScore = 0;
+          for (const [normKey, track] of titleToTrackMap.entries()) {
+            const sim = keywordSimilarity(normCleaned, normKey);
+            if (sim > bestScore && sim >= 0.7) {
+              bestScore = sim;
+              matchedTrack = track;
+            }
+          }
+        }
+
+        if (matchedTrack) {
+          const trackInfo = getTrackInfo(matchedTrack);
+          const key = getTrackKey(trackInfo);
+
+          if (key && !globalSeenKeys.has(key) && !kwKeySeen.has(key)) {
+            const videoUrl = trackInfo.uri || (trackInfo.identifier ? `https://www.youtube.com/watch?v=${trackInfo.identifier}` : '');
+            const videoId = trackInfo.identifier || (trackInfo.uri ? getVideoIdFromUrl(trackInfo.uri) : null);
+            const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
+            let artworkUrl = trackInfo.artworkUrl;
+            if (!artworkUrl && fallbackThumb) {
+              artworkUrl = fallbackThumb;
+            }
+
+            const fullTrack: RecommendedTrack = {
+              encoded: matchedTrack.encoded,
+              info: {
+                ...matchedTrack.info,
+                title: trackInfo.title,
+                author: trackInfo.author,
+                uri: trackInfo.uri,
+                artworkUrl: artworkUrl || undefined,
+                length: trackInfo.length,
+              },
+              tags: trackInfo.tags,
+              source: `history-tag-search`,
+              keyword: keyword,
+            };
+
+            kwRecs.push(fullTrack);
+            kwKeySeen.add(key);
+          }
+        }
+      }
     }
 
-    const fullTrack: RecommendedTrack = {
-      encoded: track.encoded,
-      info: {
-        ...track.info,
-        title: trackInfo.title,
-        author: trackInfo.author,
-        uri: trackInfo.uri,
-        artworkUrl: artworkUrl || undefined,
-        length: trackInfo.length,
-      },
-      tags: trackInfo.tags,
-      source: `history-tag-search`,
-      keyword: keyword,
-    };
+    // [최소 수량 보장 Fallback] 만약 AI 클린 결과가 없거나(null) 또는 추출된 곡이 3곡 미만인 경우,
+    // 해당 키워드의 원본 검색 트랙에서 수동 필터를 적용하여 최소 3곡 이상 보충합니다. (최대 5곡)
+    if (cleanedTitles === null || kwRecs.length < 3) {
+      logger.info('music', `[Recommend Service] Keyword "${keyword}" has insufficient AI recommended tracks (${kwRecs.length}/3). Replenishing from raw search tracks.`);
+      const noiseWords = ['official', 'lyrics', 'lyric', '가사'];
 
-    globalSeenKeys.add(key);
-    recommendations.push(fullTrack);
+      for (const track of tracks) {
+        if (kwRecs.length >= 5) break;
 
-    const stat = keywordStatsMap.get(keyword);
-    if (stat) {
-      stat.collectedCount += 1;
+        const trackInfo = getTrackInfo(track);
+        if (!isDurationInRange(trackInfo.length)) continue;
+        const key = getTrackKey(trackInfo);
+        if (!key || globalSeenKeys.has(key) || kwKeySeen.has(key)) continue;
+        if (excludedTrackKeys.has(key)) continue;
+
+        const titleLower = trackInfo.title.toLowerCase();
+        if (noiseWords.some(word => titleLower.includes(word))) continue;
+
+        const videoUrl = trackInfo.uri || (trackInfo.identifier ? `https://www.youtube.com/watch?v=${trackInfo.identifier}` : '');
+        const videoId = trackInfo.identifier || (trackInfo.uri ? getVideoIdFromUrl(trackInfo.uri) : null);
+        const fallbackThumb = videoId ? `https://i.ytimg.com/vi/${videoId}/mqdefault.jpg` : null;
+        let artworkUrl = trackInfo.artworkUrl;
+        if (!artworkUrl && fallbackThumb) {
+          artworkUrl = fallbackThumb;
+        }
+
+        const fullTrack: RecommendedTrack = {
+          encoded: track.encoded,
+          info: {
+            ...track.info,
+            title: trackInfo.title,
+            author: trackInfo.author,
+            uri: trackInfo.uri,
+            artworkUrl: artworkUrl || undefined,
+            length: trackInfo.length,
+          },
+          tags: trackInfo.tags,
+          source: `history-tag-search`,
+          keyword: keyword,
+        };
+
+        kwRecs.push(fullTrack);
+        kwKeySeen.add(key);
+      }
     }
-    
-    if (!usedKeywords.includes(keyword)) {
-      usedKeywords.push(keyword);
+
+    // 최종 확정된 트랙들을 글로벌 중복 방지 세트에 추가 및 글로벌 recommendations 배열에 임시 보관
+    for (const tr of kwRecs) {
+      const key = getTrackKey(getTrackInfo(tr));
+      if (key) {
+        globalSeenKeys.add(key);
+      }
+    }
+    keywordRecommendationsMap.set(keyword, kwRecs);
+  }
+
+  // 이제 각 키워드별 큐에서 곡을 교차 배분하여 최종 recommendations 리스트를 완성한다.
+  const activeQueues = keywordsToTry
+    .map(kw => keywordRecommendationsMap.get(kw)!)
+    .filter(Boolean);
+
+  let hasMore = true;
+  while (recommendations.length < normalizedCount && hasMore) {
+    hasMore = false;
+    for (const q of activeQueues) {
+      if (recommendations.length >= normalizedCount) break;
+      if (q.length > 0) {
+        const item = q.shift()!;
+        recommendations.push(item);
+        
+        // 통계 갱신
+        const stat = keywordStatsMap.get(item.keyword || '');
+        if (stat) {
+          stat.collectedCount += 1;
+        }
+        if (!usedKeywords.includes(item.keyword || '')) {
+          usedKeywords.push(item.keyword || '');
+        }
+        hasMore = true;
+      }
     }
   }
+
 
   const keywordStats: KeywordStat[] = keywordsToTry.map(kw => {
     const stat = keywordStatsMap.get(kw) || { rawCount: 0, collectedCount: 0 };
@@ -655,7 +789,7 @@ export async function recommendFromHistory({
   }
 
   const finalItems = recommendations.slice(0, normalizedCount);
-  const displayOrder = interleaveBySource(finalItems, finalItems.length);
+  const displayOrder = interleaveByKeyword(finalItems, keywordsToTry);
 
   logger.info('music', `Generated recommendations for guild ${resolvedGuildId}`, {
     guildId: resolvedGuildId,
@@ -752,4 +886,47 @@ export function isKeywordMatched(tag: string, patterns: string[] | Set<string>):
     if (normTag === normPattern) return true;
     return keywordSimilarity(normTag, normPattern) >= threshold;
   });
+}
+
+/**
+ * 추천 트랙 리스트를 키워드 기준으로 라운드 로빈 교차 배치합니다.
+ */
+export function interleaveByKeyword(tracks: RecommendedTrack[], keywords: string[]): RecommendedTrack[] {
+  const keywordQueues = new Map<string, RecommendedTrack[]>();
+  
+  for (const kw of keywords) {
+    keywordQueues.set(kw.toLowerCase(), []);
+  }
+  const unknownQueue: RecommendedTrack[] = [];
+
+  for (const track of tracks) {
+    const kw = String(track.keyword || '').toLowerCase();
+    if (keywordQueues.has(kw)) {
+      keywordQueues.get(kw)!.push(track);
+    } else {
+      unknownQueue.push(track);
+    }
+  }
+
+  const ordered: RecommendedTrack[] = [];
+  const activeQueues = keywords
+    .map(kw => keywordQueues.get(kw.toLowerCase())!)
+    .filter(Boolean);
+
+  let hasMore = true;
+  while (hasMore) {
+    hasMore = false;
+    for (const q of activeQueues) {
+      if (q.length > 0) {
+        ordered.push(q.shift()!);
+        hasMore = true;
+      }
+    }
+  }
+
+  if (unknownQueue.length > 0) {
+    ordered.push(...unknownQueue);
+  }
+
+  return ordered;
 }
