@@ -11,6 +11,7 @@ import { verifyDashboardToken } from '../common/auth';
 import { notifyMusicUpdate } from '../common/socket';
 import { isDurationInRange } from '../music/utils/track-parser';
 import { logger } from '../common/logger';
+import { GuildConfig } from '../music/models/guild-config';
 
 import { KeywordBlacklist } from '../music/models/keyword-blacklist';
 import { MusicHistory } from '../music/models/music-history';
@@ -218,11 +219,21 @@ export function createDashboardRouter(
       const guild = await client.guilds.fetch(session.guildId);
       const member = await guild.members.fetch(session.userId);
       
+      let targetChannelId = member.voice.channelId;
+      try {
+        const config = await GuildConfig.findOne({ where: { guildId: session.guildId } });
+        if (config && config.musicChannelId) {
+          targetChannelId = config.musicChannelId;
+        }
+      } catch (err) {
+        logger.error('music', 'Dashboard play failed to get guild config', { error: err });
+      }
+
       const context = {
         guild,
         member,
         user: member.user,
-        channelId: member.voice.channelId
+        channelId: targetChannelId
       };
 
       const result = await music.play(context, url);
