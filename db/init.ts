@@ -4,6 +4,7 @@ import { KeywordBlacklist, initKeywordBlacklistModel } from '../music/models/key
 import { UserKeywordBlacklist, initUserKeywordBlacklistModel } from '../music/models/user-keyword-blacklist';
 import { KeywordPin, initKeywordPinModel } from '../music/models/keyword-pin';
 import { UserKeywordPin, initUserKeywordPinModel } from '../music/models/user-keyword-pin';
+import { GuildConfig, initGuildConfigModel } from '../music/models/guild-config';
 import { sequelize } from './sequelize';
 import { logger } from '../common/logger';
 
@@ -16,6 +17,7 @@ export async function initDb(): Promise<void> {
         initUserKeywordBlacklistModel(sequelize);
         initKeywordPinModel(sequelize);
         initUserKeywordPinModel(sequelize);
+        initGuildConfigModel(sequelize);
         await sequelize.authenticate();
 
         // 오라클 Sequelize sync 인덱스 중복 생성 버그 우회를 위한 런타임 인덱스 설정 백업

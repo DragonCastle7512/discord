@@ -1,10 +1,8 @@
-import { Model, DataTypes, Sequelize } from 'sequelize';
+import { Model, DataTypes, InferAttributes, InferCreationAttributes, Sequelize } from 'sequelize';
 
-export class GuildConfig extends Model {
-  public guildId!: string;
-  public musicChannelId!: string | null;
-  public readonly createdAt!: Date;
-  public readonly updatedAt!: Date;
+export class GuildConfig extends Model<InferAttributes<GuildConfig>, InferCreationAttributes<GuildConfig>> {
+  declare guildId: string;
+  declare musicChannelId: string | null;
 }
 
 export function initGuildConfigModel(sequelize: Sequelize): void {
@@ -25,8 +23,10 @@ export function initGuildConfigModel(sequelize: Sequelize): void {
     {
       sequelize,
       tableName: 'GUILD_CONFIG',
-      timestamps: true,
+      timestamps: false,
       underscored: true,
     }
   );
 }
+
+
