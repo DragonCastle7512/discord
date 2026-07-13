@@ -1,7 +1,7 @@
 import { Client, Guild, VoiceBasedChannel, TextChannel } from 'discord.js';
 import { Shoukaku, Player, Node } from 'shoukaku';
 import { GuildState, Track, RuntimeUtils } from '../types';
-import { isUrl, extractYoutubeVideoId, extractTagsFromTrackInfo, sleep } from '../utils/track-parser';
+import { isUrl, extractYoutubeVideoId, extractTagsFromTrackInfo, sleep, preprocessSearchQuery } from '../utils/track-parser';
 import { buildNowPlayingEmbed } from '../embeds/buildEmbed';
 import { insertHistory, updateHistorySkipped } from '../repositorys/music-history.repository';
 import { notifyMusicUpdate } from '../../common/socket';
@@ -221,18 +221,19 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
   }
 
   async function resolveTracks(query: string): Promise<{ tracks: Track[]; playlistName: string | null }> {
+    const preprocessedQuery = preprocessSearchQuery(query);
     const node =
       (readyNodes.has('main') && shoukaku.nodes.get('main')) ||
       [...readyNodes].map((name) => shoukaku.nodes.get(name)).find(Boolean) ||
       null;
     if (!node) throw new Error('No Lavalink node is available');
 
-    const isDirectUrl = isUrl(query);
-    const ytId = isDirectUrl ? extractYoutubeVideoId(query) : null;
+    const isDirectUrl = isUrl(preprocessedQuery);
+    const ytId = isDirectUrl ? extractYoutubeVideoId(preprocessedQuery) : null;
 
     const identifiers: string[] = [];
     if (isDirectUrl) {
-      identifiers.push(query);
+      identifiers.push(preprocessedQuery);
       if (ytId) {
         identifiers.push(`https://www.youtube.com/watch?v=${ytId}`);
         identifiers.push(`https://music.youtube.com/watch?v=${ytId}`);
@@ -241,12 +242,12 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
         identifiers.push(`ytmsearch:${ytId}`);
       }
     } else {
-      if (/^(ytmsearch|ytsearch|scsearch):/.test(query)) {
-        identifiers.push(query);
+      if (/^(ytmsearch|ytsearch|scsearch):/.test(preprocessedQuery)) {
+        identifiers.push(preprocessedQuery);
       } else {
-        identifiers.push(`ytmsearch:${query}`, `ytsearch:${query}`);
+        identifiers.push(`ytmsearch:${preprocessedQuery}`, `ytsearch:${preprocessedQuery}`);
         if (allowSoundCloudFallback) {
-          identifiers.push(`scsearch:${query}`);
+          identifiers.push(`scsearch:${preprocessedQuery}`);
         }
       }
     }
