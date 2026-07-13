@@ -265,7 +265,6 @@ export async function recommendFromHistory({
 
     try {
       const aiRequestCountForKeyword = 5;
-      logger.info('music', `[Recommend Service] Requesting AI clean for keyword "${keyword}" with ${videoTitlesForKeyword.length} candidates`);
       const cleanedTitles = await selectAndCleanSongsFromSearch(
         videoTitlesForKeyword,
         `#${keyword}`,
@@ -339,7 +338,6 @@ export async function recommendFromHistory({
     }
 
     if (cleanedTitles === null || kwRecs.length < 3) {
-      logger.info('music', `[Recommend Service] Keyword "${keyword}" has insufficient AI recommended tracks (${kwRecs.length}/3). Replenishing from raw search tracks.`);
       const noiseWords = ['official', 'lyrics', 'lyric', '가사'];
 
       for (const track of tracks) {
