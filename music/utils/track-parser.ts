@@ -4,6 +4,21 @@ export function isUrl(input: string): boolean {
     return /^https?:\/\//i.test(input);
 }
 
+export function preprocessSearchQuery(query: string): string {
+    const trimmed = query.trim();
+    if (!trimmed) return trimmed;
+    if (isUrl(trimmed)) {
+        return trimmed;
+    }
+    const lower = trimmed.toLowerCase();
+    const keywords = ['노래', '음악', 'music', 'song', 'ost', 'playlist', '플레이리스트'];
+    const hasMusicKeyword = keywords.some(k => lower.includes(k));
+    if (hasMusicKeyword) {
+        return trimmed;
+    }
+    return `${trimmed} 노래`;
+}
+
 export function sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
 }
