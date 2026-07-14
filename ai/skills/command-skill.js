@@ -169,6 +169,20 @@ module.exports = {
       },
     },
     {
+      name: 'slash_set_music_channel',
+      description: '음악 재생 명령을 수신할 채널을 설정합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {
+          channel: {
+            type: 'STRING',
+            description: '설정할 채널 ID',
+          },
+        },
+        required: ['channel'],
+      },
+    },
+    {
       name: 'slash_shuffle',
       description: '현재 서버의 재생 대기열 순서를 무작위로 섞습니다. 현재 재생 중인 곡은 유지하고 대기 중인 곡 목록만 섞습니다.',
       parameters: {
@@ -256,6 +270,7 @@ module.exports = {
     slash_loop: async (args, obj) => executeSlash(obj, 'loop', { enable: args?.enable }),
     slash_playlist: async (args, obj) => executeSlash(obj, 'playlist'),
     slash_queue: async (args, obj) => executeSlash(obj, 'queue'),
+    slash_set_music_channel: async (args, obj) => executeSlash(obj, 'set-music-channel', { channel: args?.channel }),
     slash_shuffle: async (args, obj) => executeSlash(obj, 'shuffle'),
     slash_skip: async (args, obj) => executeSlash(obj, 'skip'),
     slash_stop: async (args, obj) => executeSlash(obj, 'stop'),

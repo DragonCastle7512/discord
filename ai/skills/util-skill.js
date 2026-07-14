@@ -62,6 +62,15 @@ module.exports = {
         required: ['query'],
       },
     },
+    {
+      name: 'get_guild_channels',
+      description: '현재 디스코드 서버(길드)의 모든 텍스트 채널 목록(이름 및 ID)을 조회합니다.',
+      parameters: {
+        type: 'OBJECT',
+        properties: {},
+        required: [],
+      },
+    },
   ],
   handlers: {
     read_messages: async (args, obj) => {
@@ -202,6 +211,21 @@ module.exports = {
       catch (err) {
         return `검색 중 오류 발생: ${err?.message || err}`;
       }
+    },
+    get_guild_channels: async (args, obj) => {
+      const guild = obj?.message?.guild;
+      if (!guild) {
+        return { ok: false, reason: '서버(길드) 정보를 찾을 수 없습니다.' };
+      }
+
+      const channels = guild.channels.cache
+        .filter(c => c.type === 0 || c.type === 'GUILD_TEXT')
+        .map(c => ({ id: c.id, name: c.name }));
+
+      return {
+        ok: true,
+        channels,
+      };
     },
   },
 };

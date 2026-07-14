@@ -28,9 +28,9 @@ function parseBoolean(value) {
   return null;
 }
 
-function createOptionsResolver(options) {
+function createOptionsResolver(options, message) {
   const raw = (options && typeof options === 'object') ? options : {};
-    const normalizeUserId = (value) => {
+    const normalizeId = (value) => {
     if (value === undefined || value === null) return null;
     if (typeof value === 'object' && value.id) {
       return String(value.id);
@@ -38,10 +38,10 @@ function createOptionsResolver(options) {
 
     const text = String(value).trim();
     if (!text) return null;
-    const mention = /^<@!?(\d+)>$/.exec(text);
+
+    const mention = /^<[@#]!?&?(\d+)>$/.exec(text);
     if (mention) return mention[1];
-    if (/^\d+$/.test(text)) return text;
-    return null;
+    return text;
   };
 
   return {
@@ -65,9 +65,28 @@ function createOptionsResolver(options) {
       return parsed;
     },
     getUser(name) {
-      const id = normalizeUserId(raw[name]);
+      const id = normalizeId(raw[name]);
       if (!id) return null;
       return { id };
+    },
+    getChannel(name) {
+      const input = normalizeId(raw[name]);
+      if (!input) return null;
+
+      let channel = message.guild?.channels?.cache?.get(input);
+      if (channel) return channel;
+
+      const cleanName = input.replace(/^#/, '');
+      channel = message.guild?.channels?.cache?.find(c => c.name === cleanName);
+      if (channel) return channel;
+
+      const isId = /^\d+$/.test(input);
+      return {
+        id: isId ? input : '0',
+        toString() {
+          return isId ? `<#${input}>` : `#${input}`;
+        },
+      };
     },
   };
 }
@@ -81,7 +100,7 @@ function createSyntheticInteraction(message, options) {
     channelId: message.channelId,
     user: message.author,
     member: message.member,
-    options: createOptionsResolver(options),
+    options: createOptionsResolver(options, message),
     deferred: false,
     replied: false,
     _replyMessage: null,
@@ -170,7 +189,8 @@ function createSlashCommandInvoker({ commands, context }) {
           ok: true,
           message: summarizeReply(interaction._replyMessage),
         };
-      } catch (err) {
+      }
+      catch (err) {
         const latencyMs = Date.now() - startTime;
         logger.error('command', `Failed command (synthetic): ${normalizedName}`, {
           userId: message.author.id,
