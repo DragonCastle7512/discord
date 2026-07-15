@@ -692,16 +692,18 @@ export function createDashboardRouter(
       const songCountMap = new Map<string, { title: string; artist: string; count: number; artworkUrl: string | null }>();
       histories.forEach(h => {
         const info = h.musicInfo;
-        const key = `${info.title}_${info.author}`;
+        const trackInfo = info?.info;
+        if (!trackInfo) return;
+        const key = `${trackInfo.title}_${trackInfo.author}`;
         const existing = songCountMap.get(key);
         if (existing) {
           existing.count++;
         } else {
           songCountMap.set(key, {
-            title: info.title,
-            artist: info.author,
+            title: trackInfo.title || '알 수 없는 곡',
+            artist: trackInfo.author || '알 수 없는 아티스트',
             count: 1,
-            artworkUrl: info.artworkUrl || null
+            artworkUrl: trackInfo.artworkUrl || null
           });
         }
       });
