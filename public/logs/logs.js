@@ -55,9 +55,123 @@ if (menuResources) {
   });
 }
 
-// Placeholder API Fetchers
+let isGuildsLoaded = false;
+
+// Statistics API Fetcher
 async function fetchStatistics() {
-  console.log('fetchStatistics placeholder');
+  const serverFilter = document.getElementById('server-filter');
+  const guildId = serverFilter ? serverFilter.value : 'ALL';
+
+  try {
+    const response = await fetch(`/api/statistics?token=${token}&guildId=${guildId}`);
+    
+    if (response.status === 401) {
+      alert('토큰이 만료되었습니다. Discord에서 /logs 명령어를 다시 입력해주세요.');
+      window.location.href = '/intro';
+      return;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+
+    // 1. 서버 선택 드롭다운 채우기 (최초 1회만)
+    if (!isGuildsLoaded && data.guilds && serverFilter) {
+      data.guilds.forEach(g => {
+        const opt = document.createElement('option');
+        opt.value = g.id;
+        opt.textContent = g.name;
+        serverFilter.appendChild(opt);
+      });
+      isGuildsLoaded = true;
+    }
+
+    // 2. 메트릭 요약 바인딩
+    document.getElementById('stat-total-plays').textContent = data.summary.totalPlays || 0;
+    document.getElementById('stat-today-plays').textContent = data.summary.todayPlays || 0;
+    document.getElementById('stat-total-ai').textContent = data.summary.totalAiCalls || 0;
+    document.getElementById('stat-today-ai').textContent = data.summary.todayAiCalls || 0;
+
+    // 3. 인기 곡 목록 렌더링
+    const trendingContainer = document.getElementById('trending-list-container');
+    trendingContainer.innerHTML = '';
+    
+    if (data.trendingSongs && data.trendingSongs.length > 0) {
+      data.trendingSongs.forEach((song, index) => {
+        const item = document.createElement('div');
+        item.className = 'trending-item';
+        
+        // 썸네일 경로
+        const thumbUrl = song.artworkUrl || (song.identifier ? `https://i.ytimg.com/vi/${song.identifier}/mqdefault.jpg` : '/dashboard/assets/default-art.png');
+        
+        item.innerHTML = `
+          <div class="trending-rank">${index + 1}</div>
+          <img src="${thumbUrl}" alt="Cover" class="trending-thumb" onerror="this.src='/dashboard/assets/default-art.png';" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover;" />
+          <div class="trending-info" style="flex: 1; min-width: 0;">
+            <div class="trending-title" style="font-size: 13px; font-weight: 500; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(song.title)}</div>
+            <div class="trending-artist" style="font-size: 11px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${escapeHtml(song.artist)}</div>
+          </div>
+          <div class="trending-count" style="font-size: 12px; font-weight: 600; color: var(--muted);">${song.count}회 재생</div>
+        `;
+        trendingContainer.appendChild(item);
+      });
+    } else {
+      trendingContainer.innerHTML = '<div class="empty-state">인기 곡 데이터가 없습니다.</div>';
+    }
+
+    // 4. 최근 7일 음악 vs AI 활성 추이 그래프 그리기
+    const ctxTrend = document.getElementById('activity-trend-chart').getContext('2d');
+    if (activityTrendChart) {
+      activityTrendChart.destroy();
+    }
+    activityTrendChart = new Chart(ctxTrend, {
+      type: 'line',
+      data: {
+        labels: data.activityTrends.dates,
+        datasets: [
+          {
+            label: '음악 재생 횟수',
+            data: data.activityTrends.playCounts,
+            borderColor: '#3ba55c',
+            backgroundColor: 'rgba(59, 165, 92, 0.1)',
+            fill: true,
+            tension: 0.3
+          },
+          {
+            label: 'AI 호출 횟수',
+            data: data.activityTrends.aiCallCounts,
+            borderColor: '#5865f2',
+            backgroundColor: 'rgba(88, 101, 242, 0.1)',
+            fill: true,
+            tension: 0.3
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { labels: { color: '#b9bbbe' } }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { color: '#b9bbbe' }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#b9bbbe' }
+          }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error('Failed to fetch statistics:', err);
+  }
 }
 async function fetchResources() {
   console.log('fetchResources placeholder');
@@ -332,6 +446,11 @@ levelFilter.addEventListener('change', renderLogs);
 searchInput.addEventListener('input', renderLogs);
 limitFilter.addEventListener('change', renderLogs);
 reloadBtn.addEventListener('click', fetchLogs);
+
+const serverFilter = document.getElementById('server-filter');
+if (serverFilter) {
+  serverFilter.addEventListener('change', fetchStatistics);
+}
 
 // 초기화
 document.addEventListener('DOMContentLoaded', () => {
