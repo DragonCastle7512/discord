@@ -6,6 +6,7 @@
 <title>치사 봇 — Admin Page</title>
 <link rel="stylesheet" href="/dashboard/dashboard.css">
 <link rel="stylesheet" href="/logs/logs.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
 <div class="wrap" style="min-height:100vh;">
@@ -34,62 +35,195 @@
         <i data-icon="queue"></i>
         시스템 로그
       </div>
+      <div class="nav-item" id="menu-stats">
+        <i data-icon="activity"></i>
+        서비스 통계
+      </div>
+      <div class="nav-item" id="menu-resources">
+        <i data-icon="cpu"></i>
+        서버 리소스
+      </div>
     </div>
   </div>
 
   <!-- MAIN CONTENT -->
   <div class="main">
-    <div class="card">
-      <div class="section-title">
-        <i data-icon="shield"></i>
-        시스템 작동 로그
-        <span id="log-count-badge">0개의 로그</span>
+    <!-- 1. 시스템 로그 탭 -->
+    <div id="logs-tab" class="tab-content active">
+      <!-- 로그 요약 차트 영역 (Task 1 적용) -->
+      <div class="chart-row">
+        <div class="card chart-card flex-1">
+          <div class="section-title">
+            <i data-icon="pie"></i>
+            로그 레벨 비율
+          </div>
+          <div class="chart-container">
+            <canvas id="level-chart"></canvas>
+          </div>
+        </div>
+        <div class="card chart-card flex-2">
+          <div class="section-title">
+            <i data-icon="activity"></i>
+            최근 에러 타임라인
+          </div>
+          <div class="chart-container">
+            <canvas id="error-timeline-chart"></canvas>
+          </div>
+        </div>
       </div>
 
-      <!-- FILTERS -->
-      <div class="filter-row">
-        <div class="filter-item">
-          <select id="level-filter" class="filter-select">
-            <option value="ALL">모든 레벨</option>
-            <option value="INFO">INFO</option>
-            <option value="WARN">WARN</option>
-            <option value="ERROR">ERROR</option>
-          </select>
+      <!-- 기존 로그 테이블 카드 -->
+      <div class="card">
+        <div class="section-title">
+          <i data-icon="shield"></i>
+          시스템 작동 로그
+          <span id="log-count-badge">0개의 로그</span>
         </div>
-        <div class="filter-item">
-          <input type="text" id="search-input" class="filter-input" placeholder="메시지, 카테고리 검색..." />
+
+        <!-- FILTERS -->
+        <div class="filter-row">
+          <div class="filter-item">
+            <select id="level-filter" class="filter-select">
+              <option value="ALL">모든 레벨</option>
+              <option value="INFO">INFO</option>
+              <option value="WARN">WARN</option>
+              <option value="ERROR">ERROR</option>
+            </select>
+          </div>
+          <div class="filter-item">
+            <input type="text" id="search-input" class="filter-input" placeholder="메시지, 카테고리 검색..." />
+          </div>
+          <div class="filter-item">
+            <select id="limit-filter" class="filter-select">
+              <option value="100">최근 100개</option>
+              <option value="300">최근 300개</option>
+              <option value="500">최근 500개</option>
+              <option value="ALL">전체 로그</option>
+            </select>
+          </div>
+          <div style="flex:1;"></div>
+          <button id="reload-btn" class="reload-btn">
+            새로고침
+          </button>
         </div>
-        <div class="filter-item">
-          <select id="limit-filter" class="filter-select">
-            <option value="100">최근 100개</option>
-            <option value="300">최근 300개</option>
-            <option value="500">최근 500개</option>
-            <option value="ALL">전체 로그</option>
-          </select>
+
+        <!-- LOG TABLE -->
+        <div class="scrollable" style="max-height: calc(100vh - 450px); overflow-y: auto; overflow-x: auto; width: 100%;">
+          <table class="logs-table">
+            <thead>
+              <tr>
+                <th style="width: 140px;">시간</th>
+                <th style="width: 80px;">레벨</th>
+                <th style="width: 120px;">카테고리</th>
+                <th>메시지</th>
+              </tr>
+            </thead>
+            <tbody id="logs-tbody">
+              <!-- 동적 렌더링 -->
+            </tbody>
+          </table>
+          <div id="empty-message" class="empty-state" style="display:none;">
+            조건에 일치하는 시스템 로그가 없습니다.
+          </div>
         </div>
-        <div style="flex:1;"></div>
-        <button id="reload-btn" class="reload-btn">
-          새로고침
-        </button>
+      </div>
+    </div>
+
+    <!-- 2. 서비스 통계 탭 -->
+    <div id="stats-tab" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="filter-row">
+          <div class="filter-item">
+            <label for="server-filter" style="margin-right: 8px; color: var(--muted); font-size: 13px;">서버 선택:</label>
+            <select id="server-filter" class="filter-select" style="min-width: 200px;">
+              <option value="ALL">전체 서버 통계</option>
+            </select>
+          </div>
+        </div>
       </div>
 
-      <!-- LOG TABLE -->
-      <div class="scrollable" style="max-height: calc(100vh - 250px); overflow-y: auto; overflow-x: auto; width: 100%;">
-        <table class="logs-table">
-          <thead>
-            <tr>
-              <th style="width: 140px;">시간</th>
-              <th style="width: 80px;">레벨</th>
-              <th style="width: 120px;">카테고리</th>
-              <th>메시지</th>
-            </tr>
-          </thead>
-          <tbody id="logs-tbody">
-            <!-- 동적 렌더링 -->
-          </tbody>
-        </table>
-        <div id="empty-message" class="empty-state" style="display:none;">
-          조건에 일치하는 시스템 로그가 없습니다.
+      <!-- 요약 메트릭스 카드 -->
+      <div class="metrics-grid">
+        <div class="card metric-card">
+          <div class="metric-label">총 음악 재생 횟수</div>
+          <div class="metric-value" id="stat-total-plays">0</div>
+        </div>
+        <div class="card metric-card">
+          <div class="metric-label">오늘 재생된 음악</div>
+          <div class="metric-value" id="stat-today-plays">0</div>
+        </div>
+        <div class="card metric-card">
+          <div class="metric-label">총 AI 호출 횟수</div>
+          <div class="metric-value" id="stat-total-ai">0</div>
+        </div>
+        <div class="card metric-card">
+          <div class="metric-label">오늘 AI 호출</div>
+          <div class="metric-value" id="stat-today-ai">0</div>
+        </div>
+      </div>
+
+      <!-- 차트 및 리스트 레이아웃 -->
+      <div class="chart-row">
+        <div class="card chart-card flex-1">
+          <div class="section-title">
+            <i data-icon="queue"></i>
+            인기 곡 순위 (Trending)
+          </div>
+          <div id="trending-list-container" class="trending-list">
+            <div class="empty-state">인기 곡 데이터가 없습니다.</div>
+          </div>
+        </div>
+        <div class="card chart-card flex-2">
+          <div class="section-title">
+            <i data-icon="activity"></i>
+            최근 7일 이용 추이 (음악 vs AI)
+          </div>
+          <div class="chart-container">
+            <canvas id="activity-trend-chart"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 3. 서버 리소스 탭 -->
+    <div id="resources-tab" class="tab-content" style="display: none;">
+      <div class="card" style="margin-bottom: 20px;">
+        <div class="section-title">
+          <i data-icon="cpu"></i>
+          서버 하드웨어 리소스
+        </div>
+        <div class="metrics-grid" style="margin-top: 15px;">
+          <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <div class="metric-label">CPU 사용률</div>
+            <div class="metric-value" id="res-cpu">0%</div>
+            <div style="height: 100px; margin-top: 10px;">
+              <canvas id="cpu-chart"></canvas>
+            </div>
+          </div>
+          <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <div class="metric-label">메모리 사용률</div>
+            <div class="metric-value" id="res-memory">0%</div>
+            <div style="height: 100px; margin-top: 10px;">
+              <canvas id="memory-chart"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="section-title">
+          <i data-icon="shield"></i>
+          외부 인프라 연결 상태
+        </div>
+        <div class="metrics-grid" style="margin-top: 15px;">
+          <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <div class="metric-label">Discord API Ping</div>
+            <div class="metric-value" id="res-ping">0ms</div>
+          </div>
+          <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <div class="metric-label">Lavalink Node 연결</div>
+            <div class="metric-value" id="res-lavalink">연결 확인 중...</div>
+          </div>
         </div>
       </div>
     </div>
