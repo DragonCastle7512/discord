@@ -15,6 +15,8 @@ let activityTrendChart = null;
 let cpuChart = null;
 let memoryChart = null;
 
+let resourceInterval = null;
+
 // SPA 탭 엘리먼트
 const logsTab = document.getElementById('logs-tab');
 const statsTab = document.getElementById('stats-tab');
@@ -40,18 +42,22 @@ function switchTab(activeMenu, activeTab) {
 if (menuLogs) {
   menuLogs.addEventListener('click', () => {
     switchTab(menuLogs, logsTab);
+    if (resourceInterval) clearInterval(resourceInterval);
   });
 }
 if (menuStats) {
   menuStats.addEventListener('click', () => {
     switchTab(menuStats, statsTab);
+    if (resourceInterval) clearInterval(resourceInterval);
     fetchStatistics();
   });
 }
 if (menuResources) {
   menuResources.addEventListener('click', () => {
     switchTab(menuResources, resourcesTab);
+    if (resourceInterval) clearInterval(resourceInterval);
     fetchResources();
+    resourceInterval = setInterval(fetchResources, 3000);
   });
 }
 
@@ -173,8 +179,116 @@ async function fetchStatistics() {
     console.error('Failed to fetch statistics:', err);
   }
 }
+let cpuData = [];
+let memoryData = [];
+let resourceLabels = [];
+
 async function fetchResources() {
-  console.log('fetchResources placeholder');
+  try {
+    const response = await fetch(`/api/system-resources?token=${token}`);
+    
+    if (response.status === 401) {
+      if (resourceInterval) clearInterval(resourceInterval);
+      alert('토큰이 만료되었습니다. Discord에서 /logs 명령어를 다시 입력해주세요.');
+      window.location.href = '/intro';
+      return;
+    }
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    
+    const data = await response.json();
+
+    // 1. 수치 텍스트 바인딩
+    document.getElementById('res-cpu').textContent = `${data.cpu}%`;
+    document.getElementById('res-memory').textContent = `${data.memory}%`;
+    document.getElementById('res-ping').textContent = `${data.ping}ms`;
+
+    const lavalinkVal = document.getElementById('res-lavalink');
+    if (data.lavalink === 'connected') {
+      lavalinkVal.textContent = '연결됨 (정상)';
+      lavalinkVal.style.color = '#3ba55c';
+    } else {
+      lavalinkVal.textContent = '연결 끊김 (오류)';
+      lavalinkVal.style.color = 'var(--red)';
+    }
+
+    // 2. 실시간 차트 데이터 갱신 (최근 10개 지점)
+    const nowStr = new Date().toLocaleTimeString('ko-KR', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    resourceLabels.push(nowStr);
+    cpuData.push(data.cpu);
+    memoryData.push(data.memory);
+
+    if (resourceLabels.length > 10) {
+      resourceLabels.shift();
+      cpuData.shift();
+      memoryData.shift();
+    }
+
+    // 3. CPU 실시간 차트 그리기
+    const ctxCpu = document.getElementById('cpu-chart').getContext('2d');
+    if (cpuChart) {
+      cpuChart.destroy();
+    }
+    cpuChart = new Chart(ctxCpu, {
+      type: 'line',
+      data: {
+        labels: resourceLabels,
+        datasets: [{
+          label: 'CPU (%)',
+          data: cpuData,
+          borderColor: '#ff5353',
+          backgroundColor: 'rgba(255, 83, 83, 0.05)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(255, 255, 255, 0.02)' } },
+          x: { ticks: { display: false }, grid: { display: false } }
+        }
+      }
+    });
+
+    // 4. Memory 실시간 차트 그리기
+    const ctxMem = document.getElementById('memory-chart').getContext('2d');
+    if (memoryChart) {
+      memoryChart.destroy();
+    }
+    memoryChart = new Chart(ctxMem, {
+      type: 'line',
+      data: {
+        labels: resourceLabels,
+        datasets: [{
+          label: 'Memory (%)',
+          data: memoryData,
+          borderColor: '#4bc0c0',
+          backgroundColor: 'rgba(75, 192, 192, 0.05)',
+          fill: true,
+          tension: 0.4,
+          pointRadius: 2
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(255, 255, 255, 0.02)' } },
+          x: { ticks: { display: false }, grid: { display: false } }
+        }
+      }
+    });
+
+  } catch (err) {
+    console.error('Failed to fetch resources:', err);
+  }
 }
 
 // 전역 로그 상태

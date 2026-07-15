@@ -85,6 +85,8 @@ const shoukaku = new Shoukaku(
   },
 );
 
+(client as any).shoukaku = shoukaku;
+
 initDb();
 
 const guildStates = new Map<string, GuildState>();

@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { Client } from 'discord.js';
 import fs from 'node:fs';
 import path from 'node:path';
+import os from 'node:os';
 import { MusicRuntime, GuildState, PlaylistEntry, TrackInfo, HistoryEntry, Track } from '../music/types';
 import { findAllHistory } from '../music/repositorys/music-history.repository';
 import { findPlaylist } from '../music/repositorys/playlist.repository';
@@ -21,6 +22,36 @@ import { UserKeywordPin } from '../music/models/user-keyword-pin';
 import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText, isKeywordMatched } from '../music/services/recommand-service';
 import { Op } from 'sequelize';
 
+let lastCpuUsage = 0;
+let lastCpuTicks = getCpuTicks();
+
+function getCpuTicks() {
+  const cpus = os.cpus();
+  let user = 0;
+  let nice = 0;
+  let sys = 0;
+  let idle = 0;
+  let irq = 0;
+  cpus.forEach(cpu => {
+    user += cpu.times.user;
+    nice += cpu.times.nice;
+    sys += cpu.times.sys;
+    idle += cpu.times.idle;
+    irq += cpu.times.irq;
+  });
+  return { idle, total: user + nice + sys + idle + irq };
+}
+
+setInterval(() => {
+  const currentTicks = getCpuTicks();
+  const idleDifference = currentTicks.idle - lastCpuTicks.idle;
+  const totalDifference = currentTicks.total - lastCpuTicks.total;
+  
+  if (totalDifference > 0) {
+    lastCpuUsage = Math.round((1 - idleDifference / totalDifference) * 100);
+  }
+  lastCpuTicks = currentTicks;
+}, 2000).unref();
 
 export function createDashboardRouter(
   client: Client,
@@ -790,6 +821,42 @@ export function createDashboardRouter(
           playCounts,
           aiCallCounts
         }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/system-resources', verifyToken, async (req: Request, res: Response) => {
+    const session = (req as any).session;
+    if (!process.env.OWNER_ID || session.userId !== process.env.OWNER_ID) {
+      res.status(401).json({ error: '권한이 없습니다.' });
+      return;
+    }
+
+    try {
+      const freeMem = os.freemem();
+      const totalMem = os.totalmem();
+      const memoryUsage = Math.round(((totalMem - freeMem) / totalMem) * 100);
+
+      const shoukaku = (client as any).shoukaku;
+      let lavalinkConnected = false;
+      if (shoukaku && shoukaku.nodes) {
+        const nodes = Array.from(shoukaku.nodes.values());
+        lavalinkConnected = nodes.some((node: any) => 
+          node.state === 1 || 
+          node.state === 'CONNECTED' || 
+          node.readyState === 1 || 
+          node.state === 'ready'
+        );
+      }
+
+      res.json({
+        ok: true,
+        cpu: lastCpuUsage,
+        memory: memoryUsage,
+        ping: client.ws.ping || 0,
+        lavalink: lavalinkConnected ? 'connected' : 'disconnected'
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
