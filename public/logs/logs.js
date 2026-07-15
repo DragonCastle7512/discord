@@ -8,18 +8,59 @@ if (!token || token === 'admin') {
   alert('접속 토큰이 누락되었습니다. Discord에서 /logs 명령어를 다시 입력해주세요.');
 }
 
-// 사이드바 메뉴 클릭 핸들러 (토큰 유지)
-const menuDashboard = document.getElementById('menu-dashboard');
-if (menuDashboard) {
-  menuDashboard.addEventListener('click', () => {
-    window.location.href = `/dashboard?token=${token}`;
-  });
-}
+// 전역 차트 인스턴스
+let levelChart = null;
+let errorTimelineChart = null;
+let activityTrendChart = null;
+let cpuChart = null;
+let memoryChart = null;
+
+// SPA 탭 엘리먼트
+const logsTab = document.getElementById('logs-tab');
+const statsTab = document.getElementById('stats-tab');
+const resourcesTab = document.getElementById('resources-tab');
+
+// 사이드바 메뉴 클릭 핸들러 (SPA 전환)
 const menuLogs = document.getElementById('menu-logs');
+const menuStats = document.getElementById('menu-stats');
+const menuResources = document.getElementById('menu-resources');
+
+function switchTab(activeMenu, activeTab) {
+  document.querySelectorAll('.nav-item').forEach(el => el.classList.remove('active'));
+  activeMenu.classList.add('active');
+
+  document.querySelectorAll('.tab-content').forEach(el => {
+    el.style.display = 'none';
+    el.classList.remove('active');
+  });
+  activeTab.style.display = 'block';
+  activeTab.classList.add('active');
+}
+
 if (menuLogs) {
   menuLogs.addEventListener('click', () => {
-    window.location.href = `/admin/${token}`;
+    switchTab(menuLogs, logsTab);
   });
+}
+if (menuStats) {
+  menuStats.addEventListener('click', () => {
+    switchTab(menuStats, statsTab);
+    fetchStatistics();
+  });
+}
+if (menuResources) {
+  menuResources.addEventListener('click', () => {
+    switchTab(menuResources, resourcesTab);
+    fetchResources();
+  });
+}
+
+// Placeholder API Fetchers
+async function fetchStatistics() {
+  console.log('fetchStatistics placeholder');
+}
+async function fetchResources() {
+  console.log('fetchResources placeholder');
 }
 
 // 전역 로그 상태
@@ -186,6 +227,93 @@ function renderLogs() {
 
     logsTbody.appendChild(row);
     logsTbody.appendChild(detailsRow);
+  });
+
+  renderLogsCharts(filtered);
+}
+
+// 로그 통계 요약 차트 렌더링
+function renderLogsCharts(filteredLogs) {
+  let infoCount = 0;
+  let warnCount = 0;
+  let errorCount = 0;
+
+  filteredLogs.forEach(log => {
+    const lvl = (log.level || 'INFO').toUpperCase();
+    if (lvl === 'INFO') infoCount++;
+    else if (lvl === 'WARN') warnCount++;
+    else if (lvl === 'ERROR') errorCount++;
+  });
+
+  // 1. 로그 레벨 도넛 차트
+  const ctxLevel = document.getElementById('level-chart').getContext('2d');
+  if (levelChart) {
+    levelChart.destroy();
+  }
+  levelChart = new Chart(ctxLevel, {
+    type: 'doughnut',
+    data: {
+      labels: ['INFO', 'WARN', 'ERROR'],
+      datasets: [{
+        data: [infoCount, warnCount, errorCount],
+        backgroundColor: ['#3ba55c', '#f0a020', '#cd2929'],
+        borderWidth: 1,
+        borderColor: '#1e1e1e'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { color: '#b9bbbe', font: { size: 11 } }
+        }
+      }
+    }
+  });
+
+  // 2. 카테고리별 경고 & 에러 카운트
+  const categories = {};
+  filteredLogs.filter(log => ['WARN', 'ERROR'].includes(log.level)).forEach(log => {
+    const cat = log.category || 'system';
+    categories[cat] = (categories[cat] || 0) + 1;
+  });
+
+  const ctxTimeline = document.getElementById('error-timeline-chart').getContext('2d');
+  if (errorTimelineChart) {
+    errorTimelineChart.destroy();
+  }
+  errorTimelineChart = new Chart(ctxTimeline, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(categories),
+      datasets: [{
+        label: '경고 & 에러 발생 건수',
+        data: Object.values(categories),
+        backgroundColor: '#cd2929',
+        borderWidth: 1,
+        borderColor: '#1e1e1e'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          grid: { color: 'rgba(255, 255, 255, 0.05)' },
+          ticks: { color: '#b9bbbe', stepSize: 1 }
+        },
+        x: {
+          grid: { display: false },
+          ticks: { color: '#b9bbbe' }
+        }
+      }
+    }
   });
 }
 
