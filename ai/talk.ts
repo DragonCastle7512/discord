@@ -121,6 +121,7 @@ export function cleanResponseText(text: string): string {
 async function talk(message: Message, context: AppContext): Promise<RuntimeResponse> {
     let replyMsg = null;
     try {
+        logger.info('ai', 'AI 대화 요청 수신', { guildId: message.guild?.id || 'DM' });
         const contents: ContentListUnion = [];
         
         replyMsg = await safeReply(message, '생각 중... 💭');
