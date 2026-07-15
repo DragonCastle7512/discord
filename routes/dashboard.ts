@@ -19,6 +19,7 @@ import { UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
 import { KeywordPin } from '../music/models/keyword-pin';
 import { UserKeywordPin } from '../music/models/user-keyword-pin';
 import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText, isKeywordMatched } from '../music/services/recommand-service';
+import { Op } from 'sequelize';
 
 
 export function createDashboardRouter(
@@ -650,6 +651,142 @@ export function createDashboardRouter(
         user: {
           avatarUrl,
           displayName
+        }
+      });
+    } catch (err: any) {
+      res.status(500).json({ error: err.message });
+    }
+  });
+
+  router.get('/statistics', verifyToken, async (req: Request, res: Response) => {
+    const session = (req as any).session;
+    if (!process.env.OWNER_ID || session.userId !== process.env.OWNER_ID) {
+      res.status(401).json({ error: '권한이 없습니다.' });
+      return;
+    }
+
+    const selectedGuildId = req.query.guildId as string;
+    const isAll = !selectedGuildId || selectedGuildId === 'ALL';
+
+    try {
+      // 1. 봇이 참가 중인 서버(Guild) 목록 획득
+      const guilds = client.guilds.cache.map(g => ({ id: g.id, name: g.name }));
+
+      // 2. 음악 재생 내역 조회 (최근 7일)
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+
+      const historyWhere: any = {
+        createdAt: { [Op.gte]: sevenDaysAgo }
+      };
+      if (!isAll) {
+        historyWhere.guildId = selectedGuildId;
+      }
+
+      const histories = await MusicHistory.findAll({
+        where: historyWhere,
+        order: [['createdAt', 'DESC']]
+      });
+
+      // 3. 인기 곡 집계 (Top 10 / Top 5)
+      const songCountMap = new Map<string, { title: string; artist: string; count: number; artworkUrl: string | null }>();
+      histories.forEach(h => {
+        const info = h.musicInfo;
+        const key = `${info.title}_${info.author}`;
+        const existing = songCountMap.get(key);
+        if (existing) {
+          existing.count++;
+        } else {
+          songCountMap.set(key, {
+            title: info.title,
+            artist: info.author,
+            count: 1,
+            artworkUrl: info.artworkUrl || null
+          });
+        }
+      });
+      const trendingSongs = Array.from(songCountMap.values())
+        .sort((a, b) => b.count - a.count)
+        .slice(0, isAll ? 10 : 5);
+
+      // 4. AI 호출 통계 산출 (app.log 파싱)
+      const logPath = path.join(__dirname, '../logs/app.log');
+      let totalAiCalls = 0;
+      let todayAiCalls = 0;
+      const aiCallTrendMap = new Map<string, number>();
+
+      // 최근 7일 날짜 템플릿 생성
+      const dateLabels: string[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+        dateLabels.push(dateStr);
+        aiCallTrendMap.set(dateStr, 0);
+      }
+
+      const todayStr = new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+
+      if (fs.existsSync(logPath)) {
+        const rawContent = fs.readFileSync(logPath, 'utf8');
+        const lines = rawContent.split('\n');
+        lines.forEach(line => {
+          try {
+            if (!line.trim()) return;
+            const entry = JSON.parse(line);
+            if (entry.category === 'ai' && entry.message === 'AI 대화 요청 수신') {
+              const entryGuildId = entry.metadata?.guildId;
+              if (isAll || entryGuildId === selectedGuildId) {
+                totalAiCalls++;
+                const entryDate = new Date(entry.timestamp);
+                const entryDateStr = entryDate.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+                
+                if (entryDateStr === todayStr) {
+                  todayAiCalls++;
+                }
+                if (aiCallTrendMap.has(entryDateStr)) {
+                  aiCallTrendMap.set(entryDateStr, (aiCallTrendMap.get(entryDateStr) || 0) + 1);
+                }
+              }
+            }
+          } catch {}
+        });
+      }
+
+      // 5. 일자별 음악 재생 통계 집계
+      const playTrendMap = new Map<string, number>();
+      dateLabels.forEach(label => playTrendMap.set(label, 0));
+      histories.forEach(h => {
+        const hDate = new Date(h.createdAt);
+        const dateStr = hDate.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+        if (playTrendMap.has(dateStr)) {
+          playTrendMap.set(dateStr, (playTrendMap.get(dateStr) || 0) + 1);
+        }
+      });
+
+      const playCounts = dateLabels.map(label => playTrendMap.get(label) || 0);
+      const aiCallCounts = dateLabels.map(label => aiCallTrendMap.get(label) || 0);
+
+      // 오늘 전체 음악 재생 카운트 계산
+      const todayPlayCount = histories.filter(h => {
+        const hDate = new Date(h.createdAt);
+        return hDate.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) === todayStr;
+      }).length;
+
+      res.json({
+        ok: true,
+        guilds,
+        summary: {
+          totalPlays: histories.length,
+          todayPlays: todayPlayCount,
+          totalAiCalls,
+          todayAiCalls
+        },
+        trendingSongs,
+        activityTrends: {
+          dates: dateLabels,
+          playCounts,
+          aiCallCounts
         }
       });
     } catch (err: any) {
