@@ -8,3 +8,4 @@ scripts
 docs
 *.log
 *.old
+logs/
