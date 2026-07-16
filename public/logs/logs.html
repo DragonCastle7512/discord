@@ -167,35 +167,39 @@
       </div>
 
       <!-- 차트 및 리스트 레이아웃 -->
-      <div class="chart-row">
-        <div class="card chart-card flex-1">
+      <div class="chart-row" style="display: flex; gap: 20px; align-items: stretch; margin-bottom: 20px;">
+        <!-- 왼쪽 칼럼: 인기 곡 (Trending) -->
+        <div class="card chart-card" style="flex: 1; display: flex; flex-direction: column; min-height: 520px; margin-bottom: 0;">
           <div class="section-title">
             <i data-icon="queue"></i>
             인기 곡 순위 (Trending)
           </div>
-          <div id="trending-list-container" class="trending-list">
+          <div id="trending-list-container" class="trending-list" style="flex: 1; overflow-y: auto;">
             <div class="empty-state">인기 곡 데이터가 없습니다.</div>
           </div>
         </div>
-        <div class="card chart-card flex-2">
-          <div class="section-title">
-            <i data-icon="activity"></i>
-            최근 7일 이용 추이 (음악 vs AI)
+        
+        <!-- 오른쪽 칼럼: 최근 7일 추이 & 시간대별 활성도 -->
+        <div style="flex: 1.2; display: flex; flex-direction: column; gap: 20px;">
+          <div class="card chart-card" style="flex: 1; min-height: 250px; margin-bottom: 0;">
+            <div class="section-title">
+              <i data-icon="activity"></i>
+              최근 7일 이용 추이 (음악 vs AI)
+            </div>
+            <div class="chart-container" style="height: 180px;">
+              <canvas id="activity-trend-chart"></canvas>
+            </div>
           </div>
-          <div class="chart-container">
-            <canvas id="activity-trend-chart"></canvas>
+          
+          <div class="card chart-card" style="flex: 1; min-height: 250px; margin-bottom: 0;">
+            <div class="section-title">
+              <i data-icon="activity"></i>
+              시간대별 봇 활성도 (0시~23시)
+            </div>
+            <div class="chart-container" style="height: 180px;">
+              <canvas id="hourly-active-chart"></canvas>
+            </div>
           </div>
-        </div>
-      </div>
-      
-      <!-- 시간대별 봇 활성도 차트 -->
-      <div class="card chart-card" style="width: 100%; margin-top: 20px; min-height: 300px;">
-        <div class="section-title">
-          <i data-icon="activity"></i>
-          시간대별 봇 활성도 (0시~23시)
-        </div>
-        <div class="chart-container" style="height: 240px;">
-          <canvas id="hourly-active-chart"></canvas>
         </div>
       </div>
     </div>
