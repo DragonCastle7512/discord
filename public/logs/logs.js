@@ -14,6 +14,10 @@ let errorTimelineChart = null;
 let activityTrendChart = null;
 let cpuChart = null;
 let memoryChart = null;
+let hourlyActiveChart = null;
+
+let errorLabels = [];
+let errorTrends = [];
 
 let resourceInterval = null;
 
@@ -170,6 +174,45 @@ async function fetchStatistics() {
           x: {
             grid: { display: false },
             ticks: { color: '#b9bbbe' }
+          }
+        }
+      }
+    });
+
+    // 5. 시간대별 봇 활성도 막대 그래프 그리기
+    const ctxHourly = document.getElementById('hourly-active-chart').getContext('2d');
+    if (hourlyActiveChart) {
+      hourlyActiveChart.destroy();
+    }
+    const hourlyLabels = Array.from({ length: 24 }, (_, i) => `${i}시`);
+    hourlyActiveChart = new Chart(ctxHourly, {
+      type: 'bar',
+      data: {
+        labels: hourlyLabels,
+        datasets: [{
+          label: '시간대별 음악 재생 수',
+          data: data.hourlyStats || new Array(24).fill(0),
+          backgroundColor: '#ff5353',
+          borderWidth: 1,
+          borderColor: '#1e1e1e',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            grid: { color: 'rgba(255, 255, 255, 0.05)' },
+            ticks: { color: '#b9bbbe', stepSize: 1 }
+          },
+          x: {
+            grid: { display: false },
+            ticks: { color: '#b9bbbe', font: { size: 10 } }
           }
         }
       }
@@ -342,6 +385,8 @@ async function fetchLogs() {
     
     const data = await response.json();
     rawLogs = data.logs;
+    errorLabels = data.errorLabels || [];
+    errorTrends = data.errorTrends || [];
     
     // 유저 아바타 업데이트
     const userAv = document.querySelector('.user-av');
@@ -501,27 +546,24 @@ function renderLogsCharts(filteredLogs) {
     }
   });
 
-  // 2. 카테고리별 경고 & 에러 카운트
-  const categories = {};
-  filteredLogs.filter(log => ['WARN', 'ERROR'].includes(log.level)).forEach(log => {
-    const cat = log.category || 'system';
-    categories[cat] = (categories[cat] || 0) + 1;
-  });
-
+  // 2. 최근 30일 경고 & 에러 꺾은선 차트
   const ctxTimeline = document.getElementById('error-timeline-chart').getContext('2d');
   if (errorTimelineChart) {
     errorTimelineChart.destroy();
   }
   errorTimelineChart = new Chart(ctxTimeline, {
-    type: 'bar',
+    type: 'line',
     data: {
-      labels: Object.keys(categories),
+      labels: errorLabels,
       datasets: [{
         label: '경고 & 에러 발생 건수',
-        data: Object.values(categories),
-        backgroundColor: '#cd2929',
-        borderWidth: 1,
-        borderColor: '#1e1e1e'
+        data: errorTrends,
+        borderColor: '#cd2929',
+        backgroundColor: 'rgba(205, 41, 41, 0.05)',
+        borderWidth: 2,
+        fill: true,
+        tension: 0.4,
+        pointRadius: 2
       }]
     },
     options: {
