@@ -145,18 +145,22 @@
       <!-- 요약 메트릭스 카드 -->
       <div class="metrics-grid">
         <div class="card metric-card">
+          <i data-icon="musicRed" style="float: right; margin-top: 5px;"></i>
           <div class="metric-label">총 음악 재생 횟수</div>
           <div class="metric-value" id="stat-total-plays">0</div>
         </div>
         <div class="card metric-card">
+          <i data-icon="musicRed" style="float: right; margin-top: 5px;"></i>
           <div class="metric-label">오늘 재생된 음악</div>
           <div class="metric-value" id="stat-today-plays">0</div>
         </div>
         <div class="card metric-card">
+          <i data-icon="aiRed" style="float: right; margin-top: 5px;"></i>
           <div class="metric-label">총 AI 호출 횟수</div>
           <div class="metric-value" id="stat-total-ai">0</div>
         </div>
         <div class="card metric-card">
+          <i data-icon="aiRed" style="float: right; margin-top: 5px;"></i>
           <div class="metric-label">오늘 AI 호출</div>
           <div class="metric-value" id="stat-today-ai">0</div>
         </div>
@@ -183,6 +187,17 @@
           </div>
         </div>
       </div>
+      
+      <!-- 시간대별 봇 활성도 차트 -->
+      <div class="card chart-card" style="width: 100%; margin-top: 20px; min-height: 300px;">
+        <div class="section-title">
+          <i data-icon="activity"></i>
+          시간대별 봇 활성도 (0시~23시)
+        </div>
+        <div class="chart-container" style="height: 240px;">
+          <canvas id="hourly-active-chart"></canvas>
+        </div>
+      </div>
     </div>
 
     <!-- 3. 서버 리소스 탭 -->
@@ -194,6 +209,7 @@
         </div>
         <div class="metrics-grid" style="margin-top: 15px;">
           <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <i data-icon="cpu" style="color: var(--red); float: right; margin-top: 5px;"></i>
             <div class="metric-label">CPU 사용률</div>
             <div class="metric-value" id="res-cpu">0%</div>
             <div style="height: 100px; margin-top: 10px;">
@@ -201,6 +217,7 @@
             </div>
           </div>
           <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <i data-icon="dashboard" style="color: var(--red); float: right; margin-top: 5px;"></i>
             <div class="metric-label">메모리 사용률</div>
             <div class="metric-value" id="res-memory">0%</div>
             <div style="height: 100px; margin-top: 10px;">
@@ -217,10 +234,12 @@
         </div>
         <div class="metrics-grid" style="margin-top: 15px;">
           <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <i data-icon="activity" style="color: var(--red); float: right; margin-top: 5px;"></i>
             <div class="metric-label">Discord API Ping</div>
             <div class="metric-value" id="res-ping">0ms</div>
           </div>
           <div class="card metric-card" style="background: rgba(255,255,255,0.01);">
+            <i data-icon="link" style="color: var(--red); float: right; margin-top: 5px;"></i>
             <div class="metric-label">Lavalink Node 연결</div>
             <div class="metric-value" id="res-lavalink">연결 확인 중...</div>
           </div>
