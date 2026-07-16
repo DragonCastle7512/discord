@@ -7,6 +7,7 @@ import { safeReply } from "../common/reply-util";
 import { logger } from "../common/logger";
 
 const fs = require('fs');
+const path = require('path');
 const axios = require('axios');
 const { music_declarations, handlers: musicHandlers } = require('./skills/music-skill');
 const { command_declarations, handlers: commandHandlers } = require('./skills/command-skill');
@@ -118,10 +119,54 @@ export function cleanResponseText(text: string): string {
     return text.replace(pattern, '').trim();
 }
 
+function recordAiCall(guildId: string): void {
+    const dir = path.join(process.cwd(), 'logs');
+    const filePath = path.join(dir, 'ai-calls.json');
+    
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+
+    let data = { totalAiCalls: 0, dailyStats: {} as any };
+    if (fs.existsSync(filePath)) {
+        try {
+            data = JSON.parse(fs.readFileSync(filePath, 'utf8'));
+        } catch {}
+    }
+
+    const now = new Date();
+    const kstOffset = 9 * 60 * 60 * 1000;
+    const kstDate = new Date(now.getTime() + kstOffset);
+    const dateStr = kstDate.toISOString().split('T')[0];
+
+    data.totalAiCalls = (data.totalAiCalls || 0) + 1;
+
+    if (!data.dailyStats) data.dailyStats = {};
+    if (!data.dailyStats[dateStr]) {
+        data.dailyStats[dateStr] = { total: 0, guilds: {} };
+    }
+    
+    data.dailyStats[dateStr].total = (data.dailyStats[dateStr].total || 0) + 1;
+    
+    if (!data.dailyStats[dateStr].guilds) {
+        data.dailyStats[dateStr].guilds = {};
+    }
+    
+    data.dailyStats[dateStr].guilds[guildId] = (data.dailyStats[dateStr].guilds[guildId] || 0) + 1;
+
+    fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf8');
+}
+
 async function talk(message: Message, context: AppContext): Promise<RuntimeResponse> {
     let replyMsg = null;
     try {
-        logger.info('ai', 'AI 대화 요청 수신', { guildId: message.guild?.id || 'DM' });
+        const targetGuildId = message.guild?.id || 'DM';
+        logger.info('ai', 'AI 대화 요청 수신', { guildId: targetGuildId });
+        try {
+            recordAiCall(targetGuildId);
+        } catch (err) {
+            console.error('Failed to record AI call to JSON:', err);
+        }
         const contents: ContentListUnion = [];
         
         replyMsg = await safeReply(message, '생각 중... 💭');
