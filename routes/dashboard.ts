@@ -677,12 +677,40 @@ export function createDashboardRouter(
       }).filter(entry => entry !== null);
 
       entries.reverse();
+
+      // 최근 30일 날짜 템플릿 생성
+      const errorLabels: string[] = [];
+      const errorTrendMap = new Map<string, number>();
+      for (let i = 29; i >= 0; i--) {
+        const d = new Date();
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+        errorLabels.push(dateStr);
+        errorTrendMap.set(dateStr, 0);
+      }
+
+      // 경고 및 에러 건수 집계
+      entries.forEach(entry => {
+        const level = (entry.level || '').toUpperCase();
+        if (['WARN', 'ERROR'].includes(level) && entry.timestamp) {
+          const entryDate = new Date(entry.timestamp);
+          const entryDateStr = entryDate.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+          if (errorTrendMap.has(entryDateStr)) {
+            errorTrendMap.set(entryDateStr, (errorTrendMap.get(entryDateStr) || 0) + 1);
+          }
+        }
+      });
+
+      const errorTrends = errorLabels.map(label => errorTrendMap.get(label) || 0);
+
       res.json({
         logs: entries,
         user: {
           avatarUrl,
           displayName
-        }
+        },
+        errorLabels,
+        errorTrends
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
@@ -703,13 +731,8 @@ export function createDashboardRouter(
       // 1. 봇이 참가 중인 서버(Guild) 목록 획득
       const guilds = client.guilds.cache.map(g => ({ id: g.id, name: g.name }));
 
-      // 2. 음악 재생 내역 조회 (최근 7일)
-      const sevenDaysAgo = new Date();
-      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
-
-      const historyWhere: any = {
-        createdAt: { [Op.gte]: sevenDaysAgo }
-      };
+      // 2. 음악 재생 내역 조회 (정합성을 위해 날짜 필터 완전히 제거)
+      const historyWhere: any = {};
       if (!isAll) {
         historyWhere.guildId = selectedGuildId;
       }
@@ -742,8 +765,8 @@ export function createDashboardRouter(
         .sort((a, b) => b.count - a.count)
         .slice(0, isAll ? 10 : 5);
 
-      // 4. AI 호출 통계 산출 (app.log 파싱)
-      const logPath = path.join(__dirname, '../logs/app.log');
+      // 4. AI 호출 통계 산출 (ai-calls.json 기반)
+      const aiCallsFilePath = path.join(process.cwd(), 'logs/ai-calls.json');
       let totalAiCalls = 0;
       let todayAiCalls = 0;
       const aiCallTrendMap = new Map<string, number>();
@@ -758,35 +781,54 @@ export function createDashboardRouter(
         aiCallTrendMap.set(dateStr, 0);
       }
 
-      const todayStr = new Date().toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+      const now = new Date();
+      const kstOffset = 9 * 60 * 60 * 1000;
+      const todayKstDate = new Date(now.getTime() + kstOffset);
+      const todayKstStr = todayKstDate.toISOString().split('T')[0];
+      const todayStr = now.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
 
-      if (fs.existsSync(logPath)) {
-        const rawContent = fs.readFileSync(logPath, 'utf8');
-        const lines = rawContent.split('\n');
-        lines.forEach(line => {
-          try {
-            if (!line.trim()) return;
-            const entry = JSON.parse(line);
-            if (entry.category === 'ai' && entry.message === 'AI 대화 요청 수신') {
-              const entryGuildId = entry.metadata?.guildId;
-              if (isAll || entryGuildId === selectedGuildId) {
-                totalAiCalls++;
-                const entryDate = new Date(entry.timestamp);
-                const entryDateStr = entryDate.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
-                
-                if (entryDateStr === todayStr) {
-                  todayAiCalls++;
-                }
-                if (aiCallTrendMap.has(entryDateStr)) {
-                  aiCallTrendMap.set(entryDateStr, (aiCallTrendMap.get(entryDateStr) || 0) + 1);
+      if (fs.existsSync(aiCallsFilePath)) {
+        try {
+          const aiData = JSON.parse(fs.readFileSync(aiCallsFilePath, 'utf8'));
+          if (isAll) {
+            totalAiCalls = aiData.totalAiCalls || 0;
+            // 최근 7일 추이 집계
+            for (let i = 6; i >= 0; i--) {
+              const d = new Date();
+              d.setDate(d.getDate() - i);
+              const kstD = new Date(d.getTime() + kstOffset);
+              const keyDateStr = kstD.toISOString().split('T')[0];
+              const dateLabel = d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+              
+              const dayStat = aiData.dailyStats?.[keyDateStr];
+              if (dayStat) {
+                aiCallTrendMap.set(dateLabel, dayStat.total || 0);
+                if (keyDateStr === todayKstStr) {
+                  todayAiCalls = dayStat.total || 0;
                 }
               }
             }
-          } catch {}
-        });
+          } else {
+            // 특정 길드(selectedGuildId) 기준
+            for (const [keyDateStr, dayStat] of Object.entries(aiData.dailyStats || {})) {
+              const guildCount = (dayStat as any).guilds?.[selectedGuildId] || 0;
+              totalAiCalls += guildCount;
+              if (keyDateStr === todayKstStr) {
+                todayAiCalls = guildCount;
+              }
+              
+              // 최근 7일 범위 확인 후 트렌드 맵 매핑
+              const d = new Date(keyDateStr);
+              const dateLabel = d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
+              if (aiCallTrendMap.has(dateLabel)) {
+                aiCallTrendMap.set(dateLabel, guildCount);
+              }
+            }
+          }
+        } catch {}
       }
 
-      // 5. 일자별 음악 재생 통계 집계
+      // 5. 일자별 음악 재생 통계 집계 (최근 7일)
       const playTrendMap = new Map<string, number>();
       dateLabels.forEach(label => playTrendMap.set(label, 0));
       histories.forEach(h => {
@@ -806,6 +848,16 @@ export function createDashboardRouter(
         return hDate.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' }) === todayStr;
       }).length;
 
+      // 6. 시간대별(KST 0~23시) 음악 재생 통계 집계
+      const hourlyStats = new Array(24).fill(0);
+      histories.forEach(h => {
+        const hDate = new Date(h.createdAt);
+        const hour = hDate.getHours();
+        if (hour >= 0 && hour < 24) {
+          hourlyStats[hour]++;
+        }
+      });
+
       res.json({
         ok: true,
         guilds,
@@ -820,7 +872,8 @@ export function createDashboardRouter(
           dates: dateLabels,
           playCounts,
           aiCallCounts
-        }
+        },
+        hourlyStats
       });
     } catch (err: any) {
       res.status(500).json({ error: err.message });
