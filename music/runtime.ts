@@ -42,11 +42,13 @@ export function createMusicRuntime({
   } = runtimeUtils;
 
   async function play(context: any, query: string | string[]): Promise<RuntimeResponse> {
-    const { channelId: originalChannelId, guild, member: contextMember, author, user } = context;
+    const { channelId: originalChannelId, guild, member: contextMember, author, user, isAi } = context;
     if (!guild) throw new Error('Guild only command');
 
-    const userId = user?.id || author?.id;
-    if (!userId) throw new Error('User not found in context');
+    const originalUserId = user?.id || author?.id;
+    if (!originalUserId) throw new Error('User not found in context');
+
+    const userId = isAi ? (guild.client.user?.id || originalUserId) : originalUserId;
 
     let channelId = originalChannelId;
     try {
@@ -58,7 +60,7 @@ export function createMusicRuntime({
       logger.error('music', 'Failed to fetch guild channel config', { error: err });
     }
 
-    const member = contextMember || await guild.members.fetch(userId);
+    const member = contextMember || await guild.members.fetch(originalUserId);
     const voiceChannel = member.voice.channel;
     if (!voiceChannel) {
       return { ok: false, message: '음성채널에 먼저 입장해주세요!' };
@@ -125,7 +127,7 @@ export function createMusicRuntime({
 
     if (addedCount === 0) {
       try {
-        const res = await findPlaylist(userId);
+        const res = await findPlaylist(originalUserId);
         const playlist = res.map((music) => music.musicInfo);
         if (!playlist.length) {
           return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };

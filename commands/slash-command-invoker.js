@@ -91,7 +91,7 @@ function createOptionsResolver(options, message) {
   };
 }
 
-function createSyntheticInteraction(message, options) {
+function createSyntheticInteraction(message, options, extra = {}) {
   const interaction = {
     client: message.client,
     guild: message.guild,
@@ -104,6 +104,7 @@ function createSyntheticInteraction(message, options) {
     deferred: false,
     replied: false,
     _replyMessage: null,
+    isAi: extra.isAi === true,
     isRepliable() {
       return Boolean(this.channel);
     },
@@ -164,7 +165,7 @@ function summarizeReply(replyMessage) {
 
 function createSlashCommandInvoker({ commands, context }) {
   return {
-    async executeFromMessage(message, commandName, options = {}) {
+    async executeFromMessage(message, commandName, options = {}, extra = {}) {
       const normalizedName = String(commandName || '').trim().toLowerCase();
       if (!normalizedName) {
         return { ok: false, message: 'Command name is required.' };
@@ -175,7 +176,7 @@ function createSlashCommandInvoker({ commands, context }) {
         return { ok: false, message: `Unknown slash command: ${normalizedName}` };
       }
 
-      const interaction = createSyntheticInteraction(message, options);
+      const interaction = createSyntheticInteraction(message, options, extra);
       const startTime = Date.now();
       try {
         await command.execute(interaction, context);

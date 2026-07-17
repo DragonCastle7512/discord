@@ -10,7 +10,7 @@ function compactOptions(options) {
   return next;
 }
 
-async function executeSlash(obj, commandName, options = {}) {
+async function executeSlash(obj, commandName, options = {}, extra = {}) {
   const invoker = obj?.context?.slashCommands;
   if (!invoker || typeof invoker.executeFromMessage !== 'function') {
     return {
@@ -28,7 +28,7 @@ async function executeSlash(obj, commandName, options = {}) {
   }
 
   try {
-    const result = await invoker.executeFromMessage(obj.message, commandName, compactOptions(options));
+    const result = await invoker.executeFromMessage(obj.message, commandName, compactOptions(options), extra);
     return {
       ok: result?.ok === true,
       command: commandName,
@@ -261,7 +261,7 @@ module.exports = {
     },
   ],
   handlers: {
-    slash_play: async (args, obj) => executeSlash(obj, 'play', { query: args?.query }),
+    slash_play: async (args, obj) => executeSlash(obj, 'play', { query: args?.query }, { isAi: true }),
     slash_search: async (args, obj) => executeSlash(obj, 'search', { query: args?.query }),
     slash_add: async (args, obj) => executeSlash(obj, 'add', { music: args?.music }),
     slash_clear: async (args, obj) => executeSlash(obj, 'clear'),
