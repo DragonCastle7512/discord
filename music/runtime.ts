@@ -406,7 +406,17 @@ export function createMusicRuntime({
         try {
           const readyNode = await waitForReadyNode();
           if (readyNode) {
-            await joinOrMovePlayer(context.guild, context.channelId || state.textChannelId, voiceChannel);
+            let channelId = context.channelId || state.textChannelId;
+            try {
+              const config = await GuildConfig.findOne({ where: { guildId } });
+              if (config && config.musicChannelId) {
+                channelId = config.musicChannelId;
+              }
+            } catch (err) {
+              logger.error('music', 'Failed to fetch guild channel config', { error: err });
+            }
+
+            await joinOrMovePlayer(context.guild, channelId, voiceChannel);
             playNext(guildId).catch((err: Error) => logger.error('music', 'Autoplay trigger on enable failed', { error: err }));
           }
         } catch (err) {
