@@ -214,8 +214,6 @@ shoukaku.on('disconnect', (name: string) => {
   void waitAndConnectNode(name);
 });
 
-// 4. 리스너가 바인딩 완료된 시점에 비로소 최초 헬스체크 및 연결 프로세스 기동
-void waitAndConnectNode('main');
 
 client.once(Events.ClientReady, async (readyClient) => {
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
@@ -225,6 +223,9 @@ client.once(Events.ClientReady, async (readyClient) => {
     token,
     commands: loadedCommands,
   });
+
+  // 디스코드 게이트웨이 연결 및 client.user.id 가 완벽히 준비되었을 때 최초 Lavalink 연결을 가동시킵니다.
+  void waitAndConnectNode('main');
 });
 
 
