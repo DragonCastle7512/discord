@@ -67,19 +67,13 @@ const client = new MyClient({
 });
 
 const readyNodes = new Set<string>();
+
 const shoukaku = new Shoukaku(
   new Connectors.DiscordJS(client),
-  [
-    {
-      name: 'main',
-      url: `${lavalinkHost}:${lavalinkPort}`,
-      auth: lavalinkPassword,
-      secure: lavalinkSecure,
-    },
-  ],
+  [], // 빈 배열로 생성하여 인스턴스 생성 즉시 첫 연결 시도로 인한 비동기 리스너 경쟁 상태 방지
   {
-    reconnectTries: 9999,
-    reconnectInterval: 3_000,
+    reconnectTries: 1, // 수동으로 헬스체크 대기 후 커넥트를 제어하므로 1로 최솟값 할당
+    reconnectInterval: 0,
     moveOnDisconnect: false,
     resume: false,
   },
@@ -139,15 +133,89 @@ httpServer.listen(httpPort, httpHost, () => {
 });
 
 
+// 1. Lavalink HTTP REST 헬스체크 함수 (내장 fetch 사용)
+async function checkLavalinkHealthy(host: string, port: number, auth: string, secure: boolean): Promise<boolean> {
+  const protocol = secure ? 'https' : 'http';
+  const url = `${protocol}://${host}:${port}/version`;
+  try {
+    const response = await fetch(url, {
+      headers: { Authorization: auth },
+      signal: AbortSignal.timeout(2000),
+    });
+    return response.status === 200;
+  } catch {
+    return false;
+  }
+}
+
+// 2. 헬스체크 통과 대기 후 WebSocket 연결 실행 루프 (지수 백오프)
+async function waitAndConnectNode(name: string) {
+  let attempts = 0;
+  const maxAttempts = 15;
+  
+  while (attempts < maxAttempts) {
+    attempts++;
+    const intervalSec = Math.min(Math.round(3 * Math.pow(1.5, attempts - 1)), 60);
+    
+    console.log(`[Lavalink] Checking health for ${name}... (Attempt ${attempts}/${maxAttempts})`);
+    const isHealthy = await checkLavalinkHealthy(lavalinkHost, lavalinkPort, lavalinkPassword, lavalinkSecure);
+    
+    if (isHealthy) {
+      console.log(`[Lavalink] Node ${name} is healthy! Connecting WebSocket...`);
+      
+      const node = shoukaku.nodes.get(name);
+      if (node) {
+        try {
+          // 좀비 상태(state가 CONNECTED/CONNECTING으로 꼬여서 connect()가 무시되는 현상) 방지
+          try {
+            (node as any).cleanupWebsocket();
+          } catch {}
+          (node as any).state = 3; // 3 = DISCONNECTED
+          
+          await node.connect();
+        } catch (err: any) {
+          logger.error('system', `[Lavalink] Failed to connect WebSocket for ${name}: ${err.message}`);
+        }
+      } else {
+        shoukaku.addNode({
+          name,
+          url: `${lavalinkHost}:${lavalinkPort}`,
+          auth: lavalinkPassword,
+          secure: lavalinkSecure,
+        });
+      }
+      return; // 정상 연결 또는 addNode 추가 후 루프 종료
+    }
+    
+    console.log(`[Lavalink] Node ${name} is unhealthy. Waiting ${intervalSec}s before next check...`);
+    await new Promise((resolve) => setTimeout(resolve, intervalSec * 1000));
+  }
+  
+  logger.error('system', `[Lavalink] Node ${name} failed healthcheck permanently after ${maxAttempts} attempts. Exiting process...`);
+  setTimeout(() => {
+    process.exit(1);
+  }, 3000);
+}
+
+// 3. Shoukaku 이벤트 리스너 우선 등록
 shoukaku.on('ready', (name: string) => {
   readyNodes.add(name);
-  console.log(`[Lavalink] Node connected: ${name}`);
+  console.log(`[Lavalink] Node connected successfully: ${name}`);
 });
 
 shoukaku.on('error', (name: string, error: Error) => {
   readyNodes.delete(name);
   logger.error('system', `[Lavalink] Node error (${name}): ${error.message}`, { error });
 });
+
+shoukaku.on('disconnect', (name: string) => {
+  readyNodes.delete(name);
+  logger.warn('system', `[Lavalink] Node disconnected (${name}). Starting healthcheck wait loop...`);
+  void waitAndConnectNode(name);
+});
+
+// 4. 리스너가 바인딩 완료된 시점에 비로소 최초 헬스체크 및 연결 프로세스 기동
+void waitAndConnectNode('main');
 
 client.once(Events.ClientReady, async (readyClient) => {
 	console.log(`Ready! Logged in as ${readyClient.user.tag}`);
