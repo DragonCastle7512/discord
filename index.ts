@@ -1,5 +1,7 @@
+process.env.TZ = 'Asia/Seoul';
 import path from 'node:path';
 import { Shoukaku, Connectors } from 'shoukaku';
+
 import { Client, Events, GatewayIntentBits, Collection, Message, Interaction, VoiceState, BaseGuildTextChannel } from 'discord.js';
 // @ts-ignore
 import express, { Request, Response, Express } from 'express';
