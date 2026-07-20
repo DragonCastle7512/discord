@@ -86,6 +86,7 @@ services:
       - LAVALINK_PORT=2333
       - LAVALINK_SECURE=false
       - TTS_PUBLIC_BASE_URL=http://discord-bot:3000
+      - TZ=Asia/Seoul
     depends_on:
       tts-engine:
         condition: service_started
