@@ -134,12 +134,10 @@ export function createDashboardRouter(
           logger.error('music', 'History fetch failed in dashboard data', { error: e });
         }
 
-        const now = Date.now();
-        const KST_OFFSET = 9 * 60 * 60 * 1000;
-        const todayKstStr = new Date(now + KST_OFFSET).toISOString().split('T')[0];
+        const todayDateStr = new Date().toLocaleDateString('sv-SE');
         const todayPlays = allHistory.filter((h: any) => {
-          const hDateKst = new Date(new Date(h.createdAt).getTime() + KST_OFFSET);
-          return hDateKst.toISOString().split('T')[0] === todayKstStr;
+          const hDate = new Date(h.createdAt);
+          return hDate.toLocaleDateString('sv-SE') === todayDateStr;
         }).length;
 
         const counts = new Map<string, { title: string, artist: string, count: number, artwork: string | null }>();
@@ -782,9 +780,7 @@ export function createDashboardRouter(
       }
 
       const now = new Date();
-      const kstOffset = 9 * 60 * 60 * 1000;
-      const todayKstDate = new Date(now.getTime() + kstOffset);
-      const todayKstStr = todayKstDate.toISOString().split('T')[0];
+      const todayKstStr = now.toLocaleDateString('sv-SE');
       const todayStr = now.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
 
       if (fs.existsSync(aiCallsFilePath)) {
@@ -796,8 +792,7 @@ export function createDashboardRouter(
             for (let i = 6; i >= 0; i--) {
               const d = new Date();
               d.setDate(d.getDate() - i);
-              const kstD = new Date(d.getTime() + kstOffset);
-              const keyDateStr = kstD.toISOString().split('T')[0];
+              const keyDateStr = d.toLocaleDateString('sv-SE');
               const dateLabel = d.toLocaleDateString('ko-KR', { month: '2-digit', day: '2-digit' });
               
               const dayStat = aiData.dailyStats?.[keyDateStr];
