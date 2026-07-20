@@ -74,17 +74,17 @@ async function fetchStatistics() {
 
   try {
     const response = await fetch(`/api/statistics?token=${token}&guildId=${guildId}`);
-    
+
     if (response.status === 401) {
       alert('토큰이 만료되었습니다. Discord에서 /logs 명령어를 다시 입력해주세요.');
       window.location.href = '/intro';
       return;
     }
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
 
     // 1. 서버 선택 드롭다운 채우기 (최초 1회만)
@@ -107,15 +107,15 @@ async function fetchStatistics() {
     // 3. 인기 곡 목록 렌더링
     const trendingContainer = document.getElementById('trending-list-container');
     trendingContainer.innerHTML = '';
-    
+
     if (data.trendingSongs && data.trendingSongs.length > 0) {
       data.trendingSongs.forEach((song, index) => {
         const item = document.createElement('div');
         item.className = 'trending-item';
-        
+
         // 썸네일 경로
         const thumbUrl = song.artworkUrl || (song.identifier ? `https://i.ytimg.com/vi/${song.identifier}/mqdefault.jpg` : '/dashboard/assets/default-art.png');
-        
+
         item.innerHTML = `
           <div class="trending-rank">${index + 1}</div>
           <img src="${thumbUrl}" alt="Cover" class="trending-thumb" onerror="this.src='/dashboard/assets/default-art.png';" style="width: 40px; height: 40px; border-radius: 4px; object-fit: cover;" />
@@ -127,7 +127,8 @@ async function fetchStatistics() {
         `;
         trendingContainer.appendChild(item);
       });
-    } else {
+    }
+    else {
       trendingContainer.innerHTML = '<div class="empty-state">인기 곡 데이터가 없습니다.</div>';
     }
 
@@ -147,7 +148,7 @@ async function fetchStatistics() {
             borderColor: '#3ba55c',
             backgroundColor: 'rgba(59, 165, 92, 0.1)',
             fill: true,
-            tension: 0.3
+            tension: 0.3,
           },
           {
             label: 'AI 호출 횟수',
@@ -155,28 +156,28 @@ async function fetchStatistics() {
             borderColor: '#5865f2',
             backgroundColor: 'rgba(88, 101, 242, 0.1)',
             fill: true,
-            tension: 0.3
-          }
-        ]
+            tension: 0.3,
+          },
+        ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { labels: { color: '#b9bbbe' } }
+          legend: { labels: { color: '#b9bbbe' } },
         },
         scales: {
           y: {
             beginAtZero: true,
             grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: { color: '#b9bbbe' }
+            ticks: { color: '#b9bbbe' },
           },
           x: {
             grid: { display: false },
-            ticks: { color: '#b9bbbe' }
-          }
-        }
-      }
+            ticks: { color: '#b9bbbe' },
+          },
+        },
+      },
     });
 
     // 5. 시간대별 봇 활성도 막대 그래프 그리기
@@ -195,52 +196,53 @@ async function fetchStatistics() {
           backgroundColor: '#ff5353',
           borderWidth: 1,
           borderColor: '#1e1e1e',
-          borderRadius: 4
-        }]
+          borderRadius: 4,
+        }],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
         plugins: {
-          legend: { display: false }
+          legend: { display: false },
         },
         scales: {
           y: {
             beginAtZero: true,
             grid: { color: 'rgba(255, 255, 255, 0.05)' },
-            ticks: { color: '#b9bbbe', stepSize: 1 }
+            ticks: { color: '#b9bbbe', stepSize: 1 },
           },
           x: {
             grid: { display: false },
-            ticks: { color: '#b9bbbe', font: { size: 10 } }
-          }
-        }
-      }
+            ticks: { color: '#b9bbbe', font: { size: 10 } },
+          },
+        },
+      },
     });
 
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Failed to fetch statistics:', err);
   }
 }
-let cpuData = [];
-let memoryData = [];
-let resourceLabels = [];
+const cpuData = [];
+const memoryData = [];
+const resourceLabels = [];
 
 async function fetchResources() {
   try {
     const response = await fetch(`/api/system-resources?token=${token}`);
-    
+
     if (response.status === 401) {
       if (resourceInterval) clearInterval(resourceInterval);
       alert('토큰이 만료되었습니다. Discord에서 /logs 명령어를 다시 입력해주세요.');
       window.location.href = '/intro';
       return;
     }
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
 
     // 1. 수치 텍스트 바인딩
@@ -252,7 +254,8 @@ async function fetchResources() {
     if (data.lavalink === 'connected') {
       lavalinkVal.textContent = '연결됨 (정상)';
       lavalinkVal.style.color = '#3ba55c';
-    } else {
+    }
+    else {
       lavalinkVal.textContent = '연결 끊김 (오류)';
       lavalinkVal.style.color = 'var(--red)';
     }
@@ -285,8 +288,8 @@ async function fetchResources() {
           backgroundColor: 'rgba(255, 83, 83, 0.05)',
           fill: true,
           tension: 0.4,
-          pointRadius: 2
-        }]
+          pointRadius: 2,
+        }],
       },
       options: {
         responsive: true,
@@ -294,9 +297,9 @@ async function fetchResources() {
         plugins: { legend: { display: false } },
         scales: {
           y: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(255, 255, 255, 0.02)' } },
-          x: { ticks: { display: false }, grid: { display: false } }
-        }
-      }
+          x: { ticks: { display: false }, grid: { display: false } },
+        },
+      },
     });
 
     // 4. Memory 실시간 차트 그리기
@@ -315,8 +318,8 @@ async function fetchResources() {
           backgroundColor: 'rgba(75, 192, 192, 0.05)',
           fill: true,
           tension: 0.4,
-          pointRadius: 2
-        }]
+          pointRadius: 2,
+        }],
       },
       options: {
         responsive: true,
@@ -324,12 +327,13 @@ async function fetchResources() {
         plugins: { legend: { display: false } },
         scales: {
           y: { min: 0, max: 100, ticks: { display: false }, grid: { color: 'rgba(255, 255, 255, 0.02)' } },
-          x: { ticks: { display: false }, grid: { display: false } }
-        }
-      }
+          x: { ticks: { display: false }, grid: { display: false } },
+        },
+      },
     });
 
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Failed to fetch resources:', err);
   }
 }
@@ -370,39 +374,42 @@ async function fetchLogs() {
   try {
     reloadBtn.disabled = true;
     reloadBtn.textContent = '로딩 중...';
-    
+
     const response = await fetch(`/api/logs-data?token=${token}`);
-    
+
     if (response.status === 401) {
       alert('토큰이 만료되었습니다. Discord에서 /logs 명령어를 다시 입력해주세요.');
       window.location.href = '/intro';
       return;
     }
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
-    
+
     const data = await response.json();
     rawLogs = data.logs;
     errorLabels = data.errorLabels || [];
     errorTrends = data.errorTrends || [];
-    
+
     // 유저 아바타 업데이트
     const userAv = document.querySelector('.user-av');
     if (userAv && data.user) {
       if (data.user.avatarUrl) {
         userAv.innerHTML = `<img src="${data.user.avatarUrl}" alt="${escapeHtml(data.user.displayName)}" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%; display: block;" />`;
-      } else if (data.user.displayName) {
+      }
+      else if (data.user.displayName) {
         userAv.textContent = data.user.displayName.charAt(0).toUpperCase();
       }
     }
 
     renderLogs();
-  } catch (err) {
+  }
+  catch (err) {
     console.error('Failed to fetch logs:', err);
-    logsTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--red); padding: 40px 0;">로그 데이터를 불러오는 과정에서 오류가 발생했습니다.</td></tr>`;
-  } finally {
+    logsTbody.innerHTML = '<tr><td colspan="4" style="text-align: center; color: var(--red); padding: 40px 0;">로그 데이터를 불러오는 과정에서 오류가 발생했습니다.</td></tr>';
+  }
+  finally {
     reloadBtn.disabled = false;
     reloadBtn.textContent = '새로고침';
   }
@@ -420,7 +427,7 @@ function renderLogs() {
     if (selectedLevel !== 'ALL' && log.level !== selectedLevel) {
       return false;
     }
-    
+
     // 검색어 필터 (메시지, 카테고리, 혹은 메타데이터 내 특정 값 검색)
     if (searchTerm) {
       const msgMatch = log.message && log.message.toLowerCase().includes(searchTerm);
@@ -428,7 +435,7 @@ function renderLogs() {
       const metaMatch = log.metadata && JSON.stringify(log.metadata).toLowerCase().includes(searchTerm);
       return msgMatch || catMatch || metaMatch;
     }
-    
+
     return true;
   });
 
@@ -443,12 +450,12 @@ function renderLogs() {
 
   // 테이블 렌더링
   logsTbody.innerHTML = '';
-  
+
   if (filtered.length === 0) {
     emptyMessage.style.display = 'block';
     return;
   }
-  
+
   emptyMessage.style.display = 'none';
 
   filtered.forEach((log, index) => {
@@ -462,8 +469,8 @@ function renderLogs() {
     const badgeClass = ['info', 'warn', 'error'].includes(levelLower) ? levelLower : 'other';
 
     // 날짜 가공
-    const dateStr = log.timestamp 
-      ? new Date(log.timestamp).toLocaleString('ko-KR', { hour12: false }) 
+    const dateStr = log.timestamp
+      ? new Date(log.timestamp).toLocaleString('ko-KR', { hour12: false })
       : '-';
 
     row.innerHTML = `
@@ -479,8 +486,8 @@ function renderLogs() {
     detailsRow.id = `details-${index}`;
 
     const hasMetadata = log.metadata && Object.keys(log.metadata).length > 0;
-    const detailsContent = hasMetadata 
-      ? JSON.stringify(log.metadata, null, 2) 
+    const detailsContent = hasMetadata
+      ? JSON.stringify(log.metadata, null, 2)
       : '추가 메타데이터가 없습니다.';
 
     detailsRow.innerHTML = `
@@ -531,8 +538,8 @@ function renderLogsCharts(filteredLogs) {
         data: [infoCount, warnCount, errorCount],
         backgroundColor: ['#3ba55c', '#f0a020', '#cd2929'],
         borderWidth: 1,
-        borderColor: '#1e1e1e'
-      }]
+        borderColor: '#1e1e1e',
+      }],
     },
     options: {
       responsive: true,
@@ -540,10 +547,10 @@ function renderLogsCharts(filteredLogs) {
       plugins: {
         legend: {
           position: 'right',
-          labels: { color: '#b9bbbe', font: { size: 11 } }
-        }
-      }
-    }
+          labels: { color: '#b9bbbe', font: { size: 11 } },
+        },
+      },
+    },
   });
 
   // 2. 최근 30일 경고 & 에러 꺾은선 차트
@@ -563,27 +570,27 @@ function renderLogsCharts(filteredLogs) {
         borderWidth: 2,
         fill: true,
         tension: 0.4,
-        pointRadius: 2
-      }]
+        pointRadius: 2,
+      }],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
       plugins: {
-        legend: { display: false }
+        legend: { display: false },
       },
       scales: {
         y: {
           beginAtZero: true,
           grid: { color: 'rgba(255, 255, 255, 0.05)' },
-          ticks: { color: '#b9bbbe', stepSize: 1 }
+          ticks: { color: '#b9bbbe', stepSize: 1 },
         },
         x: {
           grid: { display: false },
-          ticks: { color: '#b9bbbe' }
-        }
-      }
-    }
+          ticks: { color: '#b9bbbe' },
+        },
+      },
+    },
   });
 }
 
