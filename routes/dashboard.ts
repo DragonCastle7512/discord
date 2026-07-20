@@ -761,7 +761,7 @@ export function createDashboardRouter(
       });
       const trendingSongs = Array.from(songCountMap.values())
         .sort((a, b) => b.count - a.count)
-        .slice(0, isAll ? 10 : 5);
+        .slice(0, 15);
 
       // 4. AI 호출 통계 산출 (ai-calls.json 기반)
       const aiCallsFilePath = path.join(process.cwd(), 'logs/ai-calls.json');
