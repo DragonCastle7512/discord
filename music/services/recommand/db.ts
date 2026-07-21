@@ -3,6 +3,7 @@ import { UserKeywordPin } from '../../models/user-keyword-pin';
 import { KeywordPin } from '../../models/keyword-pin';
 import { logger } from '../../../common/logger';
 import { normalizeText } from './utils';
+import { UserKeywordBlacklist } from '../../models/user-keyword-blacklist';
 
 export async function getBlacklistForGuild(guildId: string | null | undefined): Promise<Set<string>> {
   if (!guildId) return new Set<string>();
@@ -11,6 +12,17 @@ export async function getBlacklistForGuild(guildId: string | null | undefined): 
     return new Set<string>(records.map(r => normalizeText(r.keyword)));
   } catch (err) {
     logger.error('system', `[Recommend Service] Failed to load blacklist for guild ${guildId}`, { error: err instanceof Error ? err.stack : String(err) });
+    return new Set<string>();
+  }
+}
+
+export async function getUserBlacklist(userId: string ): Promise<Set<string>> {
+  if (!userId) return new Set<string>();
+  try {
+    const records = await UserKeywordBlacklist.findAll({ where: { userId } });
+    return new Set<string>(records.map(r => normalizeText(r.keyword)));
+  } catch (err) {
+    logger.error('system', `[Recommend Service] Failed to load userId for guild ${userId}`, { error: err instanceof Error ? err.stack : String(err) });
     return new Set<string>();
   }
 }

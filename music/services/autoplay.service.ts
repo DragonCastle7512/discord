@@ -2,7 +2,7 @@ import { Client } from 'discord.js';
 import { GuildState, Track } from '../types';
 import { findAllHistory, findHistoryByRequester } from '../repositorys/music-history.repository';
 import { generateSongBatchForMood, selectAndCleanSongsFromSearch } from './mood-service';
-import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText, selectRandomKeywords, getPinnedKeywordsForRecommend } from './recommand-service';
+import { buildHistoryTagKeywords, dedupeSimilarKeywords, getBlacklistForGuild, normalizeText, selectRandomKeywords, getPinnedKeywordsForRecommend, getUserBlacklist } from './recommand-service';
 import { isDurationInRange } from '../utils/track-parser';
 import { logger } from '../../common/logger';
 import { KeywordPin } from '../models/keyword-pin';
@@ -54,11 +54,14 @@ export function createAutoplayService(deps: AutoplayDeps) {
         if (mood === '서버 추천 곡' || mood === '내 추천 곡') {
             try {
                 let historyItems: any[] = [];
+                let blacklistSet: Set<string>;
                 if (mood === '내 추천 곡') {
                     if (state.autoRequesterId) {
+                        blacklistSet = await getUserBlacklist(state.autoRequesterId);
                         historyItems = await findHistoryByRequester(guildId, state.autoRequesterId);
                     }
                     if (historyItems.length === 0) {
+                        
                         const textChannel = getTextChannel(state.textChannelId);
                         if (textChannel) {
                             textChannel.send('[오토모드] 개인 히스토리가 부족하여 내 추천 곡 자동 재생을 시작할 수 없어요! 더 많은 곡을 먼저 재생해 주세요.').catch((err: any) => logger.error('music', 'Failed to send personal history insufficient notification', { error: err }));
@@ -70,10 +73,10 @@ export function createAutoplayService(deps: AutoplayDeps) {
                     }
                 } else {
                     historyItems = await findAllHistory(guildId);
+                    blacklistSet = await getBlacklistForGuild(guildId);
                 }
 
                 const tagKeywordsRaw = buildHistoryTagKeywords(historyItems, 100);
-                const blacklistSet = await getBlacklistForGuild(guildId);
                 const tagKeywords = dedupeSimilarKeywords(tagKeywordsRaw)
                     .filter(k => !blacklistSet.has(k))
                     .slice(0, 7);
