@@ -12,13 +12,24 @@ import { verifyDashboardToken } from '../common/auth';
 import { notifyMusicUpdate } from '../common/socket';
 import { isDurationInRange } from '../music/utils/track-parser';
 import { logger } from '../common/logger';
-import { GuildConfig } from '../music/models/guild-config';
-
-import { KeywordBlacklist } from '../music/models/keyword-blacklist';
-import { MusicHistory } from '../music/models/music-history';
-import { UserKeywordBlacklist } from '../music/models/user-keyword-blacklist';
-import { KeywordPin } from '../music/models/keyword-pin';
-import { UserKeywordPin } from '../music/models/user-keyword-pin';
+import {
+  findGuildConfig,
+  findAllHistory,
+  findKeywordBlacklistByGuild,
+  findKeywordBlacklistByUser,
+  addKeywordBlacklistGuild,
+  addKeywordBlacklistUser,
+  removeKeywordBlacklistGuild,
+  removeKeywordBlacklistUser,
+  findKeywordPinsByGuild,
+  findKeywordPinsByUser,
+  countKeywordPinsByGuild,
+  countKeywordPinsByUser,
+  addKeywordPinGuild,
+  addKeywordPinUser,
+  removeKeywordPinGuild,
+  removeKeywordPinUser,
+} from '../music/repositorys';
 import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText, isKeywordMatched } from '../music/services/recommand-service';
 import { Op } from 'sequelize';
 
@@ -251,7 +262,7 @@ export function createDashboardRouter(
       
       let targetChannelId = member.voice.channelId;
       try {
-        const config = await GuildConfig.findOne({ where: { guildId: session.guildId } });
+        const config = await findGuildConfig(session.guildId);
         if (config && config.musicChannelId) {
           targetChannelId = config.musicChannelId;
         }
@@ -330,7 +341,7 @@ export function createDashboardRouter(
       const session = (req as any).session;
       const mode = (req.query.mode as string) || 'server';
 
-      const histories = await MusicHistory.findAll({ where: { guildId: session.guildId } });
+      const histories = await findAllHistory(session.guildId);
       const keywordMap = new Map<string, number>();
 
       const filteredHistories = mode === 'personal'
@@ -349,26 +360,26 @@ export function createDashboardRouter(
         });
       });
 
-      const plainHistories = filteredHistories.map(h => h.get({ plain: true }));
+      const plainHistories = filteredHistories;
       const tagKeywordsRaw = buildHistoryTagKeywords(plainHistories, 9999);
       const dedupedKeywordsList: string[] = dedupeSimilarKeywords(tagKeywordsRaw);
 
       let blacklistSet = new Set<string>();
       if (mode === 'personal') {
-        const blacklistRecords = await UserKeywordBlacklist.findAll({ where: { userId: session.userId } });
+        const blacklistRecords = await findKeywordBlacklistByUser(session.userId);
         blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
       } else {
-        const blacklistRecords = await KeywordBlacklist.findAll({ where: { guildId: session.guildId } });
+        const blacklistRecords = await findKeywordBlacklistByGuild(session.guildId);
         blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
       }
 
       // 고정 키워드 조회
       let pinnedSet = new Set<string>();
       if (mode === 'personal') {
-        const pinRecords = await UserKeywordPin.findAll({ where: { userId: session.userId } }).catch(() => []);
+        const pinRecords = await findKeywordPinsByUser(session.userId).catch(() => []);
         pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
       } else {
-        const pinRecords = await KeywordPin.findAll({ where: { guildId: session.guildId } }).catch(() => []);
+        const pinRecords = await findKeywordPinsByGuild(session.guildId).catch(() => []);
         pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
       }
 
@@ -478,19 +489,9 @@ export function createDashboardRouter(
       const currentMode = mode || 'server';
 
       if (currentMode === 'personal') {
-        await UserKeywordBlacklist.findOrCreate({ 
-          where: { 
-            userId: session.userId, 
-            keyword: normalized 
-          } 
-        });
+        await addKeywordBlacklistUser(session.userId, normalized);
       } else {
-        await KeywordBlacklist.findOrCreate({ 
-          where: { 
-            guildId: session.guildId, 
-            keyword: normalized 
-          } 
-        });
+        await addKeywordBlacklistGuild(session.guildId, normalized);
       }
       notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
@@ -511,19 +512,9 @@ export function createDashboardRouter(
       const currentMode = mode || 'server';
 
       if (currentMode === 'personal') {
-        await UserKeywordBlacklist.destroy({ 
-          where: { 
-            userId: session.userId, 
-            keyword: normalized 
-          } 
-        });
+        await removeKeywordBlacklistUser(session.userId, normalized);
       } else {
-        await KeywordBlacklist.destroy({ 
-          where: { 
-            guildId: session.guildId, 
-            keyword: normalized 
-          } 
-        });
+        await removeKeywordBlacklistGuild(session.guildId, normalized);
       }
       notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
@@ -544,29 +535,19 @@ export function createDashboardRouter(
       const currentMode = mode || 'server';
 
       if (currentMode === 'personal') {
-        const count = await UserKeywordPin.count({ where: { userId: session.userId } });
+        const count = await countKeywordPinsByUser(session.userId);
         if (count >= 5) {
           res.status(400).json({ error: '최대 5개까지만 고정할 수 있습니다.' });
           return;
         }
-        await UserKeywordPin.findOrCreate({ 
-          where: { 
-            userId: session.userId, 
-            keyword: normalized 
-          } 
-        });
+        await addKeywordPinUser(session.userId, normalized);
       } else {
-        const count = await KeywordPin.count({ where: { guildId: session.guildId } });
+        const count = await countKeywordPinsByGuild(session.guildId);
         if (count >= 5) {
           res.status(400).json({ error: '최대 5개까지만 고정할 수 있습니다.' });
           return;
         }
-        await KeywordPin.findOrCreate({ 
-          where: { 
-            guildId: session.guildId, 
-            keyword: normalized 
-          } 
-        });
+        await addKeywordPinGuild(session.guildId, normalized);
       }
       notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
@@ -587,19 +568,9 @@ export function createDashboardRouter(
       const currentMode = mode || 'server';
 
       if (currentMode === 'personal') {
-        await UserKeywordPin.destroy({ 
-          where: { 
-            userId: session.userId, 
-            keyword: normalized 
-          } 
-        });
+        await removeKeywordPinUser(session.userId, normalized);
       } else {
-        await KeywordPin.destroy({ 
-          where: { 
-            guildId: session.guildId, 
-            keyword: normalized 
-          } 
-        });
+        await removeKeywordPinGuild(session.guildId, normalized);
       }
       notifyMusicUpdate(currentMode === 'personal' ? session.userId : session.guildId);
       res.json({ ok: true });
@@ -729,16 +700,7 @@ export function createDashboardRouter(
       // 1. 봇이 참가 중인 서버(Guild) 목록 획득
       const guilds = client.guilds.cache.map(g => ({ id: g.id, name: g.name }));
 
-      // 2. 음악 재생 내역 조회 (정합성을 위해 날짜 필터 완전히 제거)
-      const historyWhere: any = {};
-      if (!isAll) {
-        historyWhere.guildId = selectedGuildId;
-      }
-
-      const histories = await MusicHistory.findAll({
-        where: historyWhere,
-        order: [['createdAt', 'DESC']]
-      });
+      const histories = await findAllHistory(isAll ? undefined : selectedGuildId);
 
       // 3. 인기 곡 집계 (Top 10 / Top 5)
       const songCountMap = new Map<string, { title: string; artist: string; count: number; artworkUrl: string | null }>();

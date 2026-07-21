@@ -17,12 +17,24 @@ import {
 } from './repositorys/playlist.repository';
 import { notifyMusicUpdate } from '../common/socket';
 import { logger } from '../common/logger';
-import { MusicHistory } from './models/music-history';
-import { KeywordBlacklist } from './models/keyword-blacklist';
-import { UserKeywordBlacklist } from './models/user-keyword-blacklist';
-import { KeywordPin } from './models/keyword-pin';
-import { UserKeywordPin } from './models/user-keyword-pin';
-import { GuildConfig } from './models/guild-config';
+import {
+  findAllHistory,
+  findGuildConfig,
+  findKeywordBlacklistByGuild,
+  findKeywordBlacklistByUser,
+  addKeywordBlacklistGuild,
+  addKeywordBlacklistUser,
+  removeKeywordBlacklistGuild,
+  removeKeywordBlacklistUser,
+  findKeywordPinsByGuild,
+  findKeywordPinsByUser,
+  countKeywordPinsByGuild,
+  countKeywordPinsByUser,
+  addKeywordPinGuild,
+  addKeywordPinUser,
+  removeKeywordPinGuild,
+  removeKeywordPinUser,
+} from './repositorys';
 import { dedupeSimilarKeywords, buildHistoryTagKeywords, isValidTagKeyword, normalizeText, isKeywordMatched, keywordSimilarity } from './services/recommand-service';
 
 export function createMusicRuntime({ 
@@ -52,7 +64,7 @@ export function createMusicRuntime({
 
     let channelId = originalChannelId;
     try {
-      const config = await GuildConfig.findOne({ where: { guildId: guild.id } });
+      const config = await findGuildConfig(guild.id);
       if (config && config.musicChannelId) {
         channelId = config.musicChannelId;
       }
@@ -408,7 +420,7 @@ export function createMusicRuntime({
           if (readyNode) {
             let channelId = context.channelId || state.textChannelId;
             try {
-              const config = await GuildConfig.findOne({ where: { guildId } });
+              const config = await findGuildConfig(guildId);
               if (config && config.musicChannelId) {
                 channelId = config.musicChannelId;
               }
@@ -530,7 +542,7 @@ export function createMusicRuntime({
     pinned: string[];
   }> {
     try {
-      const histories = await MusicHistory.findAll({ where: { guildId } });
+      const histories = await findAllHistory(guildId);
       const keywordMap = new Map<string, number>();
 
       const filteredHistories = isPersonal
@@ -549,25 +561,25 @@ export function createMusicRuntime({
         });
       });
 
-      const plainHistories = filteredHistories.map(h => h.get({ plain: true }));
+      const plainHistories = filteredHistories;
       const tagKeywordsRaw = buildHistoryTagKeywords(plainHistories, 9999);
       const dedupedKeywordsList: string[] = dedupeSimilarKeywords(tagKeywordsRaw);
 
       let blacklistSet = new Set<string>();
       if (isPersonal) {
-        const blacklistRecords = await UserKeywordBlacklist.findAll({ where: { userId } });
+        const blacklistRecords = await findKeywordBlacklistByUser(userId);
         blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
       } else {
-        const blacklistRecords = await KeywordBlacklist.findAll({ where: { guildId } });
+        const blacklistRecords = await findKeywordBlacklistByGuild(guildId);
         blacklistSet = new Set(blacklistRecords.map(r => r.keyword.toLowerCase().trim()));
       }
 
       let pinnedSet = new Set<string>();
       if (isPersonal) {
-        const pinRecords = await UserKeywordPin.findAll({ where: { userId } }).catch(() => []);
+        const pinRecords = await findKeywordPinsByUser(userId).catch(() => []);
         pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
       } else {
-        const pinRecords = await KeywordPin.findAll({ where: { guildId } }).catch(() => []);
+        const pinRecords = await findKeywordPinsByGuild(guildId).catch(() => []);
         pinnedSet = new Set(pinRecords.map(r => normalizeText(r.keyword)));
       }
 
@@ -614,10 +626,10 @@ export function createMusicRuntime({
   async function getKeywordBlacklist(targetId: string, isPersonal: boolean): Promise<{ ok: boolean; keywords: string[] }> {
     try {
       if (isPersonal) {
-        const records = await UserKeywordBlacklist.findAll({ where: { userId: targetId } });
+        const records = await findKeywordBlacklistByUser(targetId);
         return { ok: true, keywords: records.map(r => r.keyword) };
       } else {
-        const records = await KeywordBlacklist.findAll({ where: { guildId: targetId } });
+        const records = await findKeywordBlacklistByGuild(targetId);
         return { ok: true, keywords: records.map(r => r.keyword) };
       }
     } catch (err: any) {
@@ -631,7 +643,7 @@ export function createMusicRuntime({
     if (!normalizedInput) return normalizedInput;
 
     try {
-      const histories = await MusicHistory.findAll({ where: { guildId } });
+      const histories = await findAllHistory(guildId);
       const tagKeywordsRaw: string[] = [];
       histories.forEach(h => {
         if ((h.musicInfo as any)?.isSkipped) return;
@@ -675,9 +687,9 @@ export function createMusicRuntime({
     }
     try {
       if (isPersonal) {
-        await UserKeywordBlacklist.findOrCreate({ where: { userId: targetId, keyword: normalized } });
+        await addKeywordBlacklistUser(targetId, normalized);
       } else {
-        await KeywordBlacklist.findOrCreate({ where: { guildId: targetId, keyword: normalized } });
+        await addKeywordBlacklistGuild(targetId, normalized);
       }
       notifyMusicUpdate(targetId);
       return { ok: true, message: `키워드 '${normalized}'를 블랙리스트에 추가했습니다.` };
@@ -699,9 +711,9 @@ export function createMusicRuntime({
     }
     try {
       if (isPersonal) {
-        await UserKeywordBlacklist.destroy({ where: { userId: targetId, keyword: normalized } });
+        await removeKeywordBlacklistUser(targetId, normalized);
       } else {
-        await KeywordBlacklist.destroy({ where: { guildId: targetId, keyword: normalized } });
+        await removeKeywordBlacklistGuild(targetId, normalized);
       }
       notifyMusicUpdate(targetId);
       return { ok: true, message: `키워드 '${normalized}'를 블랙리스트에서 제거했습니다.` };
@@ -714,10 +726,10 @@ export function createMusicRuntime({
   async function getKeywordPins(targetId: string, isPersonal: boolean): Promise<{ ok: boolean; keywords: string[] }> {
     try {
       if (isPersonal) {
-        const records = await UserKeywordPin.findAll({ where: { userId: targetId } });
+        const records = await findKeywordPinsByUser(targetId);
         return { ok: true, keywords: records.map(r => r.keyword) };
       } else {
-        const records = await KeywordPin.findAll({ where: { guildId: targetId } });
+        const records = await findKeywordPinsByGuild(targetId);
         return { ok: true, keywords: records.map(r => r.keyword) };
       }
     } catch (err: any) {
@@ -738,17 +750,17 @@ export function createMusicRuntime({
     }
     try {
       if (isPersonal) {
-        const count = await UserKeywordPin.count({ where: { userId: targetId } });
+        const count = await countKeywordPinsByUser(targetId);
         if (count >= 5) {
           return { ok: false, message: '최대 5개까지만 고정할 수 있습니다.' };
         }
-        await UserKeywordPin.findOrCreate({ where: { userId: targetId, keyword: normalized } });
+        await addKeywordPinUser(targetId, normalized);
       } else {
-        const count = await KeywordPin.count({ where: { guildId: targetId } });
+        const count = await countKeywordPinsByGuild(targetId);
         if (count >= 5) {
           return { ok: false, message: '최대 5개까지만 고정할 수 있습니다.' };
         }
-        await KeywordPin.findOrCreate({ where: { guildId: targetId, keyword: normalized } });
+        await addKeywordPinGuild(targetId, normalized);
       }
       notifyMusicUpdate(targetId);
       return { ok: true, message: `키워드 '${normalized}'를 고정 목록에 추가했습니다.` };
@@ -770,9 +782,9 @@ export function createMusicRuntime({
     }
     try {
       if (isPersonal) {
-        await UserKeywordPin.destroy({ where: { userId: targetId, keyword: normalized } });
+        await removeKeywordPinUser(targetId, normalized);
       } else {
-        await KeywordPin.destroy({ where: { guildId: targetId, keyword: normalized } });
+        await removeKeywordPinGuild(targetId, normalized);
       }
       notifyMusicUpdate(targetId);
       return { ok: true, message: `키워드 '${normalized}'를 고정 목록에서 제거했습니다.` };

@@ -5,9 +5,10 @@ export async function insertHistory(guildId: string, musicInfo: Track): Promise<
   return MusicHistory.create({ guildId, musicInfo });
 }
 
-export async function findAllHistory(guildId: string): Promise<HistoryEntry[]> {
+export async function findAllHistory(guildId?: string): Promise<HistoryEntry[]> {
+  const where = guildId ? { guildId } : {};
   const items = await MusicHistory.findAll({
-    where: { guildId },
+    where,
     order: [['createdAt', 'DESC']],
   });
   return items.map(item => item.get({ plain: true })) as unknown as HistoryEntry[];

@@ -1,4 +1,4 @@
-import { UserKeywordBlacklist } from '../../models/user-keyword-blacklist';
+import { findKeywordBlacklistByUser } from '../../repositorys/user-keyword-blacklist.repository';
 import { isDurationInRange } from '../../utils/track-parser';
 import { logger } from '../../../common/logger';
 import { Track } from '../../types';
@@ -147,7 +147,7 @@ export async function recommendFromHistory({
 
   if (userId) {
     try {
-      const userRecords = await UserKeywordBlacklist.findAll({ where: { userId } });
+      const userRecords = await findKeywordBlacklistByUser(userId);
       userRecords.forEach((r) => blacklistSet.add(normalizeText(r.keyword)));
     } catch (err) {
       logger.error('system', `[Recommend Service] Failed to load blacklist for user ${userId}`, { error: err instanceof Error ? err.stack : String(err) });

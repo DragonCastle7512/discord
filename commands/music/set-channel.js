@@ -1,5 +1,5 @@
 import { safeReply } from '../../common/reply-util';
-import { GuildConfig } from '../../music/models/guild-config';
+import { upsertGuildMusicChannel } from '../../music/repositorys/guild-config.repository';
 
 const { SlashCommandBuilder, PermissionFlagsBits, ChannelType } = require('discord.js');
 
@@ -23,13 +23,7 @@ module.exports = {
     const guildId = interaction.guild.id;
 
     try {
-      const config = await GuildConfig.findOne({ where: { guildId } });
-      if (config) {
-        await config.update({ musicChannelId: channel.id });
-      }
-      else {
-        await GuildConfig.create({ guildId, musicChannelId: channel.id });
-      }
+      await upsertGuildMusicChannel(guildId, channel.id);
 
       await safeReply(interaction, `성공적으로 노래 재생 알림 채널을 ${channel}로 지정하였습니다!`);
     }
