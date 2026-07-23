@@ -179,7 +179,7 @@ function createSlashCommandInvoker({ commands, context }) {
       const interaction = createSyntheticInteraction(message, options, extra);
       const startTime = Date.now();
       try {
-        await command.execute(interaction, context);
+        const commandResult = await command.execute(interaction, context);
         const latencyMs = Date.now() - startTime;
         logger.info('command', `Executed command (synthetic): ${normalizedName}`, {
           userId: message.author.id,
@@ -189,6 +189,7 @@ function createSlashCommandInvoker({ commands, context }) {
         return {
           ok: true,
           message: summarizeReply(interaction._replyMessage),
+          data: commandResult || null,
         };
       }
       catch (err) {

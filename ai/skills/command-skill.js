@@ -34,6 +34,7 @@ async function executeSlash(obj, commandName, options = {}, extra = {}) {
       command: commandName,
       options: compactOptions(options),
       message: result?.message || null,
+      data: result?.data || null,
     };
   }
   catch (err) {
@@ -69,7 +70,7 @@ module.exports = {
     },
     {
       name: 'slash_search',
-      description: '노래를 검색하고 상위 5개 결과를 버튼으로 선택해 재생할 수 있는 UI를 보여줍니다. 바로 재생하지 않고 사용자가 결과를 고르게 할 때 사용합니다.',
+      description: '사용자가 명시적으로 검색 결과 UI/버튼 목록 출력을 원할 때 사용합니다. 바로 노래를 재생하거나 틀어 달라는 요청(예: "OO 틀어줘")에는 이 도구를 사용하지 마세요.',
       parameters: {
         type: 'OBJECT',
         properties: {

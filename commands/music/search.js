@@ -37,13 +37,23 @@ module.exports = {
 
     if (!tracks.length) {
       await safeReply(interaction, { content: '검색 결과가 없어요.' });
-      return;
+      return { ok: false, tracks: [] };
     }
 
     await safeReply(interaction, {
       flags: MessageFlags.IsComponentsV2,
       components: buildSearchComponents(query, tracks, interaction.user.id),
     });
+
+    return {
+      ok: true,
+      tracks: tracks.map((t) => ({
+        title: t.info.title,
+        author: t.info.author,
+        url: t.info.uri,
+        duration: t.info.length,
+      })),
+    };
   },
 
   canHandleComponent(interaction) {

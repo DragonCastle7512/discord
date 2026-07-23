@@ -137,7 +137,7 @@ module.exports = {
     },
     {
       name: 'get_youtube_popular_music',
-      description: '유튜브 인기 음악을 조회합니다.',
+      description: '유튜브 인기 음악을 조회합니다. 키워드가 비어있다면 최신 인기 음악, 키워드가 존재하면 해당 키워드의 인기 곡들을 조회합니다.',
       parameters: {
         type: 'OBJECT',
         properties: {
