@@ -246,7 +246,11 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
 
         if(replyMsg?.deletable) await replyMsg?.delete();
         if(!response.text) {
+            const firstCandidate = response.candidates?.[0];
             logger.error('ai', 'Gemini response text is empty or blocked', { 
+                finishReason: firstCandidate?.finishReason,
+                finishMessage: (firstCandidate as any)?.finishMessage,
+                safetyRatings: firstCandidate?.safetyRatings,
                 response: JSON.parse(JSON.stringify(response)) 
             });
             return { ok: false, message: '문제가 발생했어요.' };
