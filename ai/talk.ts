@@ -85,7 +85,16 @@ const isRetriableError = (err: any) => {
     return [429, 503].includes(status) || status >= 500 || text.includes('UNAVAILABLE') || text.includes('high demand');
 };
 
-async function generateWithRetry(contents: ContentListUnion): Promise<GenerateContentResponse> {
+interface GenerateOptions {
+    temperature?: number;
+    tools?: any[];
+}
+
+async function generateWithRetry(
+    contents: ContentListUnion, 
+    options: GenerateOptions = {}
+): Promise<GenerateContentResponse> {
+    const { temperature = 0, tools = [{ functionDeclarations }] } = options;
     for (let i = 0; i < ai.models.length; i++) {
         const model = ai.models[ai.index];
         try {
@@ -94,7 +103,8 @@ async function generateWithRetry(contents: ContentListUnion): Promise<GenerateCo
                 config: {
                     thinkingConfig: { includeThoughts: false },
                     systemInstruction: getSystemInstructions(),
-                    tools: [{ functionDeclarations }]
+                    temperature,
+                    ...(tools && tools.length > 0 ? { tools } : {})
                 },
                 contents,
             });
@@ -199,9 +209,11 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
             }
         }
         contents.push({ role: 'user', parts });
-        let response: GenerateContentResponse = await generateWithRetry(contents);
+        let response: GenerateContentResponse = await generateWithRetry(contents, { temperature: 0 });
+        let hasToolBeenCalled = false;
 
         while (response?.functionCalls && response.functionCalls?.length > 0) {
+            hasToolBeenCalled = true;
             const firstTool: string | undefined = response.functionCalls[0].name;
             if(!firstTool) break;
             const statusText = toolStatusMap[firstTool] || '잠시만 기다려주세요... ⏳';
@@ -223,7 +235,13 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
                 return { functionResponse: { id: fc.id, name: fc.name, response: { output } } };
             }));
             contents.push({ role: 'user', parts: toolParts });
-            response = await generateWithRetry(contents);
+
+            // 연속 도구 호출 확인 단계에서도 temperature: 0 유지
+            response = await generateWithRetry(contents, { temperature: 0 });
+        }
+
+        if (hasToolBeenCalled || !response.text) {
+            response = await generateWithRetry(contents, { temperature: 0.7, tools: [] });
         }
 
         if(replyMsg?.deletable) await replyMsg?.delete();
