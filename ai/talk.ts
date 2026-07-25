@@ -107,12 +107,17 @@ export function scheduleDaily16Reset(): { timeout: NodeJS.Timeout; interval?: No
         intervalTimer = setInterval(() => {
             resetModelIndex();
         }, 24 * 60 * 60 * 1000);
+        if (intervalTimer.unref) intervalTimer.unref();
     }, msUntil16);
+
+    if (timeoutTimer.unref) timeoutTimer.unref();
 
     return { timeout: timeoutTimer, interval: intervalTimer };
 }
 
-scheduleDaily16Reset();
+if (process.env.NODE_ENV !== 'test') {
+    scheduleDaily16Reset();
+}
 
 const isRetriableError = (err: any) => {
     const status = Number(err?.status || err?.error?.code || 0);
