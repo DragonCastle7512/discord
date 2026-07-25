@@ -79,6 +79,41 @@ const ai: AI = {
     index: 0,
 };
 
+export function getAiModelIndex(): number {
+    return ai.index;
+}
+
+export function resetModelIndex(): void {
+    ai.index = 0;
+    logger.info('ai', 'AI 모델 인덱스가 0(첫 번째 모델)으로 초기화되었습니다.');
+}
+
+export function scheduleDaily16Reset(): { timeout: NodeJS.Timeout; interval?: NodeJS.Timeout } {
+    const now = new Date();
+    const kstNow = new Date(now.getTime() + (9 * 60 * 60 * 1000));
+    
+    const kstTarget = new Date(kstNow);
+    kstTarget.setUTCHours(16, 0, 0, 0);
+
+    if (kstNow.getTime() >= kstTarget.getTime()) {
+        kstTarget.setUTCDate(kstTarget.getUTCDate() + 1);
+    }
+
+    const msUntil16 = kstTarget.getTime() - kstNow.getTime();
+    
+    let intervalTimer: NodeJS.Timeout | undefined;
+    const timeoutTimer = setTimeout(() => {
+        resetModelIndex();
+        intervalTimer = setInterval(() => {
+            resetModelIndex();
+        }, 24 * 60 * 60 * 1000);
+    }, msUntil16);
+
+    return { timeout: timeoutTimer, interval: intervalTimer };
+}
+
+scheduleDaily16Reset();
+
 const isRetriableError = (err: any) => {
     const status = Number(err?.status || err?.error?.code || 0);
     const text = String(err?.message || '');
@@ -269,4 +304,4 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
     }
 }
 
-module.exports = { talk, cleanResponseText, getSystemInstructions };
+module.exports = { talk, cleanResponseText, getSystemInstructions, resetModelIndex, getAiModelIndex, scheduleDaily16Reset };
