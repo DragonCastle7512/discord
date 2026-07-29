@@ -20,6 +20,8 @@ import { initSocket } from './common/socket';
 import { createRuntimeUtils } from './music/runtime-util';
 import { logger } from './common/logger';
 import { commandRateLimiter, aiRateLimiter } from './common/rate-limiter';
+import { savePlaybackStatesSync } from './music/playback-state-store';
+import { restorePlaybackStates } from './music/playback-restorer';
 
 const { talk } = require('./ai/talk');
 const { createMusicRuntime } = require('./music/runtime');
@@ -55,6 +57,8 @@ if (!token || !lavalinkHost || !lavalinkPassword) {
   process.exit(1);
 }
 
+const lavalinkResumeTimeout: number = Number(process.env.LAVALINK_RESUME_TIMEOUT_SEC || 60);
+
 class MyClient extends Client {
   commands: Collection<string, any> = new Collection();
 }
@@ -74,10 +78,12 @@ const shoukaku = new Shoukaku(
   new Connectors.DiscordJS(client),
   [], // 빈 배열로 생성하여 인스턴스 생성 즉시 첫 연결 시도로 인한 비동기 리스너 경쟁 상태 방지
   {
-    reconnectTries: 1, // 수동으로 헬스체크 대기 후 커넥트를 제어하므로 1로 최솟값 할당
-    reconnectInterval: 0,
+    reconnectTries: 5,
+    reconnectInterval: 3000,
     moveOnDisconnect: false,
-    resume: false,
+    resume: true,
+    resumeTimeout: lavalinkResumeTimeout,
+    resumeByLibrary: true,
   },
 );
 
@@ -199,10 +205,21 @@ async function waitAndConnectNode(name: string) {
   }, 3000);
 }
 
+let isRestoredOnce = false;
+
 // 3. Shoukaku 이벤트 리스너 우선 등록
-shoukaku.on('ready', (name: string) => {
+shoukaku.on('ready', (name: string, lavalinkResume: boolean, libraryResume: boolean) => {
   readyNodes.add(name);
-  console.log(`[Lavalink] Node connected successfully: ${name}`);
+  console.log(`[Lavalink] Node connected successfully: ${name} (lavalinkResume: ${lavalinkResume}, libraryResume: ${libraryResume})`);
+
+  if (!isRestoredOnce) {
+    isRestoredOnce = true;
+    setTimeout(() => {
+      restorePlaybackStates({ client, shoukaku, guildStates, runtimeUtils }).catch((err) => {
+        logger.error('music', `Failed to restore playback states: ${err.message}`, { error: err });
+      });
+    }, 1000);
+  }
 });
 
 shoukaku.on('error', (name: string, error: Error) => {
@@ -386,3 +403,26 @@ client.on('messageCreate', async (message: Message) => {
     await safeReply(message, '대화 중 에러가 발생했습니다.');
   }
 });
+
+// Graceful Shutdown handling for zero-downtime / seamless deployment
+async function gracefulShutdown(signal: string) {
+  logger.info('system', `[Shutdown] Received ${signal}. Shutting down gracefully...`);
+  try {
+    // 1. 현재 각 서버의 음악 재생 상태를 파일에 동기식으로 안전하게 백업 저장
+    savePlaybackStatesSync(guildStates);
+
+    // 2. Discord Client Gateway 연결 해제
+    await client.destroy();
+    logger.info('system', '[Shutdown] Discord client destroyed successfully.');
+  } catch (err: any) {
+    logger.error('system', `[Shutdown] Error during graceful shutdown: ${err.message}`);
+  }
+  process.exit(0);
+}
+
+process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
+process.on('exit', () => {
+  savePlaybackStatesSync(guildStates);
+});
+

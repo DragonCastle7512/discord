@@ -48,6 +48,9 @@ export interface GuildState {
   autoRequesterId?: string | null;
   autoPool?: string[];
   currentHistoryId?: number | null;
+  trackStartedAt?: number | null;
+  accumulatedPosition?: number;
+  isRestoring?: boolean;
 }
 
 

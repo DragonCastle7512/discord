@@ -7,6 +7,7 @@ import { insertHistory, updateHistorySkipped } from '../repositorys/music-histor
 import { notifyMusicUpdate } from '../../common/socket';
 import { createAutoplayService } from './autoplay.service';
 import { logger } from '../../common/logger';
+import { savePlaybackStatesSync } from '../playback-state-store';
 
 export interface PlayerEngineDeps {
   client: Client;
@@ -124,7 +125,12 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       }
 
       player.on('end', async (event) => {
-        if ((event?.reason as any) === 'replaced') {
+        if (state.isRestoring) {
+          logger.info('music', '[PlayerEngine] Ignoring track end event during playback state restoration.');
+          return;
+        }
+        const reason = event?.reason;
+        if (reason === 'replaced' || reason === 'cleanup') {
           return;
         }
         const endedTrack = state.current;
@@ -310,6 +316,7 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
       state.player = null;
       state.voiceChannelId = null;
       notifyMusicUpdate(guildId, 'music');
+      savePlaybackStatesSync(guildStates);
     }
   }
 
@@ -345,7 +352,10 @@ export function createPlayerEngine(deps: PlayerEngineDeps): RuntimeUtils {
     }
 
     state.playing = true;
+    state.trackStartedAt = Date.now();
+    state.accumulatedPosition = 0;
     notifyMusicUpdate(guildId, 'music');
+    savePlaybackStatesSync(guildStates);
     try {
       await state.player.playTrack({ track: { encoded: next.encoded } });
       
