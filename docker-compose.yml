@@ -20,6 +20,7 @@ services:
     image: ghcr.io/lavalink-devs/lavalink:4
     container_name: lavalink
     restart: always
+    network_mode: "host"
     volumes:
       - ../lavalink/application.yml:/opt/Lavalink/application.yml
     ports:
@@ -33,39 +34,45 @@ services:
       timeout: 3s
       retries: 10
       start_period: 10s
-    networks:
-      - bot-network
+    # networks:
+    #   - bot-network
 
   lavalink-prewarm:
     image: alpine:3.20
     container_name: lavalink-prewarm
     restart: always
+    env_file:
+      - ./.env
     depends_on:
       lavalink:
-        condition: service_healthy
+        condition: service_started
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
-      - LAVALINK_HOST=lavalink
+      - LAVALINK_HOST=172.17.0.1
       - LAVALINK_PORT=2333
       - LAVALINK_SECURE=false
       - LAVALINK_PASSWORD=${LAVALINK_PASSWORD}
       - PREWARM_IDENTIFIERS=${LAVALINK_PREWARM_IDENTIFIERS}
-    command: >
-      sh -c "apk add --no-cache curl >/dev/null 2>&1 || true;
-      echo '[Prewarm] container started';
-      until curl -sS -H \"Authorization: ${LAVALINK_PASSWORD}\" http://${LAVALINK_HOST}:${LAVALINK_PORT}/version >/dev/null 2>&1; do
-        echo '[Prewarm] waiting for lavalink...';
-        sleep 5;
-      done;
-      echo '[Prewarm] lavalink ready, running prewarm';
-      while true; do
-        for id in $(echo \"$LAVALINK_PREWARM_IDENTIFIERS\" | tr ',' ' '); do
-          if [ -n \"$$id\" ]; then
-            echo \"[Prewarm] resolving: $$id\";
-            curl -sS -H \"Authorization: ${LAVALINK_PASSWORD}\" --get --data-urlencode \"identifier=$$id\" http://${LAVALINK_HOST}:${LAVALINK_PORT}/v4/loadtracks >/dev/null 2>&1 || true;
-          fi;
-        done;
-        sleep 86400;
-      done"
+    command:
+      - sh
+      - -c
+      - |
+        echo '[Prewarm] container started'
+        until wget -qO- --header="Authorization: ${LAVALINK_PASSWORD}" http://172.17.0.1:2333/version >/dev/null 2>&1; do
+          echo '[Prewarm] waiting for lavalink...'
+          sleep 5
+        done
+        echo '[Prewarm] lavalink ready, running prewarm'
+        while true; do
+          for id in $(echo "$PREWARM_IDENTIFIERS" | tr ',' ' '); do
+            if [ -n "$id" ]; then
+              echo "[Prewarm] resolving: $id"
+              wget -qO- --header="Authorization: ${LAVALINK_PASSWORD}" "http://172.17.0.1:2333/v4/loadtracks?identifier=$id" >/dev/null 2>&1 || true
+            fi
+          done
+          sleep 86400
+        done
     networks:
       - bot-network
 
@@ -80,9 +87,11 @@ services:
       - '3000:3000'
     volumes:
       - /home/ubuntu/discord/discord-bot/logs:/app/logs
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - TTS_SERVER_URL=http://tts-engine:9880
-      - LAVALINK_HOST=lavalink
+      - LAVALINK_HOST=host.docker.internal
       - LAVALINK_PORT=2333
       - LAVALINK_SECURE=false
       - TTS_PUBLIC_BASE_URL=http://discord-bot:3000
