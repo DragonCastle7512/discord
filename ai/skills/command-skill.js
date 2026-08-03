@@ -250,7 +250,7 @@ module.exports = {
         properties: {
           mood: {
             type: 'STRING',
-            description: `분위기(${MOOD_CHOICES.map(c => c.value).join(',')} 중 택1). 활성화 시 필수 입력`,
+            description: `분위기/무드(${MOOD_CHOICES.map(c => c.value).join(',')}) 또는 검색할 특정 아티스트/키워드(예: 아이유, 지브리 OST 등). 활성화 시 필수 입력`,
           },
           enable: {
             type: 'BOOLEAN',

@@ -176,17 +176,52 @@ export function createAutoplayService(deps: AutoplayDeps) {
             }
         }
         else {
-            try {
-                const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
-                state.autoPool = Array.isArray(batch) ? batch : [];
-                logger.info('music', `[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`, {
-                    mood,
-                    songs: state.autoPool,
-                });
+            const PRESET_MOODS = new Set(['잔잔한', '신나는', '랩/힙합', '재즈', '록/메탈', 'Jpop', '비오는 날', '카페', '우울한']);
+            if (PRESET_MOODS.has(mood)) {
+                try {
+                    const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
+                    state.autoPool = Array.isArray(batch) ? batch : [];
+                    logger.info('music', `[AutoPlay Mood] Replenished pool with ${state.autoPool.length} songs for "${mood}"`, {
+                        mood,
+                        songs: state.autoPool,
+                    });
+                }
+                catch (err: any) {
+                    logger.error('music', 'generateSongBatchForMood failed in autoplay', { error: err.stack, mood });
+                    throw new Error(`generateSongBatchForMood failed: ${err.message}`);
+                }
             }
-            catch (err: any) {
-                logger.error('music', 'generateSongBatchForMood failed in autoplay', { error: err.stack, mood });
-                throw new Error(`generateSongBatchForMood failed: ${err.message}`);
+            else {
+                // 커스텀 키워드 직접 입력 처리 (ytsearch 기반 검색 -> Gemini 정제)
+                try {
+                    logger.info('music', `[AutoPlay Custom Keyword] Searching tracks for keyword: "${mood}"`);
+                    const resolved = await resolveTracks(mood);
+                    const tracks = resolved?.tracks || [];
+                    const videoTitles = tracks
+                        .filter(t => isDurationInRange(t.info.length))
+                        .map(t => t.info ? `${t.info.author} - ${t.info.title}` : null)
+                        .filter((t): t is string => !!t);
+
+                    if (videoTitles.length > 0) {
+                        const batch = await selectAndCleanSongsFromSearch(videoTitles, mood, excludedTitles, 20);
+                        state.autoPool = Array.isArray(batch) ? batch : [];
+                        logger.info('music', `[AutoPlay Custom Keyword] Replenished pool with ${state.autoPool.length} songs for keyword "${mood}"`, {
+                            keyword: mood,
+                            songs: state.autoPool,
+                        });
+                    }
+                    else {
+                        // 유튜브 직접 검색 결과가 적거나 없으면 AI 프롬프트 기반으로 fallback
+                        logger.info('music', `[AutoPlay Custom Keyword] Fallback to AI song batch for keyword "${mood}"`);
+                        const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
+                        state.autoPool = Array.isArray(batch) ? batch : [];
+                    }
+                }
+                catch (err: any) {
+                    logger.error('music', `[AutoPlay Custom Keyword] Error processing custom keyword "${mood}", trying fallback`, { error: err.stack });
+                    const batch = await generateSongBatchForMood(mood, excludedTitles, 20);
+                    state.autoPool = Array.isArray(batch) ? batch : [];
+                }
             }
         }
     }

@@ -276,6 +276,19 @@ client.on(Events.InteractionCreate, async (interaction: Interaction) => {
       }
     }
 
+    if (interaction.isAutocomplete()) {
+      const command = (interaction.client as MyClient).commands.get(interaction.commandName);
+      if (command && typeof command.autocomplete === 'function') {
+        try {
+          await command.autocomplete(interaction, context);
+        }
+        catch (err) {
+          logger.error('command', `Error handling autocomplete for command ${interaction.commandName}`, { error: err });
+        }
+      }
+      return;
+    }
+
     if (!interaction.isChatInputCommand()) return;
     const command = (interaction.client as MyClient).commands.get(interaction.commandName);
     if (!command) return;
