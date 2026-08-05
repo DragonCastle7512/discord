@@ -138,28 +138,7 @@ export function createMusicRuntime({
     }
 
     if (addedCount === 0) {
-      try {
-        const res = await findPlaylist(originalUserId);
-        const playlist = res.map((music) => music.musicInfo);
-        if (!playlist.length) {
-          return { ok: false, message: 'Playlist가 비어있습니다! 추가 이후 재시도 해주세요!' };
-        }
-
-        const queuedTracks = playlist.map((track) => ({
-          encoded: track.encoded,
-          info: track.info || {},
-          requestedBy: userId,
-        }));
-
-        state.queue.push(...queuedTracks);
-        notifyMusicUpdate(guild.id, 'queue');
-        await playNext(guild.id);
-        return { ok: true, message: `총 ${queuedTracks.length} 개의 노래를 추가 했어요!` };
-      }
-      catch (err) {
-        logger.error('music', `Failed to queue playlist: ${err instanceof Error ? err.message : String(err)}`, { error: err });
-        return { ok: false, message: '찾을 수 없는 노래에요!' };
-      }
+      return { ok: true, message: '검색 결과가 없어요.' };
     }
 
     if (!state.current) {
