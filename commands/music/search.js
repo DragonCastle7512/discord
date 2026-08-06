@@ -36,7 +36,7 @@ module.exports = {
       .slice(0, RESULT_LIMIT);
 
     if (!tracks.length) {
-      await safeReply(interaction, { content: '검색 결과가 없어요.' });
+      await safeReply(interaction, { content: '검색 결과가 없어요!' });
       return { ok: false, tracks: [] };
     }
 
