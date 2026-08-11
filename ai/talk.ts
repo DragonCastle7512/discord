@@ -259,6 +259,10 @@ async function talk(message: Message, context: AppContext): Promise<RuntimeRespo
             const statusText = toolStatusMap[firstTool] || '잠시만 기다려주세요... ⏳';
             replyMsg = await safeReply(message, statusText, replyMsg);
 
+            if (response.candidates?.[0]?.content) {
+                contents.push(response.candidates[0].content);
+            }
+
             const toolParts = await Promise.all(response.functionCalls.map(async (fc) => {
                 logger.info('ai', `Tool called: ${fc.name}`, { args: fc.args });
                 if (!fc.name) {
