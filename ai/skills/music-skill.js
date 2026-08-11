@@ -362,10 +362,11 @@ module.exports = {
       }
 
       const result = await obj?.context?.music?.history(guildId);
+      const validItems = (result?.items || []).filter((track) => !(track?.musicInfo?.isSkipped));
       return {
         ok: true,
-        total: Number(result?.total || 0),
-        items: result.items.map((track, index) => ({
+        total: validItems.length,
+        items: validItems.map((track, index) => ({
           index: index + 1,
           title: track?.musicInfo?.info?.title || 'Unknown title',
           url: track?.musicInfo?.info?.uri || null,

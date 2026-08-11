@@ -128,7 +128,11 @@ export async function recommendFromHistory({
   pinnedKeywords = [],
 }: RecommendFromHistoryArgs): Promise<RecommendResult> {
   const normalizedCount = clampRecommendationCount(count);
-  const recentHistoryItems = (Array.isArray(historyItems) ? historyItems : []).slice(0, historyLimit);
+  const validHistoryItems = (Array.isArray(historyItems) ? historyItems : []).filter((entry) => {
+    const base = entry?.musicInfo || entry || {};
+    return !base.isSkipped;
+  });
+  const recentHistoryItems = validHistoryItems.slice(0, historyLimit);
 
   if (!recentHistoryItems.length) {
     return {

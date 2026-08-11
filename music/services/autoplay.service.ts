@@ -58,7 +58,8 @@ export function createAutoplayService(deps: AutoplayDeps) {
                 if (mood === '내 추천 곡') {
                     if (state.autoRequesterId) {
                         blacklistSet = await getUserBlacklist(state.autoRequesterId);
-                        historyItems = await findHistoryByRequester(guildId, state.autoRequesterId);
+                        const rawHistory = await findHistoryByRequester(guildId, state.autoRequesterId);
+                        historyItems = rawHistory.filter((entry: any) => !entry?.musicInfo?.isSkipped);
                     }
                     if (historyItems.length === 0) {
                         
@@ -72,7 +73,8 @@ export function createAutoplayService(deps: AutoplayDeps) {
                         return;
                     }
                 } else {
-                    historyItems = await findAllHistory(guildId);
+                    const rawHistory = await findAllHistory(guildId);
+                    historyItems = rawHistory.filter((entry: any) => !entry?.musicInfo?.isSkipped);
                     blacklistSet = await getBlacklistForGuild(guildId);
                 }
 
