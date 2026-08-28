@@ -42,12 +42,15 @@ export class VirtualGuildManager {
   private activeGuilds: Map<string, VirtualGuild> = new Map();
 
   createVirtualGuild(index: number): VirtualGuild {
-    const id = `mock-bench-guild-${index}`;
+    const id = String(990000000000000000n + BigInt(index));
+    const channelId = String(991000000000000000n + BigInt(index));
+    const voiceChannelId = String(992000000000000000n + BigInt(index));
+
     const guild: VirtualGuild = {
       id,
       name: `Mock Benchmark Guild ${index}`,
-      channelId: `mock-text-chan-${index}`,
-      voiceChannelId: `mock-voice-chan-${index}`,
+      channelId,
+      voiceChannelId,
     };
     this.activeGuilds.set(id, guild);
     return guild;

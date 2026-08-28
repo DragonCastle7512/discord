@@ -184,7 +184,8 @@ async function runStage(
             collector.recordDbLatency(Date.now() - startTime, false);
           });
       } catch (err: any) {
-        console.error(`가상 플레이어 ${guild.id} 생성 실패:`, err?.message || err);
+        const errorDetail = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message || String(err));
+        console.error(`가상 플레이어 ${guild.id} 생성 실패:`, errorDetail);
       }
     }
   }
