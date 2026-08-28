@@ -5,6 +5,7 @@ import { VirtualGuildManager } from './virtual-guild-manager';
 import { BenchmarkReporter } from './reporter';
 import { BenchmarkConfig, StageReport } from './types';
 import { insertHistory } from '../../music/repositorys/music-history.repository';
+import { initDb } from '../../db/init';
 
 const LAVALINK_HOST = process.env.LAVALINK_HOST || 'localhost';
 const LAVALINK_PORT = Number(process.env.LAVALINK_PORT || 2333);
@@ -48,6 +49,7 @@ let sessionId: string | null = null;
 let latestStats: any = null;
 let activePlayerGuildIds = new Set<string>();
 let isShuttingDown = false;
+let isDbReady = false;
 
 async function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -174,15 +176,25 @@ async function runStage(
         );
         activePlayerGuildIds.add(guild.id);
 
-        // DB 히스토리 삽입 부하 테스트 (선택적)
-        const startTime = Date.now();
-        insertHistory(guild.id, 'mock-bench-user', track.info.title, [track.info.author || 'Lofi'], 'scsearch:lofi')
-          .then(() => {
-            collector.recordDbLatency(Date.now() - startTime, true);
-          })
-          .catch(() => {
-            collector.recordDbLatency(Date.now() - startTime, false);
-          });
+        // DB 히스토리 삽입 부하 테스트 (DB 사용 가능한 경우에만)
+        if (isDbReady) {
+          const startTime = Date.now();
+          const mockTrack: any = {
+            title: track.info.title || 'Lofi Chill',
+            author: track.info.author || 'Lofi Artist',
+            url: track.info.uri || 'https://soundcloud.com',
+            thumbnail: '',
+            duration: track.info.length || 0,
+            requestedBy: 'mock-bench-user',
+          };
+          insertHistory(guild.id, mockTrack)
+            .then(() => {
+              collector.recordDbLatency(Date.now() - startTime, true);
+            })
+            .catch(() => {
+              collector.recordDbLatency(Date.now() - startTime, false);
+            });
+        }
       } catch (err: any) {
         const errorDetail = err?.response?.data ? JSON.stringify(err.response.data) : (err?.message || String(err));
         console.error(`가상 플레이어 ${guild.id} 생성 실패:`, errorDetail);
@@ -255,6 +267,16 @@ async function main() {
   process.on('SIGTERM', handleExit);
 
   try {
+    // 1. DB 초기화 시도
+    try {
+      await initDb();
+      isDbReady = true;
+      console.log('📦 [DB] 데이터베이스 연결 및 모델 초기화 완료');
+    } catch {
+      console.log('ℹ️ [DB] 데이터베이스 연결 생략 (Lavalink 및 봇 엔진 벤치마크 모드로 진행)');
+    }
+
+    // 2. Lavalink WebSocket 연결 및 트랙 로드
     await setupLavalinkWs();
     const track = await loadTestTrack();
 
