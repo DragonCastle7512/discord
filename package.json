@@ -8,6 +8,7 @@
     "deploy": "tsx --env-file=.env deploy-commands.js",
     "backfill:history-tags": "node --env-file=.env scripts/backfill-history-tags.js",
     "backfill:remove-youtube-tag": "node --env-file=.env scripts/backfill-remove-youtube-tag.js",
+    "benchmark": "tsx --env-file=.env scripts/benchmark/index.ts",
     "test": "tsx --env-file=.env --test \"tests/**/*.test.ts\""
   },
   "author": "",
