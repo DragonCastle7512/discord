@@ -33,8 +33,25 @@ export interface DbMetrics {
   failedInserts: number;
 }
 
+export interface StartupMetrics {
+  targetPlayers: number;
+  previousPlayers: number;
+  requestedPlayers: number;
+  successfulPlayers: number;
+  failedPlayers: number;
+  failureRate: number; // 0.0 ~ 1.0
+  startupDurationMs: number;
+  createLatencyMeanMs: number;
+  createLatencyP95Ms: number;
+  createLatencyMaxMs: number;
+  sessionPlayers: number;
+  lavalinkPlayingPlayers: number;
+  targetReached: boolean;
+}
+
 export interface StageReport {
   stage: BenchmarkStage;
+  startup?: StartupMetrics;
   lavalink: LavalinkMetrics;
   node: NodeMetrics;
   db: DbMetrics;
@@ -48,11 +65,15 @@ export interface CircuitBreakerThresholds {
   maxEventLoopLagMs: number; // default: 150 (ms)
   maxHeapMb: number;         // default: 1500 (MB)
   maxDbFailures: number;     // default: 3
+  maxStartupFailureRate?: number; // default: 0.02 (2%)
+  minPlayingPlayersRatio?: number; // default: 0.98 (98%)
 }
 
 export interface BenchmarkConfig {
   stages: BenchmarkStage[];
   cooldownSeconds: number;
+  startupConcurrency?: number;
+  statsFreshnessMs?: number;
   thresholds: CircuitBreakerThresholds;
   targetSpecs: {
     ocpu: number;

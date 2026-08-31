@@ -1,4 +1,4 @@
-import { CircuitBreakerThresholds, LavalinkMetrics, NodeMetrics, DbMetrics } from './types';
+import { CircuitBreakerThresholds, LavalinkMetrics, NodeMetrics, DbMetrics, StartupMetrics } from './types';
 
 export interface EvaluationResult {
   shouldAbort: boolean;
@@ -8,7 +8,26 @@ export interface EvaluationResult {
 export class CircuitBreaker {
   constructor(private thresholds: CircuitBreakerThresholds) {}
 
-  evaluate(lavalink: LavalinkMetrics, node: NodeMetrics, db: DbMetrics): EvaluationResult {
+  evaluate(lavalink: LavalinkMetrics, node: NodeMetrics, db: DbMetrics, startup?: StartupMetrics): EvaluationResult {
+    if (startup) {
+      const maxStartupFailureRate = this.thresholds.maxStartupFailureRate ?? 0.02;
+      if (startup.failureRate >= maxStartupFailureRate) {
+        return {
+          shouldAbort: true,
+          reason: `동시 재생 시작 실패율 한계치 도달 (${(startup.failureRate * 100).toFixed(1)}% >= ${(maxStartupFailureRate * 100).toFixed(1)}%)`,
+        };
+      }
+
+      const minPlayingPlayersRatio = this.thresholds.minPlayingPlayersRatio ?? 0.98;
+      const sessionRatio = startup.targetPlayers > 0 ? startup.sessionPlayers / startup.targetPlayers : 1;
+      if (sessionRatio < minPlayingPlayersRatio) {
+        return {
+          shouldAbort: true,
+          reason: `Lavalink session player 목표 미달 (${startup.sessionPlayers}/${startup.targetPlayers}, ${(sessionRatio * 100).toFixed(1)}% < ${(minPlayingPlayersRatio * 100).toFixed(1)}%)`,
+        };
+      }
+    }
+
     // 1. CPU 검사
     const maxCpu = Math.max(lavalink.lavalinkLoad || 0, lavalink.systemLoad || 0);
     if (maxCpu >= this.thresholds.maxCpuRate) {
